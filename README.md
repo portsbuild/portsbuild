@@ -71,7 +71,7 @@ PortsBuild will NOT support:
 
 ## Future Plans
 * CustomBuild to PortsBuild conversion guide
-* DirectAdmin UI Plugin for PortsBuild similarly to [CustomBuild](http://forum.directadmin.com/showthread.php?t=48989)
+* DirectAdmin UI Plugin for PortsBuild similarly to [CustomBuild's plugin](http://forum.directadmin.com/showthread.php?t=48989)
 * Failover (CARP+HAST) configurations
 * Load-Balancing between multiple servers
 * Best Practices Guide (Infrastructure, Design, Implementation, Maintenance)
