@@ -13,24 +13,25 @@ Support for various software stacks will be added in the following priorities:
 
 Phase 1
 * Apache 2.4.x
-* php5-fpm 5.4.x
+* php5-fpm 5.4.x/5.5.x
 * MySQL/MariaDB 5.5.x
 * Dovecot 2.2.x
 * Exim 4.80+
-* phpMyAdmin 4.x
+* phpMyAdmin 4.2.x
 * pure-FTPd
-* ClamAV
-* SpamAssassin
-* curl
-* RoundCube
+* ClamAV 0.98+
+* SpamAssassin 3.4.0
+* curl 7.38+
+* RoundCube 1.x
 
 
 Phase 2
 * nginx
 * PigeonHole
 * Mailman
-* SpamBlocker 4.x integration by NoBaloney
+* SpamBlocker 4.2.x integration by NoBaloney
 * proftpd
+* MariaDB 10.x
 
 
 Phase 3
@@ -39,16 +40,16 @@ Phase 3
 
 
 Phase 4 (no ports found / research req. / untested)
-* ZendOptimizer
-* ZendOpCache
-* suhosin patch
-* suphp support
+* ZendOptimizer (unknown)
+* ZendOpCache (works on 8.3-amd64)
+* suhosin patch (untested)
+* suphp support (works / redundant vs. fpm?)
 * mod_ruid2 (untested)
 * ionCube loaders (third-party / loadable modules)
 
 
 PortsBuild will NOT support:
-* SquirrelMail - last release in 2011
+* SquirrelMail - last release in 2011, however a fork exists in CB2 (1.4.22-20140402_0200)
 
 
 ### Supported Operating Systems (planned)
@@ -60,7 +61,9 @@ PortsBuild will NOT support:
 * ports-mgmt/pkg
 * ports-mgmt/portmaster
 * shells/bash
-* [...] 
+* lang/perl5.16
+* ftp/wget
+* [...]
 
 
 ### Additional documentation to add
@@ -76,3 +79,9 @@ PortsBuild will NOT support:
 * Load-Balancing between multiple servers
 * Best Practices Guide (Infrastructure, Design, Implementation, Maintenance)
 * Additional solutions and topics to discuss: pfSense, ZFS, FreeNAS, ESXi, hardware
+
+
+### Copyrights (more to be added)
+Portions of this file include references from third-party authors and companies not affiliated with Sarotech or the PortsBuild project.
+* DirectAdmin Copyright (C) 2003-2011 JBMC Software, St Albert, AB, Canada: http://www.directadmin.com
+* SpamBlockerTechnology is a Trademark of NoBaloney Internet Services: http://www.nobaloney.net
