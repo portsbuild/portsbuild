@@ -12,26 +12,26 @@ Automation and Integration is achieved by using simple shell scripts in true ope
 Support for various software stacks will be added in the following priorities:
 
 Phase 1
-* Apache 2.4.x
-* php5-fpm 5.4.x/5.5.x
-* MySQL/MariaDB 5.5.x
-* Dovecot 2.2.x
-* Exim 4.80+
-* phpMyAdmin 4.2.x
+* Apache 2.4
+* php5-fpm 5.4/5.5
+* MySQL/MariaDB 5.5
+* Dovecot 2.2
+* Exim 4.8
+* phpMyAdmin 4
 * pure-FTPd
-* ClamAV 0.98+
-* SpamAssassin 3.4.0
-* curl 7.38+
-* RoundCube 1.x
+* ClamAV
+* SpamAssassin 3.4
+* curl
+* RoundCube
 
 
 Phase 2
 * nginx
 * PigeonHole
 * Mailman
-* SpamBlocker 4.2.x integration by NoBaloney
+* SpamBlocker 4.3.x integration by NoBaloney
 * proftpd
-* MariaDB 10.x
+* MariaDB 10
 
 
 Phase 3
@@ -52,18 +52,35 @@ PortsBuild will NOT support:
 * SquirrelMail - last release in 2011, however a fork exists in CB2 (1.4.22-20140402_0200)
 
 
-### Supported Operating Systems (planned)
-* FreeBSD 9.x x64
-* FreebSD 10.x x64
+### Supported Operating Systems
+* FreeBSD 10.1 x64 (primary focus)
+* FreeBSD 9.3 x64
 
 
 ### Initial Build Environment Requirements
 * ports-mgmt/pkg
 * ports-mgmt/portmaster
 * shells/bash
-* lang/perl5.16
+* lang/perl5.18
 * ftp/wget
-* [...]
+* devel/autoconf
+* devel/automake
+* devel/libtool
+* lang/pyton27
+* lang/python
+* ftp/curl
+* devel/gettext
+* lang/gcc
+* dns/bind910
+* converters/libiconv
+* graphics/gd
+* graphics/png
+* graphics/jpeg
+* graphic/tiff
+* textproc/libxslt
+* devel/gmake
+* security/cyrus-sasl2
+* textproc/libxml2
 
 
 ### Additional documentation to add
@@ -82,6 +99,6 @@ PortsBuild will NOT support:
 
 
 ### Copyrights (more to be added)
-Portions of this file include references from third-party authors and companies not affiliated with Sarotech or the PortsBuild project.
+Portions of this file include references from third-party authors and companies not affiliated with the author or the PortsBuild project.
 * DirectAdmin Copyright (C) 2003-2011 JBMC Software, St Albert, AB, Canada: http://www.directadmin.com
 * SpamBlockerTechnology is a Trademark of NoBaloney Internet Services: http://www.nobaloney.net
