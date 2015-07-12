@@ -4,8 +4,9 @@
 ## Introduction
 PortsBuild is an alternative to [DirectAdmin](http://www.directadmin.com)'s [CustomBuild](http://forum.directadmin.com/showthread.php?t=44743) for [FreeBSD](http://www.freebsd.org) installations using [Ports](http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/ports-overview.html) (and Packages) to improve the relationship between two fantastic systems.
 
-Automation and Integration is achieved by using simple shell scripts in true open-source fashion.
+Automation and Integration is achieved by using simple shell scripts, along with recommended practices according to the FreeBSD Handbook.  PortsBuild will use a combination of ports (using portmaster), packages (via pkg) and a slew of port option knobs (injected into /etc/make.conf) to install the necessary services on a FreeBSD system.
 
+The source code for this project will be open source. A distribution & copyright license has not been chosen yet at this time.
 
 ### Supported Software Stacks (planned)
 
