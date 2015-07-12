@@ -13,8 +13,8 @@ Support for various software stacks will be added in the following priorities:
 
 Phase 1
 * Apache 2.4
-* php5-fpm 5.4/5.5
-* MySQL/MariaDB 5.5
+* php5-fpm 5.4/5.5/5.6
+* MySQL/MariaDB 5.5/5.6
 * Dovecot 2.2
 * Exim 4.8
 * phpMyAdmin 4
@@ -41,8 +41,8 @@ Phase 3
 
 Phase 4 (no ports found / research req. / untested)
 * ZendOptimizer (unknown)
-* ZendOpCache (works on 8.3-amd64)
-* suhosin patch (untested)
+* ZendOpCache (works on 8.3-amd64) or php56-opcache?
+* suhosin patch (untested) php56-suhosin?
 * suphp support (works / redundant vs. fpm?)
 * mod_ruid2 (untested)
 * ionCube loaders (third-party / loadable modules)
@@ -61,7 +61,7 @@ PortsBuild will NOT support:
 * ports-mgmt/pkg
 * ports-mgmt/portmaster
 * shells/bash
-* lang/perl5.18
+* lang/perl5.20
 * ftp/wget
 * devel/autoconf
 * devel/automake
@@ -70,7 +70,7 @@ PortsBuild will NOT support:
 * lang/python
 * ftp/curl
 * devel/gettext
-* lang/gcc
+* lang/gcc (lang/gcc48)
 * dns/bind910
 * converters/libiconv
 * graphics/gd
@@ -90,11 +90,12 @@ PortsBuild will NOT support:
 
 
 ## Future Plans
+* Poudriere package building system integration (and hosting too)
 * CustomBuild to PortsBuild conversion guide
 * DirectAdmin UI Plugin for PortsBuild similarly to [CustomBuild's plugin](http://forum.directadmin.com/showthread.php?t=48989)
 * Failover (CARP+HAST) configurations
 * Load-Balancing between multiple servers
-* Best Practices Guide (Infrastructure, Design, Implementation, Maintenance)
+* Best Practices Guide (Infrastructure, Design, Implementation, Maintenance, Security, Updates, Upgrades)
 * Additional solutions and topics to discuss: pfSense, ZFS, FreeNAS, ESXi, hardware
 
 
