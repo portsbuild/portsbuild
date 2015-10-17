@@ -14,7 +14,7 @@ Support for various software stacks will be added in the following priorities:
 
 Phase 1
 * Apache 2.4
-* php5-fpm 5.4/5.5/5.6
+* php5-fpm 5.5/5.6
 * MySQL/MariaDB 5.5/5.6
 * Dovecot 2.2
 * Exim 4.8
@@ -24,6 +24,7 @@ Phase 1
 * SpamAssassin 3.4
 * curl
 * RoundCube
+* Majordomo
 
 
 Phase 2
