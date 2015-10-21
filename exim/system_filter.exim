@@ -1,0 +1,268 @@
+# Exim filter
+## Version: 0.17e
+#	$Id: system_filter.exim,v 1.11 2001/09/19 11:27:56 nigel Exp $
+
+## Exim system filter to refuse potentially harmful payloads in
+## mail messages
+## (c) 2000-2001 Nigel Metheringham <nigel@exim.org>
+##
+##     This program is free software; you can redistribute it and/or modify
+##    it under the terms of the GNU General Public License as published by
+##    the Free Software Foundation; either version 2 of the License, or
+##    (at your option) any later version.
+##
+##    This program is distributed in the hope that it will be useful,
+##    but WITHOUT ANY WARRANTY; without even the implied warranty of
+##    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##    GNU General Public License for more details.
+##
+##    You should have received a copy of the GNU General Public License
+##    along with this program; if not, write to the Free Software
+##    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+## -A copy of the GNU General Public License is distributed with exim itself
+
+## -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+## If you haven't worked with exim filters before, read
+## the install notes at the end of this file.
+## The install notes are not a replacement for the exim documentation
+## -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+## -----------------------------------------------------------------------
+# Only run any of this stuff on the first pass through the
+# filter - this is an optomisation for messages that get
+# queued and have several delivery attempts
+#
+# we express this in reverse so we can just bail out
+# on inappropriate messages
+#
+if not first_delivery
+then
+  finish
+endif
+
+## -----------------------------------------------------------------------
+# Check for MS buffer overruns as per BUGTRAQ.
+# http://www.securityfocus.com/frames/?content=/templates/article.html%3Fid%3D61
+# This could happen in error messages, hence its placing
+# here...
+# We substract the first n characters of the date header
+# and test if its the same as the date header... which
+# is a lousy way of checking if the date is longer than
+# n chars long
+if ${length_80:$header_date:} is not $header_date:
+then
+  seen finish
+endif
+
+## -----------------------------------------------------------------------
+# These messages are now being sent with a <> envelope sender, but
+# blocking all error messages that pattern match prevents
+# bounces getting back.... so we fudge it somewhat and check for known
+# header signatures.  Other bounces are allowed through.
+if $header_from: contains "@sexyfun.net"
+then
+  seen finish
+endif
+if error_message and $header_from: contains "Mailer-Daemon@"
+then
+  # looks like a real error message - just ignore it
+  finish
+endif
+
+## -----------------------------------------------------------------------
+# Look for single part MIME messages with suspicious name extensions
+# Check Content-Type header using quoted filename [content_type_quoted_fn_match]
+if $header_content-type: matches "(?:file)?name=\"([^\"]+\\\\.(?:ad[ep]|ba[st]|chm|cmd|com|cpl|crt|eml|exe|hlp|hta|in[fs]|isp|jse?|lnk|md[be]|ms[cipt]|pcd|pif|reg|sc[mrt]|shs|url|vb[se]?|ws[fhc]))\""
+then
+  seen finish
+endif
+# same again using unquoted filename [content_type_unquoted_fn_match]
+if $header_content-type: matches "(?:file)?name=(\\\\S+\\\\.(?:ad[ep]|ba[st]|chm|cmd|com|cpl|crt|eml|exe|hlp|hta|in[fs]|isp|jse?|lnk|md[be]|ms[cipt]|pcd|pif|reg|sc[mrt]|shs|url|vb[se]?|ws[fhc]))"
+then
+  seen finish
+endif
+
+
+## -----------------------------------------------------------------------
+# Attempt to catch embedded VBS attachments
+# in emails.   These were used as the basis for 
+# the ILOVEYOU virus and its variants - many many varients
+# Quoted filename - [body_quoted_fn_match]
+if $message_body matches "(?:Content-(?:Type:(?>\\\\s*)[\\\\w-]+/[\\\\w-]+|Disposition:(?>\\\\s*)attachment);(?>\\\\s*)(?:file)?name=|begin(?>\\\\s+)[0-7]{3,4}(?>\\\\s+))\"([^\"]+\\\\.(?:ad[ep]|ba[st]|chm|cmd|com|cpl|crt|eml|exe|hlp|hta|in[fs]|isp|jse?|lnk|md[be]|ms[cipt]|pcd|pif|reg|sc[mrt]|shs|url|vb[se]?|ws[fhc]))\"[\\\\s;]"
+then
+  seen finish
+endif
+# same again using unquoted filename [body_unquoted_fn_match]
+if $message_body matches "(?:Content-(?:Type:(?>\\\\s*)[\\\\w-]+/[\\\\w-]+|Disposition:(?>\\\\s*)attachment);(?>\\\\s*)(?:file)?name=|begin(?>\\\\s+)[0-7]{3,4}(?>\\\\s+))(\\\\S+\\\\.(?:ad[ep]|ba[st]|chm|cmd|com|cpl|crt|eml|exe|hlp|hta|in[fs]|isp|jse?|lnk|md[be]|ms[cipt]|pcd|pif|reg|sc[mrt]|shs|url|vb[se]?|ws[fhc]))[\\\\s;]"
+then
+  seen finish
+endif
+## -----------------------------------------------------------------------
+
+# Fudge to catch Klez virus (mal formed mime details, unquoted filename with spaces)
+if $message_body matches "Content-Type:(?>\\\\s*)[\\\\w-]+/[\\\\w-]+;\\\\s*(?:name)=([^\" ]+ [^\"]*\\\\.(?:ad[ep]|ba[st]|chm|cmd|com|cpl|crt|eml|exe|hlp|hta|in[fs]|isp|jse?|lnk|md[be]|ms[cipt]|pcd|pif|reg|sc[mrt]|shs|url|vb[se]?|ws[fhc]))[\\\\s;]"
+then
+  seen finish
+endif
+
+
+## -----------------------------------------------------------------------
+
+
+#### Version history
+#
+# 0.01 5 May 2000
+#	Initial release
+# 0.02 8 May 2000
+#	Widened list of content-types accepted, added WSF extension
+# 0.03 8 May 2000
+#	Embedded the install notes in for those that don't do manuals
+# 0.04 9 May 2000
+#	Check global content-type header.  Efficiency mods to REs
+# 0.05 9 May 2000
+#	More minor efficiency mods, doc changes
+# 0.06 20 June 2000
+#	Added extension handling - thx to Douglas Gray Stephens & Jeff Carnahan
+# 0.07 19 July 2000
+#	Latest MS Outhouse bug catching
+# 0.08 19 July 2000
+#	Changed trigger length to 80 chars, fixed some spelling
+# 0.09 29 September 2000
+#	More extensions... its getting so we should just allow 2 or 3 through
+# 0.10 18 January 2001
+#	Removed exclusion for error messages - this is a little nasty
+#	since it has other side effects, hence we do still exclude
+#	on unix like error messages
+# 0.11 20 March, 2001
+#	Added CMD extension, tidied docs slightly, added RCS tag
+#	** Missed changing version number at top of file :-(
+# 0.12 10 May, 2001
+#	Added HTA extension
+# 0.13 22 May, 2001
+#	Reformatted regexps and code to build them so that they are
+#	shorter than the limits on pre exim 3.20 filters.  This will
+#	make them significantly less efficient, but I am getting so
+#	many queries about this that requiring 3.2x appears unsupportable.
+# 0.14 15 August,2001
+#	Added .lnk extension - most requested item :-)
+#	Reformatted everything so its now built from a set of short
+#	library files, cutting down on manual duplication.
+#	Changed \w in filename detection to . - dodges locale problems
+#	Explicit application of GPL after queries on license status
+# 0.15 17 August, 2001
+#	Changed the . in filename detect to \S (stops it going mad)
+# 0.16 19 September, 2001
+#	Pile of new extensions including the eml in current use
+# 0.17 19 September, 2001
+#	Syntax fix
+# 0.17a Thu 21-Feb-2002; Douglas Gray Stephens
+#        Modify for SLB (adding null return path test)
+# 0.17b Wed 01-May-2002; Douglas Gray Stephens
+#        Block mal formed mime messages that have a space in the name
+# 0.17c Wed 15-May-2002; Douglas Gray Stephens
+#        Block mal formed mime messages that have a space and period 
+#        in the name.
+#	 Also block .vb extensions
+# 0.17d Thu 16-May-2002; Douglas Gray Stephens
+#        Update the notes as Exim 4 uses system_filter_* rather 
+#        than message_filter_* 
+#        (after feedback from  David Broome <dbroome@finearts.uvic.ca>)
+# 0.17e Fri 19-Jul-2002; Douglas Gray Stephens
+#        Block SCM (ScreenCam Movie) files
+
+#
+#### Install Notes
+#
+# Exim filters run the exim filter language - a very primitive
+# scripting language - in place of a user .forward file, or on
+# a per system basis (on all messages passing through).
+# The filtering capability is documented in the main set of manuals
+# a copy of which can be found on the exim web site
+#	http://www.exim.org/
+#
+# To install, copy the filter file (with appropriate permissions)
+# to /etc/exim/system_filter.exim and add to your exim config file
+# [location is installation depedant - typicaly /etc/exim/config ]
+# in the first section the line:-
+#   Exim 3
+#	message_filter = /etc/exim/system_filter.exim
+#	message_body_visible = 5000
+#   Exim 4
+#	system_filter = /etc/exim/system_filter.exim
+#	message_body_visible = 5000
+#
+# You may also want to set the message_filter_user & message_filter_group
+# (in Exim 4 these are system_filter_user & system_filter_group)
+# options, but they default to the standard exim user and so can
+# be left untouched.  The other message_filter_* (or system_filter_*
+# for Exim 4) options are only needed if you modify this to do other
+# functions such as deliveries. 
+# The main exim documentation is quite thorough and so I see no need
+# to expand it here...
+#
+# Any message that matches the filter will then be bounced.
+# If you wish you can change the error message by editing it
+# in the section above - however be careful you don't break it.
+#
+# After install exim should be restarted - a kill -HUP to the
+# daemon will do this.
+#
+#### LIMITATIONS
+#
+# This filter tries to parse MIME with a regexp... that doesn't
+# work too well.  It will also only see the amount of the body
+# specified in message_body_visible
+#
+#### BASIS
+#
+# The regexp that is used to pickup MIME/uuencoded body parts with
+# quoted filenames is replicated below (in perl format).  
+# You need to remember that exim converts newlines to spaces in
+# the message_body variable.
+#
+#	  (?:Content-					# start of content header
+#	  (?:Type: (?>\s*)				# rest of c/t header
+#	    [\w-]+/[\w-]+				# content-type (any)
+#	    |Disposition: (?>\s*)			# content-disposition hdr
+#	    attachment)					# content-disposition
+#	  ;(?>\s*)					# ; space or newline
+#	  (?:file)?name=				# filename=/name= 
+#	  |begin (?>\s+) [0-7]{3,4} (?>\s+)) 		# begin octal-mode
+#	  (\"[^\"]+\.					# quoted filename.
+#		(?:ad[ep]				# list of extns
+#		|ba[st]
+#		|chm
+#		|cmd
+#		|com
+#		|cpl
+#		|crt
+#		|eml
+#		|exe
+#		|hlp
+#		|hta
+#		|in[fs]
+#		|isp
+#		|jse?
+#		|lnk
+#		|md[be]
+#		|ms[cipt]
+#		|pcd
+#		|pif
+#		|reg
+#		|scm
+#		|scr
+#		|sct
+#		|shs
+#		|url
+#		|vb[se]?
+#		|ws[fhc])
+#	  \"						# end quote
+#	  )						# end of filename capture
+#	  [\s;]						# trailing ;/space/newline
+
+#
+#
+### [End]
+
+
