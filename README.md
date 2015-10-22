@@ -13,41 +13,51 @@ The source code for this project will be open source. A distribution & copyright
 Support for various software stacks will be added in the following priorities:
 
 Phase 1
-* Apache 2.4
-* php5-fpm 5.5/5.6
-* MySQL/MariaDB 5.5/5.6
-* Dovecot 2.2
-* Exim 4.8
-* phpMyAdmin 4
-* pure-FTPd
-* ClamAV
-* SpamAssassin 3.4
-* curl
-* RoundCube
-* Majordomo
+
+Service 		| Status
+--------------- | ---------------
+Apache 2.4.17 | Supported
+php5-fpm 5.5 | 
+php5-fpm 5.6 | Supported
+MariaDB 5.5 | Supported
+MariaDB 10.0 | 
+MySQL 5.5 | 
+MySQL 5.6 | 
+Dovecot 2.2.x | Supported
+Exim 4.8x | Supported
+SpamBlocker 4.3.x | Supported
+phpMyAdmin 4.5.x | Supported
+ClamAV | Supported
+SpamAssassin 3.4 | Supported
+curl | Supported
+RoundCube 1.1.3+ | In progress
+Majordomo (src) | Supported
+ionCube loaders | Supported
+proftpd | Supported
+pure-FTPd | Supported
+sysbk | installed with DirectAdmin
 
 
 Phase 2
-* nginx
-* PigeonHole
-* Mailman
-* SpamBlocker 4.3.x integration by NoBaloney
-* proftpd
-* MariaDB 10
+
+Service 		| Status
+--------------- | ---------------
+nginx 1.8+ | 
+PigeonHole | 
+AwStats | www/awstats
+Webalizer | www/webalizer
+Mailman | mail/mailman
 
 
-Phase 3
-* AwStats
-* Webalizer
+Untested
 
-
-Phase 4 (no ports found / research req. / untested)
-* ZendOptimizer (unknown)
-* ZendOpCache (works on 8.3-amd64) or php56-opcache?
-* suhosin patch (untested) php56-suhosin?
-* suphp support (works / redundant vs. fpm?)
-* mod_ruid2 (untested)
-* ionCube loaders (third-party / loadable modules)
+Service 		| Status
+--------------- | ---------------
+ZendOptimizer | unknown
+ZendOpCache | php56-opcache?
+suhosin patch | untested; php56-suhosin?
+suphp | redundant vs. fpm?
+mod_ruid2 | not supported?
 
 
 PortsBuild will NOT support:
@@ -55,13 +65,14 @@ PortsBuild will NOT support:
 
 
 ### Supported Operating Systems
-* FreeBSD 10.1 x64 (primary focus)
+* FreeBSD 10.2 x64 (primary focus)
 * FreeBSD 9.3 x64
 
 
 ### Initial Build Environment Requirements
 * ports-mgmt/pkg
 * ports-mgmt/portmaster
+* ports-mgmt/portconf
 * shells/bash
 * lang/perl5.20
 * ftp/wget
@@ -73,7 +84,7 @@ PortsBuild will NOT support:
 * ftp/curl
 * devel/gettext
 * lang/gcc (lang/gcc48)
-* dns/bind910
+* dns/bind910 (for 10.1/10.2)
 * converters/libiconv
 * graphics/gd
 * graphics/png
@@ -98,10 +109,11 @@ PortsBuild will NOT support:
 * Failover (CARP+HAST) configurations
 * Load-Balancing between multiple servers
 * Best Practices Guide (Infrastructure, Design, Implementation, Maintenance, Security, Updates, Upgrades)
-* Additional solutions and topics to discuss: pfSense, ZFS, FreeNAS, ESXi, hardware
+* Additional solutions and topics to discuss: pfSense, ZFS, FreeNAS, Nas4Free, ESXi, hardware
 
 
 ### Copyrights (more to be added)
 Portions of this file include references from third-party authors and companies not affiliated with the author or the PortsBuild project.
-* DirectAdmin Copyright (C) 2003-2011 JBMC Software, St Albert, AB, Canada: http://www.directadmin.com
+* DirectAdmin Copyright (C) 2003-2015 JBMC Software, St. Albert, AB, Canada: http://www.directadmin.com
+* CustomBuild is written by DirectAdmin and Martynas Bendorius (smtalk)
 * SpamBlockerTechnology is a Trademark of NoBaloney Internet Services: http://www.nobaloney.net
