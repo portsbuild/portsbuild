@@ -35,7 +35,7 @@ Majordomo (src) | Supported
 ionCube loaders | Supported
 proftpd | Supported
 pure-FTPd | Supported
-sysbk | installed with DirectAdmin
+sysbk | Installed with DirectAdmin
 
 
 Phase 2
@@ -66,7 +66,7 @@ PortsBuild will NOT support:
 
 ### Supported Operating Systems
 * FreeBSD 10.2 x64 (primary focus)
-* FreeBSD 9.3 x64
+* FreeBSD 9.3 x64 (working)
 
 
 ### Initial Build Environment Requirements
@@ -94,6 +94,12 @@ PortsBuild will NOT support:
 * devel/gmake
 * security/cyrus-sasl2
 * textproc/libxml2
+
+
+### Current Known Limitations
+* BIND (named) does not restart after adding a domain on 9.3 due to startup script location in /etc/rc.d/ instead of /usr/local/etc/rc.d/ (DirectAdmin limitation)
+* PHP-FPM does not restart after adding a user due to startup script being called "php-fpm" instead of "php-fpmXX" (XX= 55, 56, etc.) (DirectAdmin limitation)
+* Only one instance of PHP can be installed (afaik). Multiple PHP versions may be possible, but requires testing.
 
 
 ### Additional documentation to add
