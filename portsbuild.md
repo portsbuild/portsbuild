@@ -146,9 +146,11 @@ Update the ports tree and the packages repo:
 The following is the bare minimum required to get started (according to DirectAdmin's installation guide). Additional packages (about 33 in total) will also be installed when the following full command is executed.
 
 FreeBSD 10.2 users:
+
 	pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx textproc/libxml2 dns/bind99
 
 FreeBSD 9.3 users:
+
 	pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx textproc/libxml2
 
 
