@@ -393,7 +393,9 @@ Now it's time to customize `make.conf` and adjust it according to your needs. Th
 	# graphics_gd_SET=
     # graphics_gd_UNSET= FONTCONFIG
 
+Reference:
 
+    [CATEGORY]_[PORT]_[SET|UNSET]=OPTION1 OPTION2 ...
 
 ### Prepare DirectAdmin Directories
 
@@ -1728,37 +1730,6 @@ Install via ports:
 
 	portmaster -d mail/dovecot2
 
-    # Configuration Options
-    # ===> The following configuration options are available for dovecot2-2.2.19:
-    #      DOCS=on: Build and/or install documentation
-    #      EXAMPLES=on: Build and/or install examples
-    #      GC=off: Garbage collection with boehm-gc
-    #      KQUEUE=on: kqueue(2) support
-    #      LIBWRAP=off: TCP wrapper support
-    #      LZ4=off: LZ4 compression support
-    #      SSL=on: SSL protocol support
-    #      VPOPMAIL=off: vpopmail support
-    # ====> Database support
-    #      CDB=off: CDB database support
-    #      LDAP=off: LDAP protocol support
-    #      MYSQL=off: MySQL database support
-    #      PGSQL=off: PostgreSQL database support
-    #      SQLITE=off: SQLite database support
-    # ====> Full text search plugins
-    #      ICU=off: Use libicu for FTS unicode normalization
-    #      LUCENE=off: CLucene FTS support
-    #      SOLR=off: Solr FTS support
-    #      TEXTCAT=off: Libtextcat FTS support
-    # ====> GSSAPI Security API support: you have to select exactly one of them
-    #      GSSAPI_NONE=on: Build without GSSAPI support
-    #      GSSAPI_BASE=off: Use GSSAPI from base
-    #      GSSAPI_HEIMDAL=off: Use Heimdal GSSAPI from security/heimdal
-    #      GSSAPI_MIT=off: Use MIT GSSAPI from security/krb5
-    # ===> Use 'make config' to modify these settings
-
-Reference:
-[CATEGORY]_[PORT]_[SET|UNSET]=OPTION1 OPTION2 ...
-
 
 Configuration files path: /usr/local/etc/dovecot
 
@@ -2009,27 +1980,6 @@ Install via packages:
 Install via ports:
 
 	portmaster -d mail/spamassassin
-
-    # ===> The following configuration options are available for spamassassin-3.4.1_4:
-    #      AS_ROOT=on: Run spamd as root (recommended)
-    #      SSL=on: Build spamd/spamc with SSL support
-    #      UPDATE_AND_COMPILE=on: Download and compile rulesets (recommended)
-    # ====> Optional user-config/bayes database backends
-    #      MYSQL=off: MySQL database support
-    #      PGSQL=off: PostgreSQL database support
-    # ====> Optional SpamAssassin plugins
-    #      DCC=off: DCC digest list support (mail/dcc-dccd)
-    #      DKIM=off: Verify DKIM records (mail/p5-Mail-DKIM)
-    #      PYZOR=off: Pyzor digest list support (mail/pyzor)
-    #      RAZOR=off: Vipul's Razor digest list support (mail/razor-agents)
-    #      RELAY_COUNTRY=off: Location-based scoring (net/p5-Geo-IP)
-    #      SPF_QUERY=off: Verify SPF records (mail/p5-Mail-SPF)
-    # ====> GnuPG (for sa-update, optional): you have to select exactly one of them
-    #      GNUPG_NONE=off: Do not use GnuPG
-    #      GNUPG=on: GnuPG 1 (security/gnupg1)
-    #      GNUPG2=off: GnuPG 2 (security/gnupg)
-
-
 
 Install SpamAssassin Utilities (recommended):
 
