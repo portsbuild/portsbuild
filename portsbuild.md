@@ -260,18 +260,18 @@ Update `sysctl` now to avoid having to reboot the system:
 
 This is where the magic happens. Think of `make.conf` as the equivalent to CB's `options.conf`, where you essentially set the versions and options you wish to have installed on your system.
 
-First let's create the file:
+First, let's create the file:
 
 	touch /etc/make.conf
 
-Now it's time to customize `make.conf` and adjust it according to your needs. The example file below shows how you pre-define port options and essentially creates a "statically" configured system. The default options below are similar to how DirectAdmin initially sets up a new system (Apache, PHP, Exim, Dovecot). If you want to know what options are available to you for a particular port, please see the particular section in this guide (TBD).
+Now it's time to customize `make.conf` and adjust it according to your needs. The example file below shows how you pre-define port options and essentially create a "statically" configured system. The default options below are similar to how DirectAdmin initially sets up a new system (Apache, PHP, Exim, Dovecot). If you want to know what options are available to you for a particular port, please see the particular section in this guide (TBD).
 
 	## Set default versions
 	#DEFAULT_VERSIONS= php=5.6 mysql=5.6 apache=2.4 perl=5.20
 
 	## PB: Global Port Options
 	## Prevent the installation of DOCS, HTMLDOCS, EXAMPLES, NLS and X11 stuff.
-    OPTIONS_UNSET= DOCS HTMLDOCS EXAMPLES HTMLDOCS NLS X11
+    OPTIONS_UNSET= DOCS HTMLDOCS EXAMPLES HTMLDOCS NLS X11 TESTS DEBUG GUI
 
     ## PB: Apache 2.4 Options
     www_apache24_SET= SUEXEC MPM_EVENT
@@ -475,7 +475,7 @@ FreeBSD 10.2 with BIND 9.9.5 from ports:
 
 FreeBSD 9.3 with BIND 9.9.5 from base:
 
-	wget --no-check-certificate -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named9.conf
+	wget --no-check-certificate -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named9.conf
 
 
 ### MOVE THIS: DirectAdmin Installation
