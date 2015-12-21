@@ -503,15 +503,15 @@ Create the DirectAdmin directory:
 
 Download DirectAdmin
 
-Regular way (replace YOURIPADDRESS, USERID, and LICENSEID):
+Regular way (replace SERVER_IP_ADDRESS, USER_ID, and LICENSE_ID):
 
-	wget --no-check-certificate -S -O /usr/local/directadmin/update.tar.gz --bind-address=YOURIPADDRESS "https://www.directadmin.com/cgi-bin/daupdate?uid=USERID&lid=LICENSEID"
+	wget --no-check-certificate -S -O /usr/local/directadmin/update.tar.gz --bind-address=SERVER_IP_ADDRESS "https://www.directadmin.com/cgi-bin/daupdate?uid=USER_ID&lid=LICENSE_ID"
 
 If on LAN (internal IP) then remove the --bind-address argument:
 
-	wget --no-check-certificate -S -O /usr/local/directadmin/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=7425&lid=126190"
+	wget --no-check-certificate -S -O /usr/local/directadmin/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=USER_ID&lid=LICENSE_ID"
 
-Extract update.tar.gz into /usr/local/directadmin:
+Extract `update.tar.gz` into /usr/local/directadmin:
 
 	cd /usr/local/directadmin
 	tar zxvf update.tar.gz
@@ -522,7 +522,7 @@ Verify: User Welcome message not created?
 
 Todo: Download default message templates from PB GitHub repo (they were missing on my last install).
 
-Veify: Create backup.conf (wasn't created?)
+Verfy: Create backup.conf (wasn't created?)
 
 	chown diradmin:diradmin /usr/local/directadmin/data/users/admin/backup.conf
 

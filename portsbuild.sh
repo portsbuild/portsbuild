@@ -22,7 +22,7 @@
 #  - Patience.
 #
 #  Installation:
-#  - New installs, run: ./portsbuild install
+#  - New installs, run: ./portsbuild install USER_ID LICENSE_ID IP_ADDRESS
 #
 #  Existing users:
 #  - Update: ./portsbuild update
@@ -35,6 +35,8 @@
 
 # Script is incomplete. :)
 exit;
+
+### If you want to modify PortsBuild settings, please check out 'conf/options.conf'
 
 ### PortsBuild ###
 
@@ -65,8 +67,11 @@ else
 	exit 1;
 fi
 
-## FreeBSD Ports path
-PORTS_BASE=/usr/ports
+. conf/options.conf
+. conf/ports.conf
+. conf/constants.conf
+#. conf/make.conf
+
 
 ## Automate this?
 ## Verify if /usr/ports exists.
@@ -84,137 +89,7 @@ if [ ! -d ${PORTS_BASE}/ ]; then
 fi
 
 
-## System Binary/Application paths and variables. Needed?
-## Perhaps replace with `which bin` and perform a sanity check
-CHOWN=/usr/sbin/chown
-CHMOD=/bin/chmod
-BOOT_DIR=/usr/local/etc/rc.d/
-PERL=/usr/local/bin/perl
-PKG_BIN=/usr/sbin/pkg
-PKG_FLAGS="install -y"
-PKG="${PKG_BIN} ${PKG_FLAGS}"
-PORTSNAP=/usr/sbin/portsnap
-PORTMASTER=/usr/local/sbin/portmaster
-SERVICE=/usr/sbin/service
-WGET=/usr/local/bin/wget
-TAR=/usr/bin/tar
 
-## Ports: Dependencies
-PORT_PORTMASTER=${PORTS_BASE}/ports-mgmt/portmaster
-PORT_PERL=${PORTS_BASE}/lang/perl5.20
-PORT_AUTOCONF=${PORTS_BASE}/devel/autoconf
-PORT_AUTOMAKE=${PORTS_BASE}/devel/automake
-PORT_CURL=${PORTS_BASE}/ftp/curl
-PORT_WGET=${PORTS_BASE}/ftp/wget
-PORT_LIBTOOL=${PORTS_BASE}/devel/libtool
-PORT_LIBXML2=${PORTS_BASE}/textproc/libxml2
-PORT_LIBXSLT=${PORTS_BASE}/textproc/libxslt
-PORT_FREETYPE2=${PORTS_BASE}/print/freetype2
-PORT_CYRUSSASL2=${PORTS_BASE}/security/cyrus-sasl2
-PORT_PYTHON=${PORTS_BASE}/lang/python
-PORT_CCACHE=${PORTS_BASE}/devel/ccache
-
-## Ports: WWW and PHP
-PORT_APACHE24=${PORTS_BASE}/www/apache24
-PORT_NGINX=${PORTS_BASE}/www/nginx
-PORT_PHP55=${PORTS_BASE}/lang/php55
-PORT_PHP56=${PORTS_BASE}/lang/php56
-PORT_PHPMYADMIN4=${PORTS_BASE}/databases/phpmyadmin
-PORT_IONCUBE=${PORTS_BASE}/devel/ioncube
-PORT_PCRE=${PORTS_BASE}/devel/pcre
-
-## Ports: Mail & Related Services
-PORT_EXIM=${PORTS_BASE}/mail/exim
-PORT_SPAMASSASSIN=${PORTS_BASE}/mail/p5-Mail-SpamAssassin
-PORT_DOVECOT2=${PORTS_BASE}/mail/dovecot2
-PORT_PIGEONHOLE=${PORTS_BASE}/mail/dovecot2-pigeonhole
-PORT_CLAMAV=${PORTS_BASE}/security/clamav
-PORT_ROUNDCUBE=${PORTS_BASE}/mail/roundcube
-PORT_MAILMAN=${PORTS_BASE}/mail/mailman
-## Ports: FTPd
-PORT_PUREFTPD=${PORTS_BASE}/ftp/pure-ftpd
-PORT_PROFTPD=${PORTS_BASE}/ftp/proftpd
-
-## Ports: Databases
-PORT_MYSQL55=${PORTS_BASE}/databases/mysql55-server
-PORT_MYSQL56=${PORTS_BASE}/databases/mysql56-server
-PORT_MARIADB55=${PORTS_BASE}/databases/mariadb55-server
-PORT_MARIADB100=${PORTS_BASE}/databases/mariadb100-server
-
-## Ports: Stats
-PORT_AWSTATS=${PORTS_BASE}/www/awstats
-PORT_WEBALIZER=${PORTS_BASE}/www/webalizer
-
-## Ports: Misc.
-# PORT_MEMCACHED=${PORTS_BASE}/databases/memcached
-# PORT_PECLMEMCACHE=${PORTS_BASE}/databases/pecl-memcache
-# PORT_PECLMEMCACHED=${PORTS_BASE}/databases/pecl-memcached
-
-## Ports: Unsupported
-# PORT_MYSQL51=${PORTS_BASE}/databases/mysql51-server
-# PORT_PHP54=${PORTS_BASE}/lang/php5
-# PORT_SQUIRRELMAIL=${PORTS_BASE}/mail/squirrelmail
-# PORT_ATMAIL=${PORTS_BASE}/mail/atmail
-# PORT_UEBIMIAU=${PORTS_BASE}/mail/uebimiau
-
-### --- --- --- ###
-
-### Configuration Files & Paths
-
-## DirectAdmin Paths & Files
-DA_PATH="/usr/local/directadmin"
-DA_SCRIPTS="${DA_PATH}/scripts"
-DA_CRON=${DA_SCRIPTS}/directadmin_cron
-DA_CONF=${DA_PATH}/conf/directadmin.conf
-DA_CONF_TEMPLATE=${DA_PATH}/data/templates/directadmin.conf
-DA_MYSQL_CONF=${DA_PATH}/conf/mysql.conf
-DA_MYSQL_CNF=${DA_PATH}/conf/my.cnf
-DA_LICENSE=${DA_PATH}/conf/license.key
-
-## CustomBuild Paths & Files
-CB_PATH=/usr/local/directadmin/custombuild
-CB_OPTIONS=${CB_PATH}/options.conf
-
-## Virtual Mail Directory (keeping this path as-is for simplicity).
-VIRTUAL=/etc/virtual
-
-## Apache (HTTPD)
-HTTPD_DIR=/usr/local/etc/httpd
-HTTPD_CONF_DIR=${HTTPD_DIR}/conf
-HTTPD_CONF=${HTTPD_CONF_DIR}/httpd.conf
-
-## Nginx (untested)
-NGINX_DIR=/usr/local/etc/nginx
-NGINX_CONF=${NGINX_DIR}/nginx.conf
-
-## Global WWW Directory (for webmail scripts)
-WWW_DIR=/usr/local/www
-ROUNDCUBE_DIR=${WWW_DIR}/roundcube
-PMA_DIR=${WWW_DIR}/phpmyadmin
-
-## DirectAdmin System Configuration Files
-# redundant: DACONF_FILE=/usr/local/directadmin/conf/directadmin.conf
-# redundant: DACONF_TEMPLATE_FILE=/usr/local/directadmin/data/templates/directadmin.conf
-SERVICES=${DA_PATH}data/admin/services.status
-TASK_QUEUE=${DA_PATH}/data/task.queue.cb
-
-## System User Accounts
-ADMIN_USER=admin
-DB_USER=da_admin
-APACHE_USER=apache
-APACHE_GROUP=apache
-WEBAPPS_USER=webapps
-WEBAPPS_GROUP=webapps
-EXIM_USER=mail
-EXIM_GROUP=mail
-
-## MySQL/MariaDB Paths and Credentials
-# DA Default: /home/mysql
-MYSQL_DATA=/var/db/mysql
-MYSQL_BIN=/usr/local/bin/mysql
-MYSQLDUMP_BIN=/usr/local/bin/mysqldump
-
-### --- --- --- ###
 
 ## doChecks
 ## A lot of these checks are unnecessary, since they're already installed in FreeBSD by default.
@@ -361,6 +236,7 @@ post_install() {
 
 ## Install Dependencies
 install_deps() {
+
 	if [ ${OS_BSD} -eq 10 ]; then
 		/usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx dns/bind910
 	else if [ ${OS_BSD} -eq 9 ]; then
@@ -370,18 +246,21 @@ install_deps() {
 
 ## Install Compat Libraries
 install_compats() {
+
 	if [ ${OS_BSD} -eq 10 ]; then
 		pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
 	else if [ ${OS_BSD} -eq 9 ]; then
 		pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x
-	fi	
+	fi
 }
 
 install_ccache() {
 	${PKG} ${PORT_CCACHE}
 }
 
+## Disable sendmail
 disable_sendmail() {
+
     echo "sendmail_enable=\"NONE\"" >> /etc/rc.conf
     echo "sendmail_submit_enable=\"NO\"" >> /etc/rc.conf
     echo "sendmail_outbound_enable=\"NO\"" >> /etc/rc.conf
@@ -403,7 +282,6 @@ update_rc() {
 update_sysctl() {
 
 	echo "net.inet6.ip6.v6only=0" >> /etc/sysctl.conf
-
 	sysctl net.inet6.ip6.v6only=0
 }
 
@@ -414,7 +292,185 @@ update_make() {
 		touch /etc/make.conf
 	fi
 
+	## magic goes here
+}
 
+## Setup BIND (named)
+setup_bind() {
+
+	## File target paths:
+	## 10.2: /var/named/etc/namedb/named.conf
+	## 9.3: /etc/namedb/named.conf
+
+	if [ ${OS_BSD} -eq 10 ]; then
+		## FreeBSD 10.2 with BIND 9.9.5 from ports
+		wget -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named10.conf
+	else if [ ${OS_BSD} -eq 9 ]; then
+		## FreeBSD 9.3 with BIND 9.9.5 from base
+		wget -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named9.conf
+	fi
+}
+
+## Create custombuild/options.conf
+create_cb_options() {
+
+	touch /usr/local/directadmin/custombuild/options.conf
+}
+
+
+## Create portsbuild/options.conf
+create_pb_options() {
+
+	touch /usr/local/directadmin/portsbuild/options.conf
+}
+
+
+### DirectAdmin Installation ###
+
+## The next two functions replace DirectAdmin's setup.sh
+
+## Prepare DirectAdmin Installation
+setup_directadmin() {
+
+	## Update /etc/aliases
+	echo "diradmin: :blackhole:" >> /etc/aliases
+	/usr/bin/newaliases
+
+	## Create the directory
+	mkdir /usr/local/directadmin
+
+	## Regular way (replace YOURIPADDRESS, USERID, and LICENSEID):
+
+	wget --no-check-certificate -S -O /usr/local/directadmin/update.tar.gz --bind-address=SERVER_IP_ADDRESS "https://www.directadmin.com/cgi-bin/daupdate?uid=USER_ID&lid=LICENSE_ID"
+
+	on LAN (internal IP) then remove the --bind-address argument:
+
+	wget --no-check-certificate -S -O /usr/local/directadmin/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=USER_ID&lid=LICENSE_ID"
+
+# Extract update.tar.gz into /usr/local/directadmin:
+
+	cd /usr/local/directadmin
+	tar zxvf update.tar.gz
+
+Verify: User Welcome message not created?
+
+	touch /usr/local/directadmin/data/users/admin/u_welcome.txt
+
+Todo: Download default message templates from PB GitHub repo (they were missing on my last install).
+
+#Verify: Create backup.conf (wasn't created?)
+
+	chown diradmin:diradmin /usr/local/directadmin/data/users/admin/backup.conf
+
+From setup.sh: generate setup.txt
+Pre-fetched through setup.sh prompts to the user (done)
+Replace the following with your info:
+
+    echo "hostname=myserver.example.com"        >  /usr/local/directadmin/scripts/setup.txt;
+    echo "email=root@example.com"          >> /usr/local/directadmin/scripts/setup.txt;
+    echo "mysql=YOUR_SQL_PASSWORD"   >> /usr/local/directadmin/scripts/setup.txt;
+    echo "mysqluser=da_admin"    >> /usr/local/directadmin/scripts/setup.txt;
+    echo "adminname=admin" >> /usr/local/directadmin/scripts/setup.txt;
+    echo "adminpass=YOUR_ADMIN_PASSWORD" >> /usr/local/directadmin/scripts/setup.txt;
+    echo "ns1=ns1.example.com"              >> /usr/local/directadmin/scripts/setup.txt;
+    echo "ns2=ns2.example.com"              >> /usr/local/directadmin/scripts/setup.txt;
+    echo "ip=YOUR_IP_ADDRESS"                >> /usr/local/directadmin/scripts/setup.txt;
+    echo "netmask=255.255.255.0"           >> /usr/local/directadmin/scripts/setup.txt;
+    echo "uid=USER_ID"              >> /usr/local/directadmin/scripts/setup.txt;
+    echo "lid=LICENSE_ID"              >> /usr/local/directadmin/scripts/setup.txt;
+    echo "services=services_freebsd90_64.tar.gz"    >> /usr/local/directadmin/scripts/setup.txt;
+
+
+
+}
+
+
+## Install DirectAdmin
+install_directadmin() {
+
+	#
+}
+
+
+## Apache Host Configuration
+## Copied from CB2
+doApacheHostConf() {
+
+	HOSTCONF=/usr/local/etc/apache24/extra/httpd-hostname.conf
+
+	## Set this for now since PB only supports 1 instance of PHP.
+	PHP1_MODE_OPT="php-fpm"
+
+	if [ -e ${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf ]; then
+		cp -pf ${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf ${HOSTCONF}
+	else
+		echo -n '' > ${HOSTCONF}
+
+		# if [ "${HAVE_FPM_CGI}" = "yes" ]; then
+		# 	echo 'SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1' >> ${HOSTCONF}
+		# fi
+
+		echo '<Directory /usr/local/www>' >> ${HOSTCONF}
+
+		if [ "${PHP1_MODE_OPT}" = "php-fpm" ]; then
+			echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${HOSTCONF}
+			echo "AddHandler \"proxy:unix:/usr/local/php${PHP1_SHORTRELEASE}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${PHP1_SHORTRELEASE} .phtml" >> ${HOSTCONF}
+			echo '</FilesMatch>' >> ${HOSTCONF}
+		fi
+
+		echo '	Options +SymLinksIfOwnerMatch +IncludesNoExec' >> ${HOSTCONF}
+		echo '	AllowOverride AuthConfig FileInfo Indexes Limit Options=Includes,IncludesNOEXEC,Indexes,ExecCGI,MultiViews,SymLinksIfOwnerMatch,None' >> ${HOSTCONF}
+		echo '' >> ${HOSTCONF}
+		echo '	Order allow,deny' >> ${HOSTCONF}
+		echo '	Allow from all' >> ${HOSTCONF}
+		echo '	<IfModule mod_suphp.c>' >> ${HOSTCONF}
+		echo '		suPHP_Engine On' >> ${HOSTCONF}
+		echo '		suPHP_UserGroup webapps webapps' >> ${HOSTCONF}
+		echo '	</IfModule>' >> ${HOSTCONF}
+		# echo '	<IfModule mod_ruid2.c>' >> ${HOSTCONF}
+		# echo '		RUidGid webapps webapps' >> ${HOSTCONF}
+		# echo '	</IfModule>' >> ${HOSTCONF}
+		# echo '	<IfModule mod_lsapi.c>' >> ${HOSTCONF}
+		# echo '		lsapi_user_group webapps webapps' >> ${HOSTCONF}
+		# echo '	</IfModule>' >> ${HOSTCONF}
+
+		ensure_webapps_tmp
+
+		# WEBAPPS_FCGID_DIR=/var/www/fcgid
+		SUEXEC_PER_DIR="0"
+
+		if [ -s /usr/local/sbin/suexec ]; then
+			SUEXEC_PER_DIR="`/usr/local/sbin/suexec -V 2>&1 | grep -c 'AP_PER_DIR'`"
+		fi
+
+		# if [ "${PHP1_MODE_OPT}" = "fastcgi" ]; then
+		# 	echo '	<IfModule mod_fcgid.c>' >> ${HOSTCONF}
+		# 	echo "		FcgidWrapper /usr/local/safe-bin/fcgid${PHP1_SHORTRELEASE}.sh .php" >> ${HOSTCONF}
+		# 	if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
+		# 		echo '	  SuexecUserGroup webapps webapps' >> ${HOSTCONF}
+		# 	fi
+		# 	echo '		<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${HOSTCONF}
+		# 	echo '			Options +ExecCGI' >> ${HOSTCONF}
+		# 	echo '			AddHandler fcgid-script .php' >> ${HOSTCONF}
+		# 	echo '		</FilesMatch>' >> ${HOSTCONF}
+		# 	echo '	</IfModule>' >> ${HOSTCONF}
+		# fi
+		
+		# if [ "${PHP2_MODE_OPT}" = "fastcgi" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+		# 	echo '	<IfModule mod_fcgid.c>' >> ${HOSTCONF}
+		# 	echo "		FcgidWrapper /usr/local/safe-bin/fcgid${PHP2_SHORTRELEASE}.sh .php${PHP2_SHORTRELEASE}" >> ${HOSTCONF}
+		# 	if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
+		# 	echo '		SuexecUserGroup webapps webapps' >> ${HOSTCONF}
+		# 	fi
+		# 	echo "	 <FilesMatch \"\.php${PHP2_SHORTRELEASE}\$\">" >> ${HOSTCONF}
+		# 	echo '			Options +ExecCGI' >> ${HOSTCONF}
+		# 	echo "			AddHandler fcgid-script .php${PHP2_SHORTRELEASE}" >> ${HOSTCONF}
+		# 	echo '		</FilesMatch>' >> ${HOSTCONF}
+		# 	echo '	</IfModule>' >> ${HOSTCONF}
+		# fi
+
+		echo '</Directory>' >> ${HOSTCONF}
+	fi
 }
 
 
