@@ -314,7 +314,7 @@ setup_bind() {
 ## Create custombuild/options.conf
 create_cb_options() {
 
-    touch /usr/local/directadmin/custombuild/options.conf
+    touch ${CB_CONF};
 }
 
 ## Create a spoof CustomBuild2 options.conf for DirectAdmin compatibility.
@@ -356,10 +356,10 @@ setup_directadmin() {
     ## Get DirectAdmin License
 
     ## Replace SERVER_IP_ADDRESS, USER_ID, and LICENSE_ID):
-    if [ $DA_LAN eq 0]; then
-        wget --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address=SERVER_IP_ADDRESS "https://www.directadmin.com/cgi-bin/daupdate?uid=USER_ID&lid=LICENSE_ID"
-    else if [ $DA eq 1 ]; then
-        wget --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=USER_ID&lid=LICENSE_ID"
+    if [ $DA_LAN eq 0 ]; then
+        wget --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address=${DA_SERVER_IP} "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+    else if [ $DA_LAN eq 1 ]; then
+        wget --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
     fi
 
 
@@ -379,22 +379,20 @@ setup_directadmin() {
     chown diradmin:diradmin /usr/local/directadmin/data/users/admin/backup.conf
 
 # From setup.sh: generate setup.txt
-# Pre-fetched through setup.sh prompts to the user (done)
-# Replace the following with your info:
 
-    echo "hostname=myserver.example.com"            >  /usr/local/directadmin/scripts/setup.txt;
-    echo "email=root@example.com"                   >> /usr/local/directadmin/scripts/setup.txt;
-    echo "mysql=YOUR_SQL_PASSWORD"                  >> /usr/local/directadmin/scripts/setup.txt;
-    echo "mysqluser=da_admin"                       >> /usr/local/directadmin/scripts/setup.txt;
-    echo "adminname=admin"                          >> /usr/local/directadmin/scripts/setup.txt;
-    echo "adminpass=YOUR_ADMIN_PASSWORD"            >> /usr/local/directadmin/scripts/setup.txt;
-    echo "ns1=ns1.example.com"                      >> /usr/local/directadmin/scripts/setup.txt;
-    echo "ns2=ns2.example.com"                      >> /usr/local/directadmin/scripts/setup.txt;
-    echo "ip=YOUR_IP_ADDRESS"                       >> /usr/local/directadmin/scripts/setup.txt;
-    echo "netmask=255.255.255.0"                    >> /usr/local/directadmin/scripts/setup.txt;
-    echo "uid=USER_ID"                              >> /usr/local/directadmin/scripts/setup.txt;
-    echo "lid=LICENSE_ID"                           >> /usr/local/directadmin/scripts/setup.txt;
-    echo "services=services_freebsd90_64.tar.gz"    >> /usr/local/directadmin/scripts/setup.txt;
+    echo "hostname=${SERVER_FQDN}"            >  /usr/local/directadmin/scripts/setup.txt;
+    echo "email=root@example.com"             >> /usr/local/directadmin/scripts/setup.txt;
+    echo "mysql=${DA_SQL_PASSWORD}"           >> /usr/local/directadmin/scripts/setup.txt;
+    echo "mysqluser=${DA_SQLDB_USERNAME}"     >> /usr/local/directadmin/scripts/setup.txt;
+    echo "adminname=${DA_ADMIN_USERNAME}"     >> /usr/local/directadmin/scripts/setup.txt;
+    echo "adminpass=${DA_ADMIN_PASSWORD}"     >> /usr/local/directadmin/scripts/setup.txt;
+    echo "ns1=ns1.${SERVER_DOMAIN}"           >> /usr/local/directadmin/scripts/setup.txt;
+    echo "ns2=ns2.${SERVER_DOMAIN}"           >> /usr/local/directadmin/scripts/setup.txt;
+    echo "ip=${DA_SERVER_IP}"                 >> /usr/local/directadmin/scripts/setup.txt;
+    echo "netmask=${DA_SERVER_IP_MASK}"       >> /usr/local/directadmin/scripts/setup.txt;
+    echo "uid=${DA_USER_ID}"                  >> /usr/local/directadmin/scripts/setup.txt;
+    echo "lid=${DA_LICENSE_ID}"               >> /usr/local/directadmin/scripts/setup.txt;
+    echo "services=${DA_FREEBSD_SERVICES}"    >> /usr/local/directadmin/scripts/setup.txt;
 }
 
 
