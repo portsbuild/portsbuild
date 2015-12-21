@@ -646,6 +646,8 @@ NOTE: mail group already exists in FreeBSD and this step may not be needed (veri
     pw groupadd mail 2> /dev/null
     pw useradd -g mail -u 12 -n mail -d /var/mail -s /sbin/nologin 2> /dev/null
 
+NOTE: ftp group already exists (skip)
+
     pw groupadd ftp 2> /dev/null
     pw useradd -g ftp -n ftp -s /sbin/nologin 2> /dev/null
 
