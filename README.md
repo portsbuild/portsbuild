@@ -16,7 +16,7 @@ Phase 1
 
 Service 		| Status
 --------------- | ---------------
-Apache 2.4.17 | Supported
+Apache 2.4 | Supported
 php5-fpm 5.5 | 
 php5-fpm 5.6 | Supported
 MariaDB 5.5 | Supported

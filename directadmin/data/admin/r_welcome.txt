@@ -1,8 +1,8 @@
 Dear Customer,
 
-	Thank you for choosing our service to meet your web hosting needs.
+	Thank you for making us a partner in your web hosting venture.
 
-Your account has been created with the following details:
+Your reseller account has been created with the following details:
 
 Username:	|username|
 Password:	|password|
@@ -22,12 +22,21 @@ Disk Space:	|quota| Megabytes
 Virtual Domains:	|vdomains|
 Subdomains:	|nsubdomains|
 
+Number of IPs:	|ips|
+
+You must use these dns servers for your domain. They can be changed through your domain registrar.
+
+NS1:	|ns1|
+NS1 IP:	|ns1ip|
+NS2:	|ns2|
+NS2 IP:	|ns2ip|
+
 POP Email Accounts:	|nemails|
 Email Forwarders:	|nemailf|
 Email Autoresponders:	|nemailr|
 Email Mailing Lists:	|nemailml|
 POP Server:	mail.|domain|
-SMTP Server:	mail.|domain|
+SMTP Server:	Your ISP's outgoing mail server
 Login:	|username|
 Password:	|password|
 
@@ -40,20 +49,14 @@ Password:	|password|
 IP:	|ip|
 Use |ip||*if OWNED!="yes"|/~|username||*endif| to access it until the domain resolves.
 
-You must use these dns servers for your domain. They can be changed through your domain registrar.
-
-NS1:	|ns1|
-NS1 IP:	|ns1ip|
-NS2:	|ns2|
-NS2 IP:	|ns2ip|
-
+SSH Access for your users:	|ssh|
+SSH Access:	|ssh|
+Overselling:	|oversell|
 MySQL Databases:	|mysql|
 Domain Pointers:	|domainptr|
-SSH Access:	|ssh|
 Secure Socket Layer:	|ssl|
 CGI:	|cgi|
 PHP:	|php|
 DNS control:	|dnscontrol|
-
-Once again, thank you for choosing our hosting service
+Once again, thank you for partnering with us.
 Please don't hesitate to contact us if you have any questions

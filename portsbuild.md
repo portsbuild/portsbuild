@@ -242,7 +242,7 @@ Scripted reference:
     echo "sendmail_submit_enable=\"NO\"" >> /etc/rc.conf
     echo "sendmail_outbound_enable=\"NO\"" >> /etc/rc.conf
     echo "sendmail_msp_queue_enable=\"NO\"" >> /etc/rc.conf
-	service sendmail stop
+	service sendmail onestop
 
 ##### Update `/etc/sysctl.conf`
 
@@ -471,11 +471,11 @@ Replace with version from GitHub repo.
 
 FreeBSD 10.2 with BIND 9.9.5 from ports:
 
-	wget --no-check-certificate -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named10.conf
+	wget --no-check-certificate -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.100.conf
 
 FreeBSD 9.3 with BIND 9.9.5 from base:
 
-	wget --no-check-certificate -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named9.conf
+	wget --no-check-certificate -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
 
 
 ### MOVE THIS: DirectAdmin Installation
