@@ -634,78 +634,7 @@ SKIP: Scripted reference to update hostname:
 
 ##### DirectAdmin Installation (cont.)
 
-Add the DirectAdmin user & group:
-
-	pw groupadd diradmin
-	pw useradd -g diradmin -n diradmin -d /usr/local/directadmin -s /sbin/nologin
-
-Add other users & groups:
-
-NOTE: mail group already exists in FreeBSD and this step may not be needed (verify).
-
-    pw groupadd mail 2> /dev/null
-    pw useradd -g mail -u 12 -n mail -d /var/mail -s /sbin/nologin 2> /dev/null
-
-NOTE: ftp group already exists (skip)
-
-    pw groupadd ftp 2> /dev/null
-    pw useradd -g ftp -n ftp -s /sbin/nologin 2> /dev/null
-
-Note: Using "apache" user instead of "www" for now -sg
-Apache user/group creation (change /var/www to /usr/local/www):
-
-	pw groupadd apache 2> /dev/null
-	pw useradd -g apache -n apache -d /usr/local/www -s /sbin/nologin 2> /dev/null
-
-
-#### DirectAdmin Folder permissions
-
-    chmod 755 /usr/local/directadmin
-    chown diradmin:diradmin /usr/local/directadmin
-
-Create directories and set permissions:
-
-    mkdir -p /var/log/directadmin
-    mkdir -p /usr/local/directadmin/conf
-    chown diradmin:diradmin /usr/local/directadmin/*;
-    chown diradmin:diradmin /var/log/directadmin;
-    chmod 700 /usr/local/directadmin/conf;
-    chmod 700 /var/log/directadmin;
-
--sg: Set permissions (done)
-
-	chown -R diradmin:diradmin /usr/local/directadmin/scripts/
-    chown -R diradmin:diradmin /usr/local/directadmin/data/
-
-No conf files in a fresh install:
-
-	chown diradmin:diradmin /usr/local/directadmin/conf/* 2> /dev/null > /dev/null;
-	chmod 600 $/usr/local/directadmin/conf/* 2> /dev/null > /dev/null;
-
-Create logs directory:
-
-    mkdir -p /var/log/httpd/domains
-    chmod 700 /var/log/httpd
-
-Note: /home => /usr/home
-
-    mkdir -p /home/tmp
-    chmod 1777 /home/tmp
-    chmod 711 /home
-
-Create misc directories?
-
-	mkdir -p /usr/local/directadmin/data/admin
-
-Add the soon-to-exist admin account to the sshd config file:
-
-    echo "AllowUsers admin" >> /etc/ssh/sshd_config
-    echo "AllowUsers YOUR_OTHER_ADMIN_ACCOUNT" >> /etc/ssh/sshd_config
-
-
-Set SSH folder permissions (needed?):
-
-	chmod 710 /etc/ssh
+-
 
 
 ##### Setup Exim Directories
@@ -1159,7 +1088,7 @@ WARNING: Nothing matches the include pattern
 '/usr/local/directadmin/data/users/*/php/php-fpm56.conf' from /usr/local/etc/php-fpm.conf at line 68.
 
 
-Scripted reference: from CB2:
+Scripted reference (from CB2):
 
     echo "Making PHP ${INT_RELEASE} installation compatible with php.ini file"
     /usr/local/bin/perl -pi -e 's/^register_long_arrays/;register_long_arrays/' ${PHP_INI_INT}

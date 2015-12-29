@@ -2,6 +2,9 @@
 # Script to install majordomo
 # PortsBuild edition
 
+# This script is written originally by DirectAdmin
+# http://www.directadmin.com
+
 OS=`uname`
 
 SERVER=http://files.directadmin.com/services/all/majordomo
@@ -71,7 +74,7 @@ else
 	echo "Cannot find ${PATCH1_PATH} to patch majordomo.";
 fi
 
- # Just to put up back where we were.. likely not needed.
+ # Just to put up back where we were... likely not needed.
 cd ${SOURCEPATH};
 
 chmod 750 /etc/virtual/majordomo

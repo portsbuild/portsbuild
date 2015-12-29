@@ -263,6 +263,11 @@ reinstall_all_ports() {
     ${PORTMASTER} -a -f -d
 }
 
+## Random Password Generator (from CB2)
+random_pass() {
+    tr -cd 'a-zA-Z0-9' < /dev/urandom 2>/dev/null | head -c${1:-`perl -le 'print int rand(7) + 10'`}
+}
+
 ################################################################
 
 ## Pre-Install Tasks
@@ -323,7 +328,7 @@ setup() {
     fi
 
     pre_install;
-    setup_directadmin;
+    directadmin_pre_install;
     install_directadmin;
     create_cb_options;
     exec_da_permissions;
@@ -490,10 +495,8 @@ create_pb_options() {
 
 ### DirectAdmin Installation ###
 
-## setup_directadmin and install_directadmin replace DirectAdmin's setup.sh
-
-## Prepare DirectAdmin Installation (replaces setup.sh)
-setup_directadmin() {
+## DirectAdmin Pre-Installation Tasks (replaces setup.sh)
+directadmin_pre_install() {
 
     ## Update /etc/aliases
     if [ -e /etc/aliases ]; then
@@ -594,7 +597,7 @@ install_directadmin() {
     ## Apache user/group creation (changed /var/www to /usr/local/www)
     ## NOTE: Using "apache" user instead of "www" for now
     pw groupadd apache 2> /dev/null
-    pw useradd -g apache -n apache -d /usr/local/www -s /sbin/nologin 2> /dev/null
+    pw useradd -g apache -n apache -d ${WWW_DIR} -s /sbin/nologin 2> /dev/null
 
     ## Set DirectAdmin Folder permissions:
     chmod 755 /usr/local/directadmin
@@ -645,18 +648,24 @@ install_directadmin() {
     fi
 }
 
+## DirectAdmin Post-Installation Tasks
+directadmin_post_install() {
+    mkdir -p ${DA_PATH}/data/users/admin/packages
+    chown diradmin:diradmin ${DA_PATH}/data/users/admin/packages
+    chmod 700 ${DA_PATH}/data/users/admin/packages
+}
+
 
 ## Install DA cron (from: scripts/install.sh)
 install_cron() {
 
-## Need to add:
-# * * * * * root /usr/local/directadmin/dataskq
-# 2 0-23/6 * * * root echo 'action=vacation&value=all' >> /usr/local/directadmin/data/task.queue;
-# 5 0 * * * root /usr/sbin/quotaoff -a; /sbin/quotacheck -aug; /usr/sbin/quotaon -a;
-# 30 0 * * * root echo 'action=tally&value=all' >> /usr/local/directadmin/data/task.queue
-# 40 1 1 * * root echo 'action=reset&value=all' >> /usr/local/directadmin/data/task.queue
-# 0 4 * * * root echo 'action=check&value=license' >> /usr/local/directadmin/data/task.queue
-
+    ## Need to add:
+    # * * * * * root /usr/local/directadmin/dataskq
+    # 2 0-23/6 * * * root echo 'action=vacation&value=all' >> /usr/local/directadmin/data/task.queue;
+    # 5 0 * * * root /usr/sbin/quotaoff -a; /sbin/quotacheck -aug; /usr/sbin/quotaon -a;
+    # 30 0 * * * root echo 'action=tally&value=all' >> /usr/local/directadmin/data/task.queue
+    # 40 1 1 * * root echo 'action=reset&value=all' >> /usr/local/directadmin/data/task.queue
+    # 0 4 * * * root echo 'action=check&value=license' >> /usr/local/directadmin/data/task.queue
 
     COUNT=`cat /etc/crontab | grep -c dataskq`
     if [ $COUNT = 0 ]; then
@@ -684,7 +693,7 @@ setup_newsyslog() {
 }
 
 ## Exim Pre-Installation Tasks
-exim_pre_installation() {
+exim_pre_install() {
 
     mkdir -p ${VIRTUAL};
     chown ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL};
@@ -713,13 +722,13 @@ exim_pre_installation() {
 }
 
 ## Exim Post-Installation Tasks
-exim_post_installation() {
+exim_post_install() {
 
     ## Set permissions
     chown -R ${EXIM_USER}:${EXIM_GROUP} /var/spool/exim
 
     ## Symlink for compat:
-    ln -s /usr/local/etc/exim/exim.conf /etc/exim.conf
+    ln -s ${EXIM_CONF} /etc/exim.conf
 
     ## Generate Self-Signed SSL Certificates
     ## See: http://help.directadmin.com/item.php?id=245
@@ -729,18 +738,17 @@ exim_post_installation() {
     ln -s /usr/local/etc/exim/exim.cert /etc/exim.cert
 
     ## Set permissions:
-    chown mail:mail /usr/local/etc/exim/exim.key
+    chown ${EXIM_USER}:${EXIM_GROUP} /usr/local/etc/exim/exim.key
     chmod 644 /usr/local/etc/exim/exim.key
     chmod 644 /usr/local/etc/exim/exim.cert
 
-    ## Restart Exim for the changes to take effect:
-    service exim restart
-
     ## Reference: Verify Exim config:
-    exim -C /usr/local/etc/exim/exim.conf -bV
+    exim -C ${EXIM_CONF} -bV
 
+    setVal exim_enable \"YES\" /etc/rc.conf
+    setVal exim_flags \"-bd -q1h\" /etc/rc.conf
 
-
+    service exim start
 
     ## Tel DA new path to Exim binary.
     setVal mq_exim_bin "/usr/local/sbin/exim" >> ${DA_CONF}
@@ -765,24 +773,104 @@ exim_post_installation() {
         touch /etc/periodic.conf
     fi
 
+    ## Replace with setVal
     echo "daily_status_include_submit_mailq=\"NO\"" >> /etc/periodic.conf
     echo "daily_clean_hoststat_enable=\"NO\"" >> /etc/periodic.conf
 
 }
 
 
+## SpamAssassin Pre-Installation Tasks
+spamassassin_pre_install() {
+    #
+}
+
+## SpamAssassin Post-Installation Tasks
+spamassassin_post_install() {
+    
+    setVal spamd_enable \"YES\" /etc/rc.conf
+    setVal spamd_flags \"-c -m 15\" /etc/rc.conf
+}
+
 ## Dovecot Pre-Installation Tasks
-dovecot_pre_installation() {
+dovecot_pre_install() {
     #
 }
 
 ## Dovecot Post-Installation Tasks
-dovecot_post_installation() {
-    #
+dovecot_post_install() {
+
+    ## Fetch latest config:
+    wget -O ${DOVECOT_CONF} http://files.directadmin.com/services/custombuild/dovecot.conf.2.0
+
+    ## Update directadmin.conf:
+    echo "add_userdb_quota=1" >> ${DA_CONF}
+    echo "dovecot=1" >> ${DA_CONF}
+
+    ## Reference: doRestartDA:
+    echo "action=rewrite&value=email_passwd" >> ${DA_TASK_QUEUE}
+    #run_dataskq d
+
+    ## Add Dovecot quota support to the directadmin.conf template:
+    echo "add_userdb_quota=1" >> ${DA_CONF_TEMPLATE}
+
+    ## Update dovecot.conf for SSL support using existing Apache 2.4 certs:
+    # ssl_cert = <${APACHE_DIR}/ssl/server.crt
+    # ssl_key = <${APACHE_DIR}/ssl/server.key
+
+    ## or using existing Exim certs:
+    # ssl_cert = </usr/local/etc/exim/exim.crt
+    # ssl_key = </usr/local/etc/exim/exim.key
+
+    ## or using your own custom certs:
+    # ssl_cert = </usr/local/etc/ssl/server.crt
+    # ssl_key = </usr/local/etc/ssl/server.key
+
+    ## Prepare Dovecot directories:
+    mkdir -p /etc/dovecot/
+    mkdir -p /usr/local/etc/dovecot/conf
+    mkdir -p /usr/local/etc/dovecot/conf.d
+
+    ## Symlink for compat:
+    ln -s ${DOVECOT_CONF} /etc/dovecot/dovecot.conf
+    # Skipped: ln -s /etc/dovecot/dovecot.conf /etc/dovecot.conf
+
+    cp -rf ${DA_PATH}/custombuild/configure/dovecot/conf /usr/local/etc/dovecot/
+
+    echo 'mail_plugins = $mail_plugins quota' > /usr/local/etc/dovecot/conf/lmtp_mail_plugins.conf
+
+    ${PERL} -pi -e "s|HOSTNAME|`hostname`|" /usr/local/etc/dovecot/conf/lmtp.conf
+
+    ## ltmp log files (not done):
+    touch /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
+    chown root:wheel /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
+    chmod 600 /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
+
+    ## Modifications (done):
+    ${PERL} -pi -e 's#transport = dovecot_lmtp_udp#transport = virtual_localdelivery#' /usr/local/etc/exim/exim.conf
+    ${PERL} -pi -e 's/driver = shadow/driver = passwd/' /usr/local/etc/dovecot/dovecot.conf
+    ${PERL} -pi -e 's/passdb shadow/passdb passwd/' /usr/local/etc/dovecot/dovecot.conf
+
+    echo 'mail_plugins = $mail_plugins quota' > /usr/local/etc/dovecot/conf/mail_plugins.conf
+    echo 'mail_plugins = $mail_plugins quota imap_quota' > /usr/local/etc/dovecot/conf/imap_mail_plugins.conf
+
+# # Check for IPV6 compatability (not done):
+# if [ "${IPV6}" = "1" ]; then
+#   perl -pi -e 's|^listen = \*$|#listen = \*|' /usr/local/etc/dovecot/dovecot.conf
+#   perl -pi -e 's|^#listen = \*, ::$|listen = \*, ::|' /usr/local/etc/dovecot/dovecot.conf
+# else
+#   perl -pi -e 's|^#listen = \*$|listen = \*|' /usr/local/etc/dovecot/dovecot.conf
+#   perl -pi -e 's|^listen = \*, ::$|#listen = \*, ::|' /usr/local/etc/dovecot/dovecot.conf
+# fi
+
+    echo "listen = *, ::" > /usr/local/etc/dovecot/conf/ip.conf
+
+    setVal dovecot_enable \"YES\" /etc/rc.conf
+
 }
 
 ## SQL Post-Installation Tasks
-sql_post_installation() {
+sql_post_install() {
 
     ## Secure Installation (replace it with scripted method below)
     /usr/local/bin/mysql_secure_installation
@@ -829,7 +917,7 @@ sql_post_installation() {
 }
 
 ## PHP Post-Installation Tasks
-php_post_installation() {
+php_post_install() {
 
     ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
     #cp -f /usr/local/directadmin/custombuild/configure/fpm/conf/php-fpm.conf.56 /usr/local/etc/php-fpm.conf
@@ -885,10 +973,12 @@ php_post_installation() {
 
     # secure_php_ini
 
+    setVal php_fpm_enable \"YES\" /etc/rc.conf
+
 }
 
 ## phpMyAdmin Post-Installation Tasks
-phpmyadmin_post_installation() {
+phpmyadmin_post_install() {
 
     ## Reference for virtualhost entry:
     # Alias /phpmyadmin/ "/usr/local/www/phpMyAdmin/"
@@ -992,7 +1082,7 @@ phpmyadmin_post_installation() {
 }
 
 ## Apache Post-Installation Tasks
-apache_post_installation() {
+apache_post_install() {
 
     ## Symlink for backwards compatability:
     mkdir -p /etc/httpd/conf
@@ -1042,9 +1132,9 @@ apache_post_installation() {
     ln -s /usr/local/sbin/httpd /usr/sbin/httpd
 
     ## Copy over modified (custom) CB2 conf files to conf/:
-    cp -rf /usr/local/directadmin/custombuild/custom/ap2/conf/ /usr/local/etc/apache24/
-    cp -f /usr/local/directadmin/custombuild/custom/ap2/conf/httpd.conf /usr/local/etc/apache24/
-    cp -f /usr/local/directadmin/custombuild/custom/ap2/conf/extra/httpd-mpm.conf /usr/local/etc/apache24/extra/httpd-mpm.conf
+    cp -rf ${DA_PATH}/custombuild/custom/ap2/conf/ ${APACHE_DIR}/
+    cp -f ${DA_PATH}/custombuild/custom/ap2/conf/httpd.conf ${APACHE_DIR}/
+    cp -f ${DA_PATH}/custombuild/custom/ap2/conf/extra/httpd-mpm.conf ${APACHE_DIR}/extra/httpd-mpm.conf
 
 
     ## Already done (default):
@@ -1063,13 +1153,47 @@ apache_post_installation() {
     setVal accf_httpd_load \"YES\" /boot/loader.conf
     setVal accf_data_load \"YES\" /boot/loader.conf
 
+    setVal apache24_enable \"YES\" /etc/rc.conf
+    setVal apache24_http_accept_enable \"YES\" /etc/rc.conf
 }
 
 
+## Nginx Pre-Installation Tasks
+nginx_pre_install() {
+    #
+}
+
+## Nginx Post-Installation Tasks
+nginx_post_install() {
+    ## Update directadmin.conf
+    nginxconf=/usr/local/etc/nginx/directadmin-vhosts.conf
+    nginxlogdir=/var/log/nginx/domains
+    nginxips=/usr/local/etc/nginx/directadmin-ips.conf
+    nginx_pid=/var/run/nginx.pid
+    nginx_cert=/usr/local/etc/nginx/ssl/server.crt
+    nginx_key=/usr/local/etc/nginx/ssl/server.key
+    nginx_ca=/usr/local/etc/nginx/ssl/server.ca
+}
+
+## ClamAV Post-Installation Tasks
+clamav_post_install() {
+    setVal clamav_clamd_enable \"YES\" /etc/rc.conf
+    setVal clamav_freshclam_enable \"YES\" /etc/rc.conf
+}
+
+## RoundCube Pre-Installation Tasks
+roundcube_pre_install() {
+    #
+}
+
+## RoundCube Post-Installation Tasks
+roundcube_post_install() {
+    #
+}
 
 
 ## Webapps Pre-Installation Tasks
-webapps_pre_installation() {
+webapps_pre_install() {
 
     ## Create user and group:
     pw groupadd ${WEBAPPS_GROUP}
@@ -1079,17 +1203,16 @@ webapps_pre_installation() {
     chmod 777 ${WWW_DIR}/tmp
 
     ## Temp path: /usr/local/www/webmail/tmp
-
-    ## Create webmail directory:
+    ## Create webmail/tmp directory:
     mkdir -p ${WWW_DIR}/webmail/tmp
     chmod -R 770 ${WWW_DIR}/webmail/tmp;
     chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail
     chown -R ${APACHE_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail/tmp;
-    echo "Deny from All" >> $TMPDIR/.htaccess
+    echo "Deny from All" >> ${WWW_DIR}/webmail/temp/.htaccess
 }
 
 ## Webapps Post-Installation Tasks
-webapps_post_installation() {
+webapps_post_install() {
 
     ## Increase the timeout from 10 minutes to 24
     ${PERL} -pi -e 's/idle_timeout = 10/idle_timeout = 24/' ${DEST}/webmail/inc/config.security.php
@@ -1252,6 +1375,19 @@ do_ApacheHostConf() {
     fi
 }
 
+## Setup Brute-Force Monitor
+setup_bfm() {
+    ## Defaults:
+    # brute_force_roundcube_log=/var/www/html/roundcube/logs/errors
+    # brute_force_squirrelmail_log=/var/www/html/squirrelmail/data/squirrelmail_access_log
+    # brute_force_pma_log=/var/www/html/phpMyAdmin/log/auth.log
+    brute_force_roundcube_log=${WWW_DIR}/roundcube/logs/errors
+    brute_force_squirrelmail_log=${WWW_DIR}/squirrelmail/data/squirrelmail_access_log
+    brute_force_pma_log=${WWW_DIR}/phpMyAdmin/log/auth.log
+
+    #pure_pw=/usr/bin/pure-pw
+}
+
 ## DirectAdmin Install
 exec_da_install() {
     cd ${DA_PATH}
@@ -1274,6 +1410,10 @@ install_app() {
     ## add func() to update make.conf, or config via CLI
 
     case "$1" in
+        "directadmin")
+            directadmin_pre_install
+            directadmin_post_install
+            ;;
         "apache")
             portmaster -d ${PORT_APACHE24}
             ;;
@@ -1290,40 +1430,52 @@ install_app() {
             pkgi ${PORT_IONCUBE}
             ;;
         "roundcube")
-            webapps_pre_installation
+            roundcube_pre_install
             portmaster -d ${PORT_ROUNDCUBE}
-            webapps_post_installation
+            roundcube_post_install
             ;;
         "spamassassin")
             portmaster -d ${PORT_SPAMASSASSIN}
+            spamassassin_post_install
             ;;
+        "libspf2") ;;
+        "dkim") ;;
+        "blockcracking") ;;
+        "easy_spam_fighter") ;;
         "exim")
-            exim_pre_installation
+            exim_pre_install
             portmaster -d ${PORT_EXIM}
-            exim_post_installation
+            exim_post_install
             ;;
         "mariadb55")
             # portmaster -d ${PORT_MARIADB55}
-            pkg install -y databases/mariadb55-server databases/mariadb55-client
+            pkg install -y ${PORT_MARIADB55} databases/mariadb55-client
             ;;
-
         "mariadb100")
             # portmaster -d ${PORT_MARIADB100}
-            pkg install -y databases/mariadb100-server databases/mariadb100-client
+            pkg install -y ${PORT_MARIADB100} databases/mariadb100-client
             ;;
         "mysql55")
             # portmaster -d ${PORT_MYSQL55}
-            pkg install -y databases/mysql55-server databases/mysql55-client
+            pkg install -y ${PORT_MYSQL55} databases/mysql55-client
             ;;
         "mysql56")
             # portmaster -d ${PORT_MYSQL56}
-            pkg install -y databases/mysql56-server databases/mysql56-client
+            pkg install -y ${PORT_MYSQL56} databases/mysql56-client
+            ;;
+        "phpmyadmin")
+            phpmyadmin_pre_install
+            portmaster -d ${PORT_PHPMYADMIN}
+            phpmyadmin_post_install
             ;;
         "pureftpd")
             portmaster -d ${PORT_PUREFTPD}
             ;;
         "proftpd")
             portmaster -d ${PORT_PROFTPD}
+            ;;
+        "bfm")
+            setup_bfm
             ;;
     esac
     

@@ -13,7 +13,7 @@ doroundcube() {
 
 	REALPATH=/usr/local/www/roundcube
 
-	ALIASPATH=${WWWDIR}/roundcube
+	ALIASPATH=${WWW_DIR}/roundcube
 
 	HTTPPATH=${WEBPATH_SERVICES}/all/roundcube
 
