@@ -92,10 +92,11 @@ if [ ! -d ${PORTS_BASE}/ ]; then
         exit 1;
     else
         ## Automatically install & update /usr/ports/
-        /usr/sbin/portsnap fetch extract
+        setup_ports
     fi
 fi
 
+################################################################
 
 ## Get DA Options (copied from CB2)
 getDA_Opt() {
@@ -116,6 +117,7 @@ getDA_Opt() {
 }
 
 ## Get Option (copied from CB2)
+## Used to retrieve CB/PB options.conf
 getOpt() {
     ## $1 = option name
     ## $2 = default value
@@ -130,24 +132,26 @@ getOpt() {
 }
 
 ## Set Option (copied from CB2)
+## Used to manipulate CB/PB options.conf
 setOpt() {
     ## $1 = option name
     ## $2 = value
 
-    if [ "$1" = "email" ]; then
-        OPT_VALUE1="`grep -m1 "^$1=" ${OPTIONS_CONF} | cut -d= -f2 | cut -d\@ -f 1`"
-        OPT_VALUE2="`grep -m1 "^$1=" ${OPTIONS_CONF} | cut -d= -f2 | cut -d\@ -f 2`"
-        OPT_NEW_VALUE1="`echo "$2" | cut -d\@ -f 1`"
-        OPT_NEW_VALUE2="`echo "$2" | cut -d\@ -f 2`"
-        perl -pi -e "s#$1=${OPT_VALUE1}\@${OPT_VALUE2}#$1=${OPT_NEW_VALUE1}\@${OPT_NEW_VALUE2}#" ${PB_CONF}
-        # if [ "${HIDE_CHANGES}" = "0" ]; then
-        #     echo "Changed ${boldon}$1${boldoff} option from ${boldon}${OPT_VALUE1}@${OPT_VALUE2}${boldoff} to ${boldon}$2${boldoff}"
-        # fi
-    else
+    ## Handle email field seperately
+    # if [ "$1" = "email" ]; then
+    #     OPT_VALUE1="`grep -m1 "^$1=" ${OPTIONS_CONF} | cut -d= -f2 | cut -d\@ -f 1`"
+    #     OPT_VALUE2="`grep -m1 "^$1=" ${OPTIONS_CONF} | cut -d= -f2 | cut -d\@ -f 2`"
+    #     OPT_NEW_VALUE1="`echo "$2" | cut -d\@ -f 1`"
+    #     OPT_NEW_VALUE2="`echo "$2" | cut -d\@ -f 2`"
+    #     ${PERL} -pi -e "s#$1=${OPT_VALUE1}\@${OPT_VALUE2}#$1=${OPT_NEW_VALUE1}\@${OPT_NEW_VALUE2}#" ${PB_CONF}
+    #     # if [ "${HIDE_CHANGES}" = "0" ]; then
+    #     #     echo "Changed ${boldon}$1${boldoff} option from ${boldon}${OPT_VALUE1}@${OPT_VALUE2}${boldoff} to ${boldon}$2${boldoff}"
+    #     # fi
+    # else
         VAR=`echo $1 | tr "[a-z]" "[A-Z]"`
         if [ -z "$(eval_var ${VAR}_DEF)" ]; then
             echo "${1} is not a valid option."
-            EXIT_CODE=50
+            #EXIT_CODE=50
             return
         fi
         VALID="no"
@@ -159,131 +163,74 @@ setOpt() {
         done
         if [ "${VALID}" = "no" ]; then
             echo "${2} is not a valid setting for ${1} option."
-            EXIT_CODE=51
+            #EXIT_CODE=51
             return
         fi
         OPT_VALUE="`grep -m1 "^$1=" ${OPTIONS_CONF} | cut -d= -f2`"
-        perl -pi -e "s#$1=${OPT_VALUE}#$1=$2#" ${PB_CONF}
+        ${PERL} -pi -e "s#$1=${OPT_VALUE}#$1=$2#" ${PB_CONF}
         # if [ "${HIDE_CHANGES}" = "0" ]; then
         #     echo "Changed ${boldon}$1${boldoff} option from ${boldon}${OPT_VALUE}${boldoff} to ${boldon}$2${boldoff}"
         # fi
-    fi
+    # fi
 }
 
 
 ## Set Value (copied from CB2)
 ## Sets the value of $1 to $2 in the file $3
+## e.g. setVal mysql_enable yes /etc/rc.conf
 setVal() {
+    ## Check if file exists.
     if [ ! -e $3 ]; then
         return
     fi
 
-    if ! grep -m1 -q ${1}= ${3}; then
-        #ok, it's not there, add it.
+    ## Can't put [brackets] around the statement else grep flips out.
+    if ! grep -m1 -q ${1}= ${3} ; then
+        ## It's not there, so add it.
         echo "$1=$2" >> $3
         return
     else
-        #ok, the value is already in the file $3, so use perl to regex it.
-        /usr/local/bin/perl -pi -e "s/`grep ${1}= ${3}`/${1}=${2}/" ${3}
+        ## The value is already in the file $3, so use perl regex to replace it.
+        ${PERL} -pi -e "s/`grep ${1}= ${3}`/${1}=${2}/" ${3}
     fi
 }
 
+## Unset Value (opposite of setVal)
+# unsetVal() {
+#     ## Check if file exists.
+#     if [ ! -e $3 ]; then
+#         return
+#     fi
 
-## Do basic checks
-## A lot of these checks are unnecessary, since they're already installed in FreeBSD by default.
-do_checks() {
+#     ## Can't put [brackets] around the statement else grep flips out.
+#     if ! grep -m1 -q ${1}= ${3} ; then
+#         ## It's not there. Great!
+#         return
+#     else
+#         ## The value is already in the file $3, so use perl regex to remove it.
+#         ${PERL} -pi -e "s/`grep ${1}= ${3}`//" ${3}
+#     fi
+# }
 
-    RET=0;
+################################################################
 
-    #DA_CONF=/usr/local/directadmin/data/templates/directadmin.conf
-
-    # Check for a separate /home partition (for quota support).
-    HOME_YES=`cat /etc/fstab | grep -c /home`;
-    if [ $HOME_YES -lt "1" ]; then
-        echo 'quota_partition=/' >> ${DA_CONF_TEMPLATE};
-    fi
-
-    # Detect the ethernet interface that is available on the system.
-    ETH_DEV="`cat /etc/rc.conf | grep ifconfig | cut -d= -f1 | cut -d_ -f2`"
-    if [ "$ETH_DEV" != "" ]; then
-        COUNT=`cat $DA_CONF_TEMPLATE | grep -c ethernet_dev`;
-        if [ $COUNT -eq 0 ]; then
-            echo ethernet_dev=${ETH_DEV} >> $DA_CONF_TEMPLATE;
-        fi
-    fi
-
-    if [ ! -e /usr/sbin/pkg ]; then
-        if [ ${AUTO_MODE} -eq 1 ]; then
-            echo "Warning: pkg not found. Attempting to auto-install."
-            setup_pkg;
-        else
-            echo "*** Error: cannot find pkg (/usr/sbin/pkg). Please make sure that pkg is installed. ***";
-            RET=1;
-        fi
-    fi
-
-    if [ ! -e /usr/local/sbin/named ]; then
-        echo "*** Error: cannot find the named binary. Please install: dns/bind99 ***";
-        RET=1;
-    fi
-
-    # if [ ! -e /usr/local/etc/namedb/named.conf ]; then
-    #   echo "*** Error: Cannot find /usr/local/etc/namedb/named.conf.  Make sure Bind is completely installed. ***";
-    #   RET=1;
-    # fi
-
-    # if [ ! -e /usr/local/bin/gcc ]; then
-    #   echo "*** Error: gcc not found. Please install: lang/gcc48 ***";
-    #   RET=1;
-    # fi
-
-    if [ ! -e /usr/bin/flex ]; then
-        echo "*** Error: flex not found in the Base System, which is odd. ***";
-        RET=1;
-    fi
-
-    if [ ! -e /usr/local/bin/bison ]; then
-        echo "*** Error: bison not found. Please install: devel/bison ***";
-        RET=1;
-    fi
-
-    if [ ! -e /usr/include/openssl/ssl.h ]; then
-        echo "*** Error: Base System OpenSSL libraries were not found (specifically: /usr/include/openssl/ssl.h). ***";
-        RET=1;
-    fi
-
-    # if [ ! -e /usr/bin/patch ]; then
-    #   echo "*** Error: patch not found in the Base System (/usr/bin/patch), which is odd. ***";
-    #   RET=1;
-    # fi
-
-    if [ ! -e /usr/sbin/edquota ]; then
-        echo "*** Error: cannot find /usr/sbin/edquota. Please make sure that quota is installed. ***";
-        RET=1;
-    fi
-
-    if [ $RET = 0 ]; then
-        echo "All pre-install checks have passed.";
-    else
-        if [ ${AUTO_MODE} -eq 1 ]; then
-            echo "Auto-Installing required dependencies.";
-            install_deps;
-        else
-            echo "*** Error: Pre-install checks failed. Please look above to see what has failed and apply the necessary fixes.";
-            echo "Once requirements are met, run the following to continue the install:";
-            echo "  cd /usr/local/directadmin/scripts";
-            echo "  ./portsbuild.sh";
-        fi
-    fi
+## Enable a service in /etc/rc.conf
+service_on() {
+    setVal ${1}_enable \"YES\" /etc/rc.conf
 }
 
+## Disable a service in /etc/rc.conf
+service_off() {
+    setVal ${1}_enable \"NO\" /etc/rc.conf
+}
 
+################################################################
 
 ## pkg bootstrap
 setup_pkg() {
-    echo "Bootstrapping and updating pkg";
+    echo "Bootstrapping and updating pkg"
     env ASSUME_ALWAYS_YES=YES pkg bootstrap
-    update_pkg();
+    update_pkg
 }
 
 ## pkg update
@@ -291,109 +238,143 @@ update_pkg() {
     ${PKG} update
 }
 
+## Install package without prompts
+pkgi() {
+    ${PKG} install -y $1
+}
+
 ## Setup /usr/ports
 setup_ports() {
     ${PORTSNAP} fetch extract
 }
 
+## Update /usr/ports
+update_ports() {
+    ${PORTSNAP} fetch update
+}
+
+## Clean stale ports
+clean_stale_ports() {
+    ${PORTMASTER} -s
+}
+
+## Reinstall all ports "in place" (from manual)
+reinstall_all_ports() {
+    ${PORTMASTER} -a -f -d
+}
+
+################################################################
+
 ## Pre-Install Tasks
 pre_install() {
-
     ## Need to create a blank /etc/auth.conf file for DA compatibility.
+    echo "Pre-Install Task: checking for /etc/auth.conf"
     if [ ! -e /etc/auth.conf ]; then
-        echo "Pre-Install Task: creating /etc/auth.conf"
         /usr/bin/touch /etc/auth.conf;
         /bin/chmod 644 /etc/auth.conf;
     fi
 
     ## Symlink Perl for DA compat
+    echo "Pre-Install Task: checking for /usr/bin/perl symlink"
     if [ ! -e /usr/bin/perl ]; then
         if [ -e /usr/local/bin/perl ]; then
             ln -s /usr/local/bin/perl /usr/bin/perl
         else
-            ${PKGI} ${PORT_PERL}
+            pkgi ${PORT_PERL}
             if [ $? eq 0 ]; then
                 ln -s /usr/local/bin/perl /usr/bin/perl
             fi
         fi
     fi
 
-    # pkg install -y gcc gmake perl5 wget bison flex cyrus-sasl cmake python autoconf libtool libarchive iconv bind99 mailx
+    ## Check for /etc/rc.conf
+    if [ ! -e /etc/rc.conf ]; then
+        touch /etc/rc.conf
+    fi
 
-    # Make sure pkg is installed. Check ports?
-    # if [ ! -e /usr/sbin/pkg ]; then
-    #   pkg
-    # fi
+    ## Check for /etc/make.conf
+    if [ ! -e /etc/make.conf ]; then
+        touch /etc/make.conf
+    fi
+
+
+    setVal ipv6_ipv4mapping \"YES\" /etc/rc.conf
+
+    setVal net.inet6.ip6.v6only 0 /etc/sysctl.conf
+
+    /sbin/sysctl net.inet6.ip6.v6only=0
+
+    disable_sendmail
+
+
+    ## Ethernet Device checking here
+    ##
+
 
 }
 
-## Post-Install Tasks
-post_install() {
-    # cleanup leftover files?
-    exit 0;
+## Setup
+setup() {
+    install_deps;
+    install_compats;
+
+    if [ OPT_INSTALL_CCACHE = "YES" ]; then
+        install_ccache;
+    fi
+
+    pre_install;
+    setup_directadmin;
+    install_directadmin;
+    create_cb_options;
+    exec_da_permissions;
+    post_install;
 }
+
 
 ## Install Dependencies
 install_deps() {
-
     if [ ${OS_MAJ} -eq 10 ]; then
         /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx dns/bind910
-    else if [ ${OS_MAJ} -eq 9 ]; then
+    elif [ ${OS_MAJ} -eq 9 ]; then
         /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx
     fi
 }
 
 ## Install Compat Libraries
 install_compats() {
-
     if [ ${OS_MAJ} -eq 10 ]; then
-        pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
+        /usr/sbin/pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
     elif [ ${OS_MAJ} -eq 9 ]; then
-        pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x
+        /usr/sbin/pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x
     fi
 }
 
 ## Install CCache
 install_ccache() {
-    ${PKGI} ${PORT_CCACHE}
+    pkgi devel/ccache
 
     if [ $? == 0 ]; then
-        if [ -e /etc/make.conf ]; then
-            echo "WITH_CCACHE_BUILD=yes" >> /etc/make.conf
+        if [ ! -e /etc/make.conf ]; then
+            touch /etc/make.conf
         fi
+        setVal WITH_CCACHE_BUILD yes /etc/make.conf
     fi
+}
+
+## Post-Install Tasks
+post_install() {
+    ## cleanup leftover files?
+    echo "All done."
+    exit 0;
 }
 
 ## Disable sendmail
 disable_sendmail() {
 
-    ${PERL} -pi -e 's/sendmail_enable=\"YES\"/sendmail_enable=\"NONE\"/' /etc/rc.conf
-    ${PERL} -pi -e 's/sendmail_enable=\"NO\"/sendmail_enable=\"NONE\"/' /etc/rc.conf
-
-    COUNT=`grep -c sendmail_enable=\"NONE\" /etc/rc.conf`
-    if [ "$COUNT" -eq 0 ]; then
-        echo -e "sendmail_enable=\"NONE\"" >> /etc/rc.conf
-    fi
-
-    COUNT=`grep -c sendmail_submit_enable=\"NO\" /etc/rc.conf`
-    if [ "$COUNT" -eq 0 ]; then
-        echo -e "sendmail_submit_enable=\"NO\"" >> /etc/rc.conf
-    fi
-
-    COUNT=`grep -c sendmail_outbound_enable=\"NO\" /etc/rc.conf`
-    if [ "$COUNT" -eq 0 ]; then
-        echo -e "sendmail_outbound_enable=\"NO\"" >> /etc/rc.conf
-    fi
-
-    COUNT=`grep -c sendmail_msp_queue_enable=\"NO\" /etc/rc.conf`
-    if [ "$COUNT" -eq 0 ]; then
-        echo -e "sendmail_msp_queue_enable=\"NO\"" >> /etc/rc.conf
-    fi
-
-    ## echo "sendmail_enable=\"NONE\"" >> /etc/rc.conf
-    ## echo "sendmail_submit_enable=\"NO\"" >> /etc/rc.conf
-    ## echo "sendmail_outbound_enable=\"NO\"" >> /etc/rc.conf
-    ## echo "sendmail_msp_queue_enable=\"NO\"" >> /etc/rc.conf
+    setVal sendmail_enable \"NONE\" /etc/rc.conf
+    setVal sendmail_submit_enable \"NO\" /etc/rc.conf
+    setVal sendmail_outbound_enable \"NO\" /etc/rc.conf
+    setVal sendmail_msp_queue_enable \"NO\" /etc/rc.conf
 
     ${SERVICE} sendmail onestop
 }
@@ -401,47 +382,20 @@ disable_sendmail() {
 ## Enable SSH Daemon
 enable_sshd() {
 
-    ${PERL} -pi -e 's/sshd_enable=\"NO\"/sshd_enable=\"YES\"/' /etc/rc.conf
-
-    COUNT=`grep -c sshd_enable=\"YES\" /etc/rc.conf`
-    if [ "$COUNT" -eq 0 ]; then
-        echo "sshd_enable=\"YES\"" >> /etc/rc.conf
-    fi
+    setVal sshd_enable \"YES\" /etc/rc.conf
 
     ${SERVICE} sshd start
 }
 
 ## Update /etc/rc.conf
 update_rc() {
-
-    if [ ! -e /etc/rc.conf ]; then
-        touch /etc/rc.conf
-    fi
-
-    ## From DA/setup.sh:
-    COUNT=`grep -c ipv6_ipv4mapping /etc/rc.conf`
-    if [ "$COUNT" -eq 0 ]; then
-        echo "ipv6_ipv4mapping=\"YES\"" >> /etc/rc.conf
-    fi
-
-    disable_sendmail;
-
-    enable_sshd;
-
-    #set_hostname;
-
+    ## Go through installed/enabled services and make sure they're all enabled.
+    ## Perhaps rename this function to verify_rc?
 }
 
 ## Update /etc/sysctl.conf
 update_sysctl() {
-
-    ## From DA/setup.sh
-    COUNT=`grep -c net.inet6.ip6.v6only /etc/sysctl.conf`
-    if [ "$COUNT" -eq 0 ]; then
-        echo "net.inet6.ip6.v6only=0" >> /etc/sysctl.conf
-    fi
-
-    /sbin/sysctl net.inet6.ip6.v6only=0
+   #
 }
 
 ## Update /etc/make.conf
@@ -479,6 +433,23 @@ update_hosts() {
 ## Setup BIND (named)
 setup_bind() {
 
+    ## BIND (named)
+    if [ ${OS_MAJ} -eq 10 ]; then
+        if [ ! -e /usr/local/sbin/named ]; then
+            echo "*** Error: Cannot find the named binary.";
+        fi
+        if [ ! -e /usr/local/etc/namedb/named.conf ]; then
+            echo "*** Error: Cannot find /usr/local/etc/namedb/named.conf.";
+        fi
+    elif [ $OS_MAJ -eq 9 ]; then
+        if [ ! -e /usr/sbin/named ]; then
+            echo "*** Error: Cannot find the named binary.";
+        fi
+        if [ ! -e /var/named/etc/namedb/named.conf ]; then
+            echo "*** Error: Cannot find /var/named/etc/namedb/named.conf. Make sure Bind is completely installed.";
+        fi
+    fi
+
     ## File target paths:
     ## 10.2: /var/named/etc/namedb/named.conf
     ## 9.3: /etc/namedb/named.conf
@@ -490,12 +461,10 @@ setup_bind() {
         ## FreeBSD 9.3 with BIND 9.9.5 from base
         ${WGET} -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
     fi
-}
 
-## Create custombuild/options.conf
-create_cb_options() {
+    setVal named_enable \"YES\" /etc/rc.conf
 
-    touch ${CB_CONF};
+    ${SERVICE} named start
 }
 
 ## Create a spoof CustomBuild2 options.conf for DirectAdmin compatibility.
@@ -505,7 +474,7 @@ create_cb_options() {
         mkdir -p ${CB_PATH}
     fi
 
-    ${WGET} -O ${CB_CONF} ${PB_MIRROR}/conf/options.conf
+    ${WGET} -O ${CB_CONF} ${PB_MIRROR}/conf/cb-options.conf
 
     if [ -e ${CB_OPTIONS} ]; then
         chmod 755 ${CB_OPTIONS}
@@ -521,7 +490,7 @@ create_pb_options() {
 
 ### DirectAdmin Installation ###
 
-## The next two functions replace DirectAdmin's setup.sh
+## setup_directadmin and install_directadmin replace DirectAdmin's setup.sh
 
 ## Prepare DirectAdmin Installation (replaces setup.sh)
 setup_directadmin() {
@@ -566,6 +535,24 @@ setup_directadmin() {
         echo "Cannot find the DirectAdmin binary. Extraction failed";
         exit 5;
     fi
+
+
+    ## These were in do_checks()
+    ## Check for a separate /home partition (for quota support).
+    HOME_YES=`cat /etc/fstab | grep -c /home`;
+    if [ $HOME_YES -lt "1" ]; then
+        echo 'quota_partition=/' >> ${DA_CONF_TEMPLATE};
+    fi
+
+    ## Detect the ethernet interfaces that are available on the system (NOTE: can return more than 1 interface, even commented).
+    ETH_DEV="`cat /etc/rc.conf | grep ifconfig | cut -d= -f1 | cut -d_ -f2`"
+    if [ "$ETH_DEV" != "" ]; then
+        COUNT=`cat $DA_CONF_TEMPLATE | grep -c ethernet_dev`;
+        if [ $COUNT -eq 0 ]; then
+            echo ethernet_dev=${ETH_DEV} >> ${DA_CONF_TEMPLATE};
+        fi
+    fi
+
 
 
 ## From setup.sh: generate setup.txt
@@ -637,8 +624,7 @@ install_directadmin() {
     touch ${DA_PATH}/data/admin/r_welcome.txt
 
     #Verify: Create backup.conf (wasn't created?)
-    chown diradmin:diradmin /usr/local/directadmin/data/users/admin/backup.conf
-
+    chown diradmin:diradmin ${DA_PATH}/data/users/admin/backup.conf
 
     ## Create logs directory:
     mkdir -p /var/log/httpd/domains
@@ -663,6 +649,7 @@ install_directadmin() {
 ## Install DA cron (from: scripts/install.sh)
 install_cron() {
 
+## Need to add:
 # * * * * * root /usr/local/directadmin/dataskq
 # 2 0-23/6 * * * root echo 'action=vacation&value=all' >> /usr/local/directadmin/data/task.queue;
 # 5 0 * * * root /usr/sbin/quotaoff -a; /sbin/quotacheck -aug; /usr/sbin/quotaon -a;
@@ -687,16 +674,20 @@ install_cron() {
 ## <include> /usr/local/etc/newsyslog.conf.d/*
 setup_newsyslog() {
 
-    #fix: cp /etc/newsyslog.conf.d/directadmin.conf /usr/local/etc/newsyslog.conf.d/
+    #fix this
+    #cp /etc/newsyslog.conf.d/directadmin.conf /usr/local/etc/newsyslog.conf.d/
+
+    ## See what's enabled/installed on the system and update the newsyslog with the appropriate services
+    ##
 
     /usr/sbin/newsyslog
 }
 
-## Exim-specific stuff (from: scripts/install.sh)
-prepare_exim() {
+## Exim Pre-Installation Tasks
+exim_pre_installation() {
 
     mkdir -p ${VIRTUAL};
-    chown mail:mail ${VIRTUAL};
+    chown ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL};
     chmod 755 ${VIRTUAL};
 
     echo "`hostname`" >> ${VIRTUAL}/domains;
@@ -718,27 +709,422 @@ prepare_exim() {
         chmod 600 ${VIRTUAL}/$i;
     done
 
-    chown mail:mail ${VIRTUAL}/*;
+    chown ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL}/*;
+}
+
+## Exim Post-Installation Tasks
+exim_post_installation() {
+
+    ## Set permissions
+    chown -R ${EXIM_USER}:${EXIM_GROUP} /var/spool/exim
+
+    ## Symlink for compat:
+    ln -s /usr/local/etc/exim/exim.conf /etc/exim.conf
+
+    ## Generate Self-Signed SSL Certificates
+    ## See: http://help.directadmin.com/item.php?id=245
+    /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout /usr/local/etc/exim/exim.key -out /usr/local/etc/exim/exim.cert -days 9000 -nodes
+
+    ln -s /usr/local/etc/exim/exim.key /etc/exim.key
+    ln -s /usr/local/etc/exim/exim.cert /etc/exim.cert
+
+    ## Set permissions:
+    chown mail:mail /usr/local/etc/exim/exim.key
+    chmod 644 /usr/local/etc/exim/exim.key
+    chmod 644 /usr/local/etc/exim/exim.cert
+
+    ## Restart Exim for the changes to take effect:
+    service exim restart
+
+    ## Reference: Verify Exim config:
+    exim -C /usr/local/etc/exim/exim.conf -bV
+
+
+
+
+    ## Tel DA new path to Exim binary.
+    setVal mq_exim_bin "/usr/local/sbin/exim" >> ${DA_CONF}
+
+    ## Replace sendmail programs with Exim binaries.
+    ## There's another way to do this via mail/exim and typing "make something"
+    if [ ! -e /etc/mail/mailer.conf ]; then
+        touch /etc/mail/mailer.conf
+    fi
+
+    ## Update /etc/mail/mailer.conf:
+    ## Change to:
+    # sendmail /usr/local/sbin/exim
+    # send-mail /usr/local/sbin/exim
+    # mailq /usr/local/sbin/exim -bp
+    # newaliases /usr/bin/true
+    # #hoststat /usr/libexec/sendmail/sendmail
+    # #purgestat /usr/libexec/sendmail/sendmail
+    # rmail /usr/local/sbin/exim -i -oee
+
+    if [ ! -e /etc/periodic.conf ]; then
+        touch /etc/periodic.conf
+    fi
+
+    echo "daily_status_include_submit_mailq=\"NO\"" >> /etc/periodic.conf
+    echo "daily_clean_hoststat_enable=\"NO\"" >> /etc/periodic.conf
+
+}
+
+
+## Dovecot Pre-Installation Tasks
+dovecot_pre_installation() {
+    #
+}
+
+## Dovecot Post-Installation Tasks
+dovecot_post_installation() {
+    #
+}
+
+## SQL Post-Installation Tasks
+sql_post_installation() {
+
+    ## Secure Installation (replace it with scripted method below)
+    /usr/local/bin/mysql_secure_installation
+
+    ## Use this:
+    # /usr/local/bin/mysqladmin --user=root password YOURSQLPASSWORD 1> /dev/null 2> /dev/null
+    # echo "UPDATE mysql.user SET password=PASSWORD('YOURSQLPASSWORD') WHERE user='root';"> mysql.temp;
+    # echo "UPDATE mysql.user SET password=PASSWORD('YOURSQLPASSWORD') WHERE password='';">> mysql.temp;
+    # echo "DROP DATABASE IF EXISTS test;" >> mysql.temp
+    # echo "FLUSH PRIVILEGES;" >> mysql.temp;
+    # /usr/local/bin/mysql mysql --user=root --password=YOURSQLPASSWORD < mysql.temp;
+    # rm -f mysql.temp;
+
+    ## Note: there are two (2) users (with different passwords): root and da_admin
+    ## Add the `da_admin` user to MySQL (replace the variables!):
+    # echo "GRANT CREATE, DROP ON *.* TO da_admin@localhost IDENTIFIED BY 'YOURSQLPASSWORD' WITH GRANT OPTION;" > mysql.temp;
+    # echo "GRANT ALL PRIVILEGES ON *.* TO da_admin@localhost IDENTIFIED BY 'YOURSQLPASSWORD' WITH GRANT OPTION;" >> mysql.temp;
+    # /usr/local/bin/mysql --user=root --password=YOURSQLPASSWORD < mysql.temp;
+    # rm -f mysql.temp;
+
+
+    ## CLI method (incomplete):
+    #   /usr/local/bin/mysql --user=root --password=ROOT_SQL_PASSWORD "GRANT CREATE, DROP ON *.* TO da_admin@localhost IDENTIFIED BY 'DA_ADMIN_SQL_PASSWORD' WITH GRANT OPTION;"
+
+
+    ## Add DirectAdmin `da_admin` SQL database credentials to `mysql.conf`:
+    # echo "user=da_admin" > /usr/local/directadmin/conf/mysql.conf
+    # echo "passwd=DA_ADMIN_SQL_PASSWORD" >> /usr/local/directadmin/conf/mysql.conf
+    # chown diradmin:diradmin /usr/local/directadmin/conf/mysql.conf;
+    # chmod 400 /usr/local/directadmin/conf/mysql.conf;
+
+    ## Create and update `/usr/local/etc/my.cnf`:
+
+    # touch /usr/local/etc/my.cnf
+    # echo "[mysqld]" > /usr/local/etc/my.cnf;
+    # echo "local-infile=0" >> /usr/local/etc/my.cnf;
+    # echo "innodb_file_per_table" >> /usr/local/etc/my.cnf;
+
+
+    ## Symlink the `mysqldump` binary for compat. This is used by DirectAdmin during SQL backup functions (may not be needed since we can set the binary path in directadmin.conf):
+    mkdir -p /usr/local/mysql/bin
+    ln -s /usr/local/bin/mysqldump /usr/local/mysql/bin/mysqldump
+
+}
+
+## PHP Post-Installation Tasks
+php_post_installation() {
+
+    ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
+    #cp -f /usr/local/directadmin/custombuild/configure/fpm/conf/php-fpm.conf.56 /usr/local/etc/php-fpm.conf
+
+    ## Create CB2/DA directories for compat (replace php56 with your appropriate version):
+
+    mkdir -p /usr/local/php56
+    mkdir -p /usr/local/php56/bin
+    mkdir -p /usr/local/php56/etc
+    mkdir -p /usr/local/php56/include
+    mkdir -p /usr/local/php56/lib
+    mkdir -p /usr/local/php56/php
+    mkdir -p /usr/local/php56/sbin
+    mkdir -p /usr/local/php56/sockets
+    mkdir -p /usr/local/php56/var/log/
+    mkdir -p /usr/local/php56/var/run
+    #mkdir -p /usr/local/php56/lib/php.conf.d/
+    mkdir -p /usr/local/php56/lib/php/
+
+    ## Symlink for compat (replace php56 with your appropriate version):
+
+    ln -s /usr/local/bin/php /usr/local/php56/bin/php
+    ln -s /usr/local/bin/php-cgi /usr/local/php56/bin/php-cgi
+    ln -s /usr/local/bin/php-config /usr/local/php56/bin/php-config
+    ln -s /usr/local/bin/phpize /usr/local/php56/bin/phpize
+    ln -s /usr/local/sbin/php-fpm /usr/local/php56/sbin/php-fpm
+    ln -s /var/log/php-fpm.log /usr/local/php56/var/log/php-fpm.log
+    ln -s /usr/local/include/php /usr/local/php56/include
+
+    ## Scan directory for PHP ini files:
+    ln -s /usr/local/etc/php /usr/local/php56/lib/php.conf.d
+    ln -s /usr/local/etc/php.ini /usr/local/php56/lib/php.ini
+    ln -s /usr/local/etc/php-fpm.conf /usr/local/php56/etc/php-fpm.conf
+    ln -s /usr/local/lib/php/build /usr/local/php56/lib/php/build
+    ln -s /usr/local/lib/php/20131226 /usr/local/php56/lib/php/extensions
+
+
+    ## Scripted reference (from CB2):
+    echo "Making PHP installation compatible with php.ini file"
+    ${PERL} -pi -e 's/^register_long_arrays/;register_long_arrays/' ${PHP_INI}
+    ${PERL} -pi -e 's/^magic_quotes_gpc/;magic_quotes_gpc/' ${PHP_INI}
+    ${PERL} -pi -e 's/^safe_mode/;safe_mode/' ${PHP_INI}
+    ${PERL} -pi -e 's/^register_globals/;register_globals/' ${PHP_INI}
+    ${PERL} -pi -e 's/^register_long_arrays/;register_long_arrays/' ${PHP_INI}
+    ${PERL} -pi -e 's/^allow_call_time_pass_reference/;allow_call_time_pass_reference/' ${PHP_INI}
+    ${PERL} -pi -e 's/^define_syslog_variables/;define_syslog_variables/' ${PHP_INI}
+    ${PERL} -pi -e 's/^highlight.bg/;highlight.bg/' ${PHP_INI}
+    ${PERL} -pi -e 's/^session.bug_compat_42/;session.bug_compat_42/' ${PHP_INI}
+    ${PERL} -pi -e 's/^session.bug_compat_warn/;session.bug_compat_warn/' ${PHP_INI}
+    ${PERL} -pi -e 's/^y2k_compliance/;y2k_compliance/' ${PHP_INI}
+    ${PERL} -pi -e 's/^magic_quotes_runtime/;magic_quotes_runtime/' ${PHP_INI}
+    ${PERL} -pi -e 's/^magic_quotes_sybase/;magic_quotes_sybase/' ${PHP_INI}
+
+    # secure_php_ini
+
+}
+
+## phpMyAdmin Post-Installation Tasks
+phpmyadmin_post_installation() {
+
+    ## Reference for virtualhost entry:
+    # Alias /phpmyadmin/ "/usr/local/www/phpMyAdmin/"
+    # <Directory "/usr/local/www/phpMyAdmin/">
+    #   Options None
+    #   AllowOverride Limit
+    #   Require local
+    #   Require host .example.com
+    # </Directory>
+
+    ## Custom config from cb2/custom directory (if present):
+    PMA_CONFIG=${CWD}/custom/phpmyadmin/config.inc.php
+    PMA_THEMES=${CWD}/custom/phpmyadmin/themes
+
+    ## Reference: Paths:
+
+    WWWDIR=/usr/local/www
+    ##REALPATH=${WWWDIR}/phpMyAdmin-${PHPMYADMIN_VER}
+    REALPATH=/usr/local/www/phpMyAdmin
+    ALIASPATH=${WWW_DIR}/phpMyAdmin
+    CONFIG=${REALPATH}/config.inc.php
+
+    ## Scripted reference:
+
+    ## If custom config exists
+    if [ -e ${PMA_CONFIG} ]; then
+        echo "Installing custom PhpMyAdmin Config: ${PMA_CONFIG}"
+        cp -f ${PMA_CONFIG} ${REALPATH}/config.inc.php
+    else
+        cp -f ${REALPATH}/config.sample.inc.php ${REALPATH}/config.inc.php
+        perl -pi -e "s#\['host'\] = 'localhost'#\['host'\] = '${MYSQLHOST}'#" ${REALPATH}/config.inc.php
+        perl -pi -e "s#\['host'\] = ''#\['host'\] = '${MYSQLHOST}'#" ${REALPATH}/config.inc.php
+        perl -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${REALPATH}/config.inc.php
+        perl -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${REALPATH}/config.inc.php
+    fi
+
+    ## Copy sample config:
+    cp ${WWW_DIR}/phpMyAdmin/config.sample.inc.php ${WWW_DIR}/phpMyAdmin/config.inc.php
+
+    ## Update phpMyAdmin configuration file:
+    ${PERL} -pi -e "s#\['host'\] = 'localhost'#\['host'\] = 'localhost'#" ${WWW_DIR}/phpMyAdmin/config.inc.php
+    ${PERL} -pi -e "s#\['host'\] = ''#\['host'\] = 'localhost'#" ${WWW_DIR}/phpMyAdmin/config.inc.php
+    ${PERL} -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${WWW_DIR}/phpMyAdmin/config.inc.php
+    ${PERL} -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${WWW_DIR}/phpMyAdmin/config.inc.php
+
+    # Copy custom themes:
+    if [ -d ${PMA_THEMES} ]; then
+        echo "Installing custom PhpMyAdmin themes: ${PMA_THEMES}"
+        cp -Rf ${PMA_THEMES} ${REALPATH}
+    fi
+
+    ## Update alias path via symlink (not done):
+    rm -f ${ALIASPATH} >/dev/null 2>&1
+    ln -s ${REALPATH} ${ALIASPATH}
+
+
+    ## Create logs directory:
+    if [ ! -d ${REALPATH}/log ]; then
+        mkdir -p ${REALPATH}/log
+    fi
+
+    ## Set permissions:
+    chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${REALPATH}
+    chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${ALIASPATH}
+    chmod 755 ${REALPATH}
+
+
+    ## Set permissions (same as above, remove this):
+    chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/phpMyAdmin
+    chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/phpMyAdmin
+    chmod 755 ${WWW_DIR}/phpMyAdmin
+
+    ## Symlink:
+    ln -s ${WWW_DIR}/phpMyAdmin ${WWW_DIR}/phpmyadmin
+    ln -s ${WWW_DIR}/phpMyAdmin ${WWW_DIR}/pma
+
+## verify:
+
+    # Disable scripts directory (path doesn't exist):
+    if [ -d ${REALPATH}/scripts ]; then
+        chmod 000 ${REALPATH}/scripts
+    fi
+
+    # Disable setup directory (done):
+    if [ -d ${REALPATH}/setup ]; then
+        chmod 000 ${REALPATH}/setup
+    fi
+
+    # Auth log patch for BFM compat (not done):
+    # Currently outputs to /var/log/auth.log
+    getFile patches/pma_auth_logging.patch pma_auth_logging.patch
+
+    if [ -e patches/pma_auth_logging.patch ]; then
+        echo "Patching phpMyAdmin to log failed authentications for BFM..."
+        cd ${REALPATH}
+        patch -p0 < ${WORKDIR}/patches/pma_auth_logging.patch
+    fi
+
+    ## Update /etc/groups (verify):
+    #access:*:1164:apache,nobody,mail,majordomo,daemon,clamav
+}
+
+## Apache Post-Installation Tasks
+apache_post_installation() {
+
+    ## Symlink for backwards compatability:
+    mkdir -p /etc/httpd/conf
+    ln -s /usr/local/etc/apache24 /etc/httpd/conf
+
+    ## CustomBuild2 looking for Apache modules in /usr/lib/apache*
+    ## Symlink for backcomp (done):
+
+    mkdir -p /usr/lib/apache
+    ln -s /usr/local/libexec/apache24 /usr/lib/apache
+
+    ## Since DirectAdmin/CB2 reference /var/www/html often, we'll symlink for compat:
+    mkdir -p /var/www
+    ln -s /usr/local/www /var/www/html
+    chown -h webapps:webapps /var/www/html
+
+    ## CustomBuild2 reference /etc/httpd/conf/ssl
+    ## Create empty files for CB2 to generate
+
+    ## Symlink for compat:
+    mkdir -p /etc/httpd/conf/ssl.crt
+    mkdir -p /etc/httpd/conf/ssl.key
+    mkdir -p ${APACHE_DIR}/ssl
+
+    #touch /etc/httpd/conf/ssl.crt/server.crt
+    #touch /etc/httpd/conf/ssl.key/server.key
+
+    touch ${APACHE_DIR}/ssl/server.crt
+    touch ${APACHE_DIR}/ssl/server.key
+
+    ln -s ${APACHE_DIR}/ssl/server.crt /etc/httpd/conf/ssl.crt/server.crt
+    ln -s ${APACHE_DIR}/ssl/server.ca /etc/httpd/conf/ssl.crt/server.ca
+    ln -s ${APACHE_DIR}/ssl/server.key /etc/httpd/conf/ssl.key/server.key
+
+    ln -s ${APACHE_DIR}/ssl/server.crt /usr/local/etc/apache24/ssl.crt/server.crt
+    ln -s ${APACHE_DIR}/ssl/server.ca /usr/local/etc/apache24/ssl.crt/server.ca
+    ln -s ${APACHE_DIR}/ssl/server.key /usr/local/etc/apache24/ssl.key/server.key
+
+    ## NOTE: Careful with this, paths are relative
+    /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout ${APACHE_DIR}/ssl/server.key -out ${APACHE_DIR}/ssl/server.crt -days 9999 -nodes -config ./custom/ap2/cert_config.txt
+
+    ## Set permissions:
+    chmod 600 ${APACHE_DIR}/ssl/server.crt
+    chmod 600 ${APACHE_DIR}/ssl/server.key
+
+    ## Symlink for DA compat:
+    ln -s /usr/local/sbin/httpd /usr/sbin/httpd
+
+    ## Copy over modified (custom) CB2 conf files to conf/:
+    cp -rf /usr/local/directadmin/custombuild/custom/ap2/conf/ /usr/local/etc/apache24/
+    cp -f /usr/local/directadmin/custombuild/custom/ap2/conf/httpd.conf /usr/local/etc/apache24/
+    cp -f /usr/local/directadmin/custombuild/custom/ap2/conf/extra/httpd-mpm.conf /usr/local/etc/apache24/extra/httpd-mpm.conf
+
+
+    ## Already done (default):
+
+    ${PERL} -pi -e 's/^DefaultType/#DefaultType/' ${APACHE_DIR}/httpd.conf
+    chmod 710 ${APACHE_DIR}
+
+
+    ## Rewrite Apache 2.4 configuration files
+    ## Perhaps skip this? No need I think -sg
+
+    ##cd /usr/local/directadmin/custombuild
+    ##./build rewrite_confs
+
+    ## Update /boot/loader.conf:
+    setVal accf_httpd_load \"YES\" /boot/loader.conf
+    setVal accf_data_load \"YES\" /boot/loader.conf
+
+}
+
+
+
+
+## Webapps Pre-Installation Tasks
+webapps_pre_installation() {
+
+    ## Create user and group:
+    pw groupadd ${WEBAPPS_GROUP}
+    pw useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
+
+    ## Set permissions on temp directory:
+    chmod 777 ${WWW_DIR}/tmp
+
+    ## Temp path: /usr/local/www/webmail/tmp
+
+    ## Create webmail directory:
+    mkdir -p ${WWW_DIR}/webmail/tmp
+    chmod -R 770 ${WWW_DIR}/webmail/tmp;
+    chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail
+    chown -R ${APACHE_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail/tmp;
+    echo "Deny from All" >> $TMPDIR/.htaccess
+}
+
+## Webapps Post-Installation Tasks
+webapps_post_installation() {
+
+    ## Increase the timeout from 10 minutes to 24
+    ${PERL} -pi -e 's/idle_timeout = 10/idle_timeout = 24/' ${DEST}/webmail/inc/config.security.php
+
+    ${PERL} -pi -e 's#\$temporary_directory = "./database/";#\$temporary_directory = "./tmp/";#' ${DEST}/webmail/inc/config.php
+    ${PERL} -pi -e 's/= "ONE-FOR-EACH";/= "ONE-FOR-ALL";/' ${DEST}/webmail/inc/config.php
+    ${PERL} -pi -e 's#\$smtp_server = "SMTP.DOMAIN.COM";#\$smtp_server = "localhost";#' ${DEST}/webmail/inc/config.php
+    # ${PERL} -pi -e 's#\$default_mail_server = "POP3.DOMAIN.COM";#\$default_mail_server = "localhost";#' ${DEST}/webmail/inc/config.php
+    ${PERL} -pi -e 's/POP3.DOMAIN.COM/localhost/' ${DEST}/webmail/inc/config.php
+
+    rm -rf ${DEST}/webmail/install
+
+    ## Copy redirect.php (done):
+    cp -f ${DA_PATH}/scripts/redirect.php ${WWW_DIR}/redirect.php
 }
 
 ## Secure php.ini (copied from CB2)
-secure_phpini() {
+## $1 = php.ini file to update
+secure_php_ini() {
     if [ -e $1 ]; then
         if grep -m1 -q -e disable_functions $1; then
             CURRENT_DISABLE_FUNCT="`grep -m1 'disable_functions' $1`"
             NEW_DISABLE_FUNCT="exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname"
-            perl -pi -e "s#${CURRENT_DISABLE_FUNCT}#disable_functions \= ${NEW_DISABLE_FUNCT}#" $1
+            ${PERL} -pi -e "s#${CURRENT_DISABLE_FUNCT}#disable_functions \= ${NEW_DISABLE_FUNCT}#" $1
         else
             echo "disable_functions = ${NEW_DISABLE_FUNCT}" >> $1
         fi
 
-        perl -pi -e 's/^register_globals = On/register_globals = Off/' $1
+        ${PERL} -pi -e 's/^register_globals = On/register_globals = Off/' $1
 
-        perl -pi -e 's/^mysql.allow_local_infile = On/mysql.allow_local_infile = Off/' $1
-        perl -pi -e 's/^mysqli.allow_local_infile = On/mysqli.allow_local_infile = Off/' $1
-        perl -pi -e 's/^;mysqli.allow_local_infile = On/mysqli.allow_local_infile = Off/' $1
+        ${PERL} -pi -e 's/^mysql.allow_local_infile = On/mysql.allow_local_infile = Off/' $1
+        ${PERL} -pi -e 's/^mysqli.allow_local_infile = On/mysqli.allow_local_infile = Off/' $1
+        ${PERL} -pi -e 's/^;mysqli.allow_local_infile = On/mysqli.allow_local_infile = Off/' $1
 
-        perl -pi -e 's/^expose_php = On/expose_php = Off/' $1
+        ${PERL} -pi -e 's/^expose_php = On/expose_php = Off/' $1
     fi
 }
 
@@ -768,6 +1154,7 @@ verify_webapps_php_ini() {
         echo "disable_functions=exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname" >> ${PHP_INI_WEBAPPS}
     fi
 }
+
 ## Ensure Webapps tmp (copied from CB2)
 verify_webapps_tmp() {
 
@@ -781,14 +1168,15 @@ verify_webapps_tmp() {
     verify_webapps_php_ini
 }
 
-## Apache Host Configuration
-## Copied from CB2
+## Apache Host Configuration (copied from CB2)
 do_ApacheHostConf() {
 
     HOSTCONF=${APACHE_DIR}/extra/httpd-hostname.conf
 
     ## Set this for now since PB only supports 1 instance of PHP.
     PHP1_MODE_OPT="php-fpm"
+    PHP1_MOD="FPM"
+    PHP1_VERSION="56"
 
     ## Copy custom/ file
     if [ -e ${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf ]; then
@@ -815,7 +1203,7 @@ do_ApacheHostConf() {
         echo '  Allow from all'                         >> ${HOSTCONF}
         echo '  <IfModule mod_suphp.c>'                 >> ${HOSTCONF}
         echo '      suPHP_Engine On'                    >> ${HOSTCONF}
-        echo '      suPHP_UserGroup webapps webapps'    >> ${HOSTCONF}
+        echo '      suPHP_UserGroup ${WEBAPPS_USER} ${WEBAPPS_GROUP}'    >> ${HOSTCONF}
         echo '  </IfModule>'                            >> ${HOSTCONF}
 
         # echo '    <IfModule mod_ruid2.c>'                 >> ${HOSTCONF}
@@ -876,15 +1264,94 @@ exec_da_permissions() {
     ./directadmin p
 }
 
+
+
+## Install Application
+## $1 = name of service
+## e.g. install_app exim
+install_app() {
+
+    ## add func() to update make.conf, or config via CLI
+
+    case "$1" in
+        "apache")
+            portmaster -d ${PORT_APACHE24}
+            ;;
+        "nginx")
+            portmaster -d ${PORT_NGINX}
+            ;;
+        "php55")
+            portmaster -d ${PORT_PHP55}
+            ;;
+        "php56")
+            portmaster -d ${PORT_PHP56}
+            ;;
+        "ioncube")
+            pkgi ${PORT_IONCUBE}
+            ;;
+        "roundcube")
+            webapps_pre_installation
+            portmaster -d ${PORT_ROUNDCUBE}
+            webapps_post_installation
+            ;;
+        "spamassassin")
+            portmaster -d ${PORT_SPAMASSASSIN}
+            ;;
+        "exim")
+            exim_pre_installation
+            portmaster -d ${PORT_EXIM}
+            exim_post_installation
+            ;;
+        "mariadb55")
+            # portmaster -d ${PORT_MARIADB55}
+            pkg install -y databases/mariadb55-server databases/mariadb55-client
+            ;;
+
+        "mariadb100")
+            # portmaster -d ${PORT_MARIADB100}
+            pkg install -y databases/mariadb100-server databases/mariadb100-client
+            ;;
+        "mysql55")
+            # portmaster -d ${PORT_MYSQL55}
+            pkg install -y databases/mysql55-server databases/mysql55-client
+            ;;
+        "mysql56")
+            # portmaster -d ${PORT_MYSQL56}
+            pkg install -y databases/mysql56-server databases/mysql56-client
+            ;;
+        "pureftpd")
+            portmaster -d ${PORT_PUREFTPD}
+            ;;
+        "proftpd")
+            portmaster -d ${PORT_PROFTPD}
+            ;;
+    esac
+    
+}
+
+## Uninstall Application
+## $1 = name of service
+## e.g. uninstall_app exim
+uninstall_app() {
+    ##
+}
+
+
+
 ## ./portsbuild selection screen
 case "$1" in
     "") ;;
 #    create_options)  ;;
 #    set)  ;;
 #    check_options) ;;
-    install) ;; ## install DirectAdmin
-    setup) ;; ## setup DirectAdmin (alias for 'install'?)
+    install) ;; ## install PB+DirectAdmin
+    #setup) ;; ## (alias for 'install'?)
     update) ;; ## update PB script
     verify) ;; ## verify system state
     all) ;;
 esac
+
+################################################################
+
+## EOF
+
