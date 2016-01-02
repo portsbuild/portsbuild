@@ -265,7 +265,7 @@ reinstall_all_ports() {
 
 ## Random Password Generator (from CB2)
 random_pass() {
-    tr -cd 'a-zA-Z0-9' < /dev/urandom 2>/dev/null | head -c${1:-`perl -le 'print int rand(7) + 10'`}
+    ${PERL} -le'print map+(A..Z,a..z,0..9)[rand 62],0..12'
 }
 
 ################################################################
@@ -398,11 +398,6 @@ update_rc() {
     ## Perhaps rename this function to verify_rc?
 }
 
-## Update /etc/sysctl.conf
-update_sysctl() {
-   #
-}
-
 ## Update /etc/make.conf
 update_make() {
 
@@ -465,6 +460,11 @@ setup_bind() {
     elif [ ${OS_MAJ} -eq 9 ]; then
         ## FreeBSD 9.3 with BIND 9.9.5 from base
         ${WGET} -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
+    fi
+
+    ## Generate BIND's rndc.key
+    if [ ! -e /usr/local/etc/namedb/rndc.key ] || [ ! -e /etc/namedb/rndc.key ]; then
+        rndc-confgen -a -s ${DA_SERVER_IP}
     fi
 
     setVal named_enable \"YES\" /etc/rc.conf
@@ -923,7 +923,6 @@ php_post_install() {
     #cp -f /usr/local/directadmin/custombuild/configure/fpm/conf/php-fpm.conf.56 /usr/local/etc/php-fpm.conf
 
     ## Create CB2/DA directories for compat (replace php56 with your appropriate version):
-
     mkdir -p /usr/local/php56
     mkdir -p /usr/local/php56/bin
     mkdir -p /usr/local/php56/etc
@@ -995,9 +994,9 @@ phpmyadmin_post_install() {
 
     ## Reference: Paths:
 
-    WWWDIR=/usr/local/www
+    #WWWDIR=/usr/local/www
     ##REALPATH=${WWWDIR}/phpMyAdmin-${PHPMYADMIN_VER}
-    REALPATH=/usr/local/www/phpMyAdmin
+    REALPATH=${WWW_DIR}/phpMyAdmin
     ALIASPATH=${WWW_DIR}/phpMyAdmin
     CONFIG=${REALPATH}/config.inc.php
 
