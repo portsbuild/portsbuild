@@ -1,0 +1,93 @@
+diff -rupN libraries.orig/common.inc.php libraries/common.inc.php
+--- libraries.orig/common.inc.php	2015-01-30 01:21:34.332632729 -0700
++++ libraries/common.inc.php	2015-01-30 01:19:23.856881237 -0700
+@@ -868,6 +868,9 @@ if (! defined('PMA_MINIMUM_COMMON')) {
+         $auth_plugin = new $auth_class($plugin_manager);
+ 
+         if (! $auth_plugin->authCheck()) {
++            //DA logging
++            log_to_file('', "not authenticated");
++
+             /* Force generating of new session on login */
+             PMA_secureSession();
+             $auth_plugin->auth();
+diff -rupN libraries.orig/logging.lib.php libraries/logging.lib.php
+--- libraries.orig/logging.lib.php	2015-01-30 01:21:34.319651116 -0700
++++ libraries/logging.lib.php	2015-01-30 01:25:48.566652817 -0700
+@@ -11,6 +11,67 @@ if (! defined('PHPMYADMIN')) {
+     exit;
+ }
+ 
++$LOG_DIR="./log";
++$LOG_FILE=$LOG_DIR."/auth.log";
++
++function ensure_log_dir()
++{
++	global $LOG_DIR;
++	if (is_dir($LOG_DIR))
++		return true;
++
++	if (!mkdir($LOG_DIR, 0770))
++		return false;
++}
++
++function log_to_file($user, $status)
++{
++	if (!ensure_log_dir())
++		return false;
++
++	global $LOG_FILE;
++
++	if ($user == '')
++	{
++		//global $PHP_AUTH_USER;
++		//$user = $PHP_AUTH_USER;
++
++		$user = PMA_getenv('PHP_AUTH_USER');
++	}
++
++	if ($user == '')
++		return true;
++
++	//remove any ' characters from $user
++	$user = urlencode($user);
++
++	//check for logout
++	if ($status == 'not authenticated')
++	{
++		if (isset($_GET['old_usr']) && isset($_SERVER['PHP_AUTH_USER']))
++		{
++			if ($_GET['old_usr'] == $_SERVER['PHP_AUTH_USER'])
++			{
++				$status = 'logout';
++			}
++		}
++	}
++
++	$log_str = date('M d H:i:s').":: pma auth user='$user' status='$status' ip='".$_SERVER["REMOTE_ADDR"]."'";
++
++	$fp = fopen($LOG_FILE, 'a');
++	if ($fp === false)
++	{
++		//log to apache error log instead
++		error_log($log_str."\n");
++		return;
++	}
++
++	fwrite($fp, $log_str."\n");
++
++	fclose($fp);
++}
++
+ /**
+  * Logs user information to webserver logs.
+  *
+@@ -25,6 +86,8 @@ function PMA_logUser($user, $status = 'o
+         apache_note('userID', $user);
+         apache_note('userStatus', $status);
+     }
++
++    log_to_file($user, $status);
+ }
+ 
+ ?>

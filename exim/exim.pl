@@ -237,7 +237,7 @@ sub auth_hit_limit_acl
 		($username,$domain) = split(/\@/, $username);
 		if ($domain eq "") { return "no"; }
 	}
-	
+
 	if ($unixuser == 1)
 	{
 		my $limit_check = hit_limit_user($username);
@@ -272,7 +272,7 @@ sub find_uid_apache
 {
 	my ($work_path) = @_;
 	my @pw;
-	
+
 	# $pwd will probably look like '/home/username/domains/domain.com/public_html'
 	# it may or may not use /home though. others are /usr/home, but it's ultimately
 	# specified in the /etc/passwd file.  We *could* parse through it, but for efficiency
@@ -391,7 +391,7 @@ sub find_uid
 	{
 		return $uid;
 	}
-	
+
 	$auth_uid = find_uid_auth_id($auth_id);
 	if ($auth_uid != -1) { return $auth_uid; }
 
@@ -490,7 +490,7 @@ sub check_limits
 			{
 				mkdir("/etc/virtual/usage/${name}_ids/$mid_char", 0770);
 			}
-			
+
 			if (! -d "/etc/virtual/usage/${name}_ids/$mid_char/$mid")
 			{
 				mkdir("/etc/virtual/usage/${name}_ids/$mid_char/$mid", 0770);
@@ -730,7 +730,7 @@ sub get_spam_high_score_drop
 				{
 					$block = "yes";
 				}
-				
+
 			}
 		}
 		close(FILTER_CONF);
@@ -775,7 +775,7 @@ sub get_spam_subject
 sub get_b64_string
 {
 	my ($str) = @_;
-	
+
 	eval
 	{
 		require MIME::Base64;

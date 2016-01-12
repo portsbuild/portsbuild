@@ -57,21 +57,21 @@ OS_DOMAIN=$(echo "$OS_HOST" | cut -d. -f2,3,4,5,6)
 if [ "${OS}" = "FreeBSD" ]; then
   if [ "${OS_B64}" -eq 1 ]; then
     if [ "$OS_VER" = "10.1" ] || [ "$OS_VER" = "10.2" ] || [ "$OS_VER" = "9.3" ]; then
-      echo "FreeBSD $OS_VER x64 operating system detected.";
+      echo "FreeBSD $OS_VER x64 operating system detected."
     else
       echo "Warning: Unsupported FreeBSD operating system detected."
-      echo "PortsBuild is tested to work with FreeBSD versions 9.3, 10.1 and 10.2 amd64 only.";
-      echo "You can press CTRL+C within 5 seconds to quit the PortsBuild script now, or proceed at your own risk.";
+      echo "PortsBuild is tested to work with FreeBSD versions 9.3, 10.1 and 10.2 amd64 only."
+      echo "You can press CTRL+C within 5 seconds to quit the PortsBuild script now, or proceed at your own risk."
       sleep 5;
     fi
   else
-    echo "Error: i386 (x86) systems are not supported.";
-    echo "PortsBuild requires FreeBSD 9.3+ amd64 (x64).";
+    echo "Error: i386 (x86) systems are not supported."
+    echo "PortsBuild requires FreeBSD 9.3+ amd64 (x64)."
     exit 1;
   fi
 else
-  echo "PortsBuild is for FreeBSD systems only. Please use CustomBuild for your Linux needs.";
-  echo "Visit: http://forum.directadmin.com/showthread.php?t=44743";
+  echo "PortsBuild is for FreeBSD systems only. Please use CustomBuild for your Linux needs."
+  echo "Visit: http://forum.directadmin.com/showthread.php?t=44743"
   exit 1;
 fi
 
@@ -85,15 +85,19 @@ fi
 ## Verify if /usr/ports exists.
 if [ ! -d ${PORTS_BASE}/ ]; then
   if [ "${AUTO_MODE}" -eq 0 ]; then
-    echo "Error: FreeBSD Ports system not installed. PortsBuild needs this to continue.";
-    echo "Please run the following command to install Ports:";
-    echo "  portsnap fetch extract";
-    echo "or visit: https://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/ports-using.html";
+    echo "Error: FreeBSD Ports system not installed. PortsBuild needs this to continue."
+    echo "Please run the following command to install Ports:"
+    echo "  portsnap fetch extract"
+    echo "or visit: https://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/ports-using.html"
     exit 1;
   else
     ## Automatically install & update /usr/ports/
     setup_ports
   fi
+fi
+
+if [ ! -f conf/defaults.conf ] || [ ! -f conf/ports.conf ] || [ ! -f conf/options.conf ]; then
+ echo "Missing files in conf/"
 fi
 
 ################################################################
@@ -825,19 +829,19 @@ dovecot_post_install() {
 
   ## Prepare Dovecot directories:
   mkdir -p /etc/dovecot/
-  mkdir -p /usr/local/etc/dovecot/conf
+  mkdir -p ${DOVECOT_PATH}
   mkdir -p /usr/local/etc/dovecot/conf.d
 
   ## Symlink for compat:
   ln -s ${DOVECOT_CONF} /etc/dovecot/dovecot.conf
   # Skipped: ln -s /etc/dovecot/dovecot.conf /etc/dovecot.conf
 
-  cp -rf ${DA_PATH}/custombuild/configure/dovecot/conf /usr/local/etc/dovecot/
+  cp -rf ${DA_PATH}/custombuild/configure/dovecot/conf ${DOVECOT_PATH}
 
-  echo "mail_plugins = $mail_plugins quota" > /usr/local/etc/dovecot/conf/lmtp_mail_plugins.conf
+  echo "mail_plugins = \$mail_plugins quota" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
 
   ## replace `hostname`
-  ${PERL} -pi -e "s|HOSTNAME|`hostname`|" /usr/local/etc/dovecot/conf/lmtp.conf
+  ${PERL} -pi -e "s|HOSTNAME|`hostname`|" ${DOVECOT_PATH}/conf/lmtp.conf
 
   ## ltmp log files (not done):
   touch /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
@@ -846,19 +850,19 @@ dovecot_post_install() {
 
   ## Modifications (done):
   ${PERL} -pi -e 's#transport = dovecot_lmtp_udp#transport = virtual_localdelivery#' /usr/local/etc/exim/exim.conf
-  ${PERL} -pi -e 's/driver = shadow/driver = passwd/' /usr/local/etc/dovecot/dovecot.conf
-  ${PERL} -pi -e 's/passdb shadow/passdb passwd/' /usr/local/etc/dovecot/dovecot.conf
+  ${PERL} -pi -e 's/driver = shadow/driver = passwd/' ${DOVECOT_CONF}
+  ${PERL} -pi -e 's/passdb shadow/passdb passwd/' ${DOVECOT_CONF}
 
-  echo "mail_plugins = $mail_plugins quota" > /usr/local/etc/dovecot/conf/mail_plugins.conf
-  echo "mail_plugins = $mail_plugins quota imap_quota" > /usr/local/etc/dovecot/conf/imap_mail_plugins.conf
+  echo "mail_plugins = \$mail_plugins quota"            > ${DOVECOT_PATH}/conf/mail_plugins.conf
+  echo "mail_plugins = \$mail_plugins quota imap_quota" > ${DOVECOT_PATH}/conf/imap_mail_plugins.conf
 
   # # Check for IPV6 compatability (not done):
   # if [ "${IPV6}" = "1" ]; then
-  #   perl -pi -e 's|^listen = \*$|#listen = \*|' /usr/local/etc/dovecot/dovecot.conf
-  #   perl -pi -e 's|^#listen = \*, ::$|listen = \*, ::|' /usr/local/etc/dovecot/dovecot.conf
+  #   perl -pi -e 's|^listen = \*$|#listen = \*|' ${DOVECOT_PATH}/dovecot.conf
+  #   perl -pi -e 's|^#listen = \*, ::$|listen = \*, ::|' ${DOVECOT_PATH}/dovecot.conf
   # else
-  #   perl -pi -e 's|^#listen = \*$|listen = \*|' /usr/local/etc/dovecot/dovecot.conf
-  #   perl -pi -e 's|^listen = \*, ::$|#listen = \*, ::|' /usr/local/etc/dovecot/dovecot.conf
+  #   perl -pi -e 's|^#listen = \*$|listen = \*|' ${DOVECOT_PATH}/dovecot.conf
+  #   perl -pi -e 's|^listen = \*, ::$|#listen = \*, ::|' ${DOVECOT_PATH}/dovecot.conf
   # fi
 
   echo "listen = *, ::" > /usr/local/etc/dovecot/conf/ip.conf
@@ -915,37 +919,38 @@ php_post_install() {
   ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
   #cp -f /usr/local/directadmin/custombuild/configure/fpm/conf/php-fpm.conf.56 /usr/local/etc/php-fpm.conf
 
-  ## Create CB2/DA directories for compat (replace php56 with your appropriate version):
-  mkdir -p /usr/local/php56
-  mkdir -p /usr/local/php56/bin
-  mkdir -p /usr/local/php56/etc
-  mkdir -p /usr/local/php56/include
-  mkdir -p /usr/local/php56/lib
-  mkdir -p /usr/local/php56/php
-  mkdir -p /usr/local/php56/sbin
-  mkdir -p /usr/local/php56/sockets
-  mkdir -p /usr/local/php56/var/log/
-  mkdir -p /usr/local/php56/var/run
-  #mkdir -p /usr/local/php56/lib/php.conf.d/
-  mkdir -p /usr/local/php56/lib/php/
+  PHP_PATH=/usr/local/php56
+
+  ## Create CB2/DA directories for compat:
+  mkdir -p ${PHP_PATH}
+  mkdir -p ${PHP_PATH}/bin
+  mkdir -p ${PHP_PATH}/etc
+  mkdir -p ${PHP_PATH}/include
+  mkdir -p ${PHP_PATH}/lib
+  mkdir -p ${PHP_PATH}/php
+  mkdir -p ${PHP_PATH}/sbin
+  mkdir -p ${PHP_PATH}/sockets
+  mkdir -p ${PHP_PATH}/var/log/
+  mkdir -p ${PHP_PATH}/var/run
+  #mkdir -p ${PHP_PATH}/lib/php.conf.d/
+  mkdir -p ${PHP_PATH}/lib/php/
 
   ## Symlink for compat (replace php56 with your appropriate version):
 
-  ln -s /usr/local/bin/php /usr/local/php56/bin/php
-  ln -s /usr/local/bin/php-cgi /usr/local/php56/bin/php-cgi
-  ln -s /usr/local/bin/php-config /usr/local/php56/bin/php-config
-  ln -s /usr/local/bin/phpize /usr/local/php56/bin/phpize
-  ln -s /usr/local/sbin/php-fpm /usr/local/php56/sbin/php-fpm
-  ln -s /var/log/php-fpm.log /usr/local/php56/var/log/php-fpm.log
-  ln -s /usr/local/include/php /usr/local/php56/include
+  ln -s /usr/local/bin/php ${PHP_PATH}/bin/php
+  ln -s /usr/local/bin/php-cgi ${PHP_PATH}/bin/php-cgi
+  ln -s /usr/local/bin/php-config ${PHP_PATH}/bin/php-config
+  ln -s /usr/local/bin/phpize ${PHP_PATH}/bin/phpize
+  ln -s /usr/local/sbin/php-fpm ${PHP_PATH}/sbin/php-fpm
+  ln -s /var/log/php-fpm.log ${PHP_PATH}/var/log/php-fpm.log
+  ln -s /usr/local/include/php ${PHP_PATH}/include
 
   ## Scan directory for PHP ini files:
-  ln -s /usr/local/etc/php /usr/local/php56/lib/php.conf.d
-  ln -s /usr/local/etc/php.ini /usr/local/php56/lib/php.ini
-  ln -s /usr/local/etc/php-fpm.conf /usr/local/php56/etc/php-fpm.conf
-  ln -s /usr/local/lib/php/build /usr/local/php56/lib/php/build
-  ln -s /usr/local/lib/php/20131226 /usr/local/php56/lib/php/extensions
-
+  ln -s /usr/local/etc/php ${PHP_PATH}/lib/php.conf.d
+  ln -s /usr/local/etc/php.ini ${PHP_PATH}/lib/php.ini
+  ln -s /usr/local/etc/php-fpm.conf ${PHP_PATH}/etc/php-fpm.conf
+  ln -s /usr/local/lib/php/build ${PHP_PATH}/lib/php/build
+  ln -s /usr/local/lib/php/20131226 ${PHP_PATH}/lib/php/extensions
 
   ## Scripted reference (from CB2):
   echo "Making PHP installation compatible with php.ini file"
@@ -963,10 +968,9 @@ php_post_install() {
   ${PERL} -pi -e 's/^magic_quotes_runtime/;magic_quotes_runtime/' ${PHP_INI}
   ${PERL} -pi -e 's/^magic_quotes_sybase/;magic_quotes_sybase/' ${PHP_INI}
 
-  # secure_php_ini
+  secure_php_ini ${PHP_INI}
 
   setVal php_fpm_enable \"YES\" /etc/rc.conf
-
 }
 
 ## phpMyAdmin Post-Installation Tasks
@@ -982,90 +986,90 @@ phpmyadmin_post_install() {
   # </Directory>
 
   ## Custom config from cb2/custom directory (if present):
-  PMA_CONFIG=${CWD}/custom/phpmyadmin/config.inc.php
-  PMA_THEMES=${CWD}/custom/phpmyadmin/themes
+  CUSTOM_PMA_CONFIG=${CWD}/custom/phpmyadmin/config.inc.php
+  CUSTOM_PMA_THEMES=${CWD}/custom/phpmyadmin/themes
 
   ## Reference: Paths:
 
   #WWWDIR=/usr/local/www
   ##REALPATH=${WWWDIR}/phpMyAdmin-${PHPMYADMIN_VER}
-  REALPATH=${WWW_DIR}/phpMyAdmin
-  ALIASPATH=${WWW_DIR}/phpMyAdmin
-  CONFIG=${REALPATH}/config.inc.php
+  #REALPATH=${WWW_DIR}/phpMyAdmin
+  ALIASPATH=${WWW_DIR}/phpmyadmin
+  REAL_CONFIG_FILE=${PMA_DIR}/config.inc.php
 
   ## Scripted reference:
 
   ## If custom config exists
-  if [ -e "${PMA_CONFIG}" ]; then
-    echo "Installing custom PhpMyAdmin Config: ${PMA_CONFIG}"
-    cp -f "${PMA_CONFIG}" ${REALPATH}/config.inc.php
+  if [ -e "${CUSTOM_PMA_CONFIG}" ]; then
+    echo "Installing custom phpMyAdmin configuration file: ${CUSTOM_PMA_CONFIG}"
+    cp -f "${CUSTOM_PMA_CONFIG}" ${PMA_DIR}/config.inc.php
   else
-    cp -f ${REALPATH}/config.sample.inc.php ${REALPATH}/config.inc.php
-    perl -pi -e "s#\['host'\] = 'localhost'#\['host'\] = '${MYSQLHOST}'#" ${REALPATH}/config.inc.php
-    perl -pi -e "s#\['host'\] = ''#\['host'\] = '${MYSQLHOST}'#" ${REALPATH}/config.inc.php
-    perl -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${REALPATH}/config.inc.php
-    perl -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${REALPATH}/config.inc.php
+    cp -f ${PMA_DIR}/config.sample.inc.php ${PMA_DIR}/config.inc.php
+    ${PERL} -pi -e "s#\['host'\] = 'localhost'#\['host'\] = '${MYSQLHOST}'#" ${PMA_DIR}/config.inc.php
+    ${PERL} -pi -e "s#\['host'\] = ''#\['host'\] = '${MYSQLHOST}'#" ${PMA_DIR}/config.inc.php
+    ${PERL} -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${PMA_DIR}/config.inc.php
+    ${PERL} -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${PMA_DIR}/config.inc.php
   fi
 
   ## Copy sample config:
-  cp ${WWW_DIR}/phpMyAdmin/config.sample.inc.php ${WWW_DIR}/phpMyAdmin/config.inc.php
+  cp ${PMA_DIR}/config.sample.inc.php ${PMA_DIR}/config.inc.php
 
   ## Update phpMyAdmin configuration file:
-  ${PERL} -pi -e "s#\['host'\] = 'localhost'#\['host'\] = 'localhost'#" ${WWW_DIR}/phpMyAdmin/config.inc.php
-  ${PERL} -pi -e "s#\['host'\] = ''#\['host'\] = 'localhost'#" ${WWW_DIR}/phpMyAdmin/config.inc.php
-  ${PERL} -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${WWW_DIR}/phpMyAdmin/config.inc.php
-  ${PERL} -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${WWW_DIR}/phpMyAdmin/config.inc.php
+  ${PERL} -pi -e "s#\['host'\] = 'localhost'#\['host'\] = 'localhost'#" ${PMA_DIR}/config.inc.php
+  ${PERL} -pi -e "s#\['host'\] = ''#\['host'\] = 'localhost'#" ${PMA_DIR}/config.inc.php
+  ${PERL} -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${PMA_DIR}/config.inc.php
+  ${PERL} -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${PMA_DIR}/config.inc.php
 
   # Copy custom themes:
-  if [ -d "${PMA_THEMES}" ]; then
+  if [ -d "${CUSTOM_PMA_THEMES}" ]; then
     echo "Installing custom PhpMyAdmin themes: ${PMA_THEMES}"
-    cp -Rf "${PMA_THEMES}" ${REALPATH}
+    cp -Rf "${CUSTOM_PMA_THEMES}" ${PMA_DIR}
   fi
 
   ## Update alias path via symlink (not done):
   rm -f ${ALIASPATH} >/dev/null 2>&1
-  ln -s ${REALPATH} ${ALIASPATH}
-
+  ln -s ${PMA_DIR} ${ALIASPATH}
 
   ## Create logs directory:
-  if [ ! -d ${REALPATH}/log ]; then
-    mkdir -p ${REALPATH}/log
+  if [ ! -d ${PMA_DIR}/log ]; then
+    mkdir -p ${PMA_DIR}/log
   fi
 
   ## Set permissions:
-  chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${REALPATH}
+  chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_DIR}
   chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${ALIASPATH}
-  chmod 755 ${REALPATH}
+  chmod 755 ${PMA_DIR}
 
 
   ## Set permissions (same as above, remove this):
-  chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/phpMyAdmin
-  chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/phpMyAdmin
-  chmod 755 ${WWW_DIR}/phpMyAdmin
+  chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_DIR}
+  chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_DIR}
+  chmod 755 ${PMA_DIR}
 
   ## Symlink:
-  ln -s ${WWW_DIR}/phpMyAdmin ${WWW_DIR}/phpmyadmin
-  ln -s ${WWW_DIR}/phpMyAdmin ${WWW_DIR}/pma
+  ln -s ${PMA_DIR} ${WWW_DIR}/phpmyadmin
+  ln -s ${PMA_DIR} ${WWW_DIR}/pma
 
   ## verify:
 
   # Disable scripts directory (path doesn't exist):
-  if [ -d ${REALPATH}/scripts ]; then
-    chmod 000 ${REALPATH}/scripts
+  if [ -d ${PMA_DIR}/scripts ]; then
+    chmod 000 ${PMA_DIR}/scripts
   fi
 
   # Disable setup directory (done):
-  if [ -d ${REALPATH}/setup ]; then
-    chmod 000 ${REALPATH}/setup
+  if [ -d ${PMA_DIR}/setup ]; then
+    chmod 000 ${PMA_DIR}/setup
   fi
 
-  # Auth log patch for BFM compat (not done):
+  ## Auth log patch for BFM compat (not done):
   # Currently outputs to /var/log/auth.log
-  getFile patches/pma_auth_logging.patch pma_auth_logging.patch
+  #getFile patches/pma_auth_logging.patch pma_auth_logging.patch
+  ${WGET} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
 
   if [ -e patches/pma_auth_logging.patch ]; then
     echo "Patching phpMyAdmin to log failed authentications for BFM..."
-    cd ${REALPATH} || exit
+    cd ${PMA_DIR} || exit
     patch -p0 < "${WORKDIR}/patches/pma_auth_logging.patch"
   fi
 
@@ -1077,7 +1081,7 @@ phpmyadmin_post_install() {
 apache_post_install() {
   ## Symlink for backwards compatability:
   mkdir -p /etc/httpd/conf
-  ln -s /usr/local/etc/apache24 /etc/httpd/conf
+  ln -s ${APACHE_DIR} /etc/httpd/conf
 
   ## CustomBuild2 looking for Apache modules in /usr/lib/apache*
   ## Symlink for backcomp (done):
@@ -1087,13 +1091,13 @@ apache_post_install() {
 
   ## Since DirectAdmin/CB2 reference /var/www/html often, we'll symlink for compat:
   mkdir -p /var/www
-  ln -s /usr/local/www /var/www/html
-  chown -h webapps:webapps /var/www/html
+  ln -s ${WWW_DIR} /var/www/html
+  chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} /var/www/html
 
   ## CustomBuild2 reference /etc/httpd/conf/ssl
   ## Create empty files for CB2 to generate
 
-  ## Symlink for compat:
+  ## Symlink SSL directories for compat:
   mkdir -p /etc/httpd/conf/ssl.crt
   mkdir -p /etc/httpd/conf/ssl.key
   mkdir -p ${APACHE_DIR}/ssl
@@ -1108,9 +1112,9 @@ apache_post_install() {
   ln -s ${APACHE_DIR}/ssl/server.ca /etc/httpd/conf/ssl.crt/server.ca
   ln -s ${APACHE_DIR}/ssl/server.key /etc/httpd/conf/ssl.key/server.key
 
-  ln -s ${APACHE_DIR}/ssl/server.crt /usr/local/etc/apache24/ssl.crt/server.crt
-  ln -s ${APACHE_DIR}/ssl/server.ca /usr/local/etc/apache24/ssl.crt/server.ca
-  ln -s ${APACHE_DIR}/ssl/server.key /usr/local/etc/apache24/ssl.key/server.key
+  ln -s ${APACHE_DIR}/ssl/server.crt ${APACHE_DIR}/ssl.crt/server.crt
+  ln -s ${APACHE_DIR}/ssl/server.ca ${APACHE_DIR}/ssl.crt/server.ca
+  ln -s ${APACHE_DIR}/ssl/server.key ${APACHE_DIR}/ssl.key/server.key
 
   ## NOTE: Careful with this, paths are relative
   /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout ${APACHE_DIR}/ssl/server.key -out ${APACHE_DIR}/ssl/server.crt -days 9999 -nodes -config ./custom/ap2/cert_config.txt
@@ -1469,22 +1473,37 @@ uninstall_app() {
   return;
 }
 
+## Update PortsBuild
+update() {
+echo "script update"
+# wget
+}
 
 
 ## ./portsbuild selection screen
 case "$1" in
-  "") ;;
+  "")
+  echo "portsbuild 1.0"
+  echo "Usage: ./portsbuild.sh <command>"
+  echo "where <command> can be:"
+  echo " install"
+  echo " setup"
+  echo " update"
+  echo " verify"
+  echo " outdated"
+  echo " version"
+  ;;
   # create_options)  ;;
   # set)  ;;
   # check_options) ;;
-  install) ;; ## install PB+DirectAdmin
-  #setup) ;; ## (alias for 'install'?)
-  update) ;; ## update PB script
-  verify) ;; ## verify system state
+  install) install ;; ## install PB+DirectAdmin
+  setup) setup ;; ## (alias for 'install'?)
+  update) update ;; ## update PB script
+  verify) verify ;; ## verify system state
+  version) show_version ;;
   all) ;;
 esac
 
 ################################################################
 
 ## EOF
-
