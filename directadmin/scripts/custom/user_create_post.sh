@@ -19,6 +19,6 @@ fi
 ## also add checks to see if php-fpm/apache24 is actually installed (same for nginx)
 /sbin/service php-fpm reload
 /sbin/service apache24 graceful
-/sbin/service named reload
+/sbin/service named restart
 
 exit 0;
