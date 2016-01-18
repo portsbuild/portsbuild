@@ -271,7 +271,9 @@ Now it's time to customize `make.conf` and adjust it according to your needs. Th
 
 	## PB: Global Port Options
 	## Prevent the installation of DOCS, HTMLDOCS, EXAMPLES, NLS and X11 stuff.
-    OPTIONS_UNSET= DOCS HTMLDOCS EXAMPLES HTMLDOCS NLS X11 TESTS DEBUG GUI
+    OPTIONS_UNSET= DOCS HTMLDOCS EXAMPLES HTMLDOCS NLS X11 TESTS DEBUG GUI MANPAGES
+
+    ## LIBGB: FONTCONFIG (to skip X11 stuff)
 
     ## PB: Apache 2.4 Options
     www_apache24_SET= SUEXEC MPM_EVENT

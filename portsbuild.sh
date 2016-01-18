@@ -52,7 +52,7 @@ OS_B64=$(uname -m | grep -c 64)  # 0, 1
 OS_MAJ=$(uname -r | cut -d. -f1) # 9, 10
 
 OS_HOST=$(hostname);
-OS_DOMAIN=$(echo "$OS_HOST" | cut -d. -f2,3,4,5,6)
+OS_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
 
 if [ "${OS}" = "FreeBSD" ]; then
   if [ "${OS_B64}" -eq 1 ]; then
@@ -75,14 +75,14 @@ else
   exit 1;
 fi
 
-## Source (include) additional files.
+## Source (include) additional files:
 . conf/defaults.conf
 . conf/ports.conf
 . conf/options.conf
-#. conf/discover.conf
+. conf/discover.sh
 #. conf/make.conf
 
-## Verify if /usr/ports exists.
+## Verify if /usr/ports exists:
 if [ ! -d ${PORTS_BASE}/ ]; then
   if [ "${AUTO_MODE}" -eq 0 ]; then
     echo "Error: FreeBSD Ports system not installed. PortsBuild needs this to continue."
@@ -138,7 +138,7 @@ getOpt() {
   ## $2 = default value
 
   # CB2: Added "grep -v" to workaround many lines with empty options
-  GET_OPTION="$(grep -v "^$1=$" ${OPTIONS_CONF} | grep -m1 "^$1=" | cut -d= -f2)"
+  GET_OPTION=$(grep -v "^$1=$" "${OPTIONS_CONF}" | grep -m1 "^$1=" | cut -d= -f2)
   if [ "${GET_OPTION}" = "" ]; then
     echo "$1=$2" >> "${OPTIONS_CONF}"
   fi
@@ -181,7 +181,7 @@ setOpt() {
       #EXIT_CODE=51
       return
     fi
-    OPT_VALUE="$(grep -m1 "^$1=" ${OPTIONS_CONF} | cut -d= -f2)"
+    OPT_VALUE=$(grep -m1 "^$1=" "${OPTIONS_CONF}" | cut -d= -f2)
     ${PERL} -pi -e "s#$1=${OPT_VALUE}#$1=$2#" ${PB_CONF}
     # if [ "${HIDE_CHANGES}" = "0" ]; then
     #     echo "Changed ${boldon}$1${boldoff} option from ${boldon}${OPT_VALUE}${boldoff} to ${boldon}$2${boldoff}"
@@ -208,6 +208,34 @@ setVal() {
     ## The value is already in the file $3, so use perl regex to replace it.
     ${PERL} -pi -e "s/$(grep "${1}"= "${3}")/${1}=${2}/" "${3}"
   fi
+}
+
+## Get Value from file
+## getVal mysql_enable /etc/rc.conf
+getVal() {
+  ## $1: option
+  ## $2: file to parse
+
+  ## Returns 0 if option is undefined (doesn't exist or blank)
+
+  ## Check if file exists.
+  if [ ! -e "$2" ]; then
+    return
+  fi
+
+  GET_VALUE=$(grep -v "^$1=$" "$2" | grep -m1 "^$1=" | cut -d= -f2 | tr -d '"')
+  if [ "${GET_VALUE}" = "" ]; then
+    echo "0"
+    #GET_VALUE=0
+    return
+  else
+    echo "${GET_VALUE}"
+    return
+  fi
+
+  #echo "${GET_VALUE}"
+
+  return;
 }
 
 ## Unset Value (opposite of setVal)
@@ -244,7 +272,7 @@ service_off() {
 ## pkg bootstrap
 setup_pkg() {
   echo "Bootstrapping and updating pkg"
-  env ASSUME_ALWAYS_YES=YES pkg bootstrap
+  /usr/bin/env ASSUME_ALWAYS_YES=YES pkg bootstrap
   update_pkg
 }
 
@@ -283,12 +311,12 @@ random_pass() {
   ## $1 = length (default: 12)
 
   if [ "$1" = "" ]; then
-    PASS_LENGTH=12
+    MAX_PASS_LENGTH=12
   else
-    PASS_LENGTH=$1
+    MAX_PASS_LENGTH=$1
   fi
 
-  ${PERL} -le"print map+(A..Z,a..z,0..9)[rand 62],0..${PASS_LENGTH}"
+  ${PERL} -le"print map+(A..Z,a..z,0..9)[rand 62],0..${MAX_PASS_LENGTH}"
 }
 
 ################################################################
@@ -848,7 +876,7 @@ dovecot_post_install() {
 
   echo "mail_plugins = \$mail_plugins quota" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
 
-  ## replace `hostname`
+  ## Todo: Replace `hostname` with $(hostname)
   ${PERL} -pi -e "s|HOSTNAME|`hostname`|" ${DOVECOT_PATH}/conf/lmtp.conf
 
   ## ltmp log files (not done):
@@ -864,14 +892,14 @@ dovecot_post_install() {
   echo "mail_plugins = \$mail_plugins quota"            > ${DOVECOT_PATH}/conf/mail_plugins.conf
   echo "mail_plugins = \$mail_plugins quota imap_quota" > ${DOVECOT_PATH}/conf/imap_mail_plugins.conf
 
-  # # Check for IPV6 compatability (not done):
-  # if [ "${IPV6}" = "1" ]; then
-  #   perl -pi -e 's|^listen = \*$|#listen = \*|' ${DOVECOT_PATH}/dovecot.conf
-  #   perl -pi -e 's|^#listen = \*, ::$|listen = \*, ::|' ${DOVECOT_PATH}/dovecot.conf
-  # else
-  #   perl -pi -e 's|^#listen = \*$|listen = \*|' ${DOVECOT_PATH}/dovecot.conf
-  #   perl -pi -e 's|^listen = \*, ::$|#listen = \*, ::|' ${DOVECOT_PATH}/dovecot.conf
-  # fi
+  ## Check for IPV6 compatibility:
+  if [ "${IPV6_ENABLED}" = "1" ]; then
+    ${PERL} -pi -e 's|^listen = \*$|#listen = \*|' ${DOVECOT_PATH}/dovecot.conf
+    ${PERL} -pi -e 's|^#listen = \*, ::$|listen = \*, ::|' ${DOVECOT_PATH}/dovecot.conf
+  else
+    ${PERL} -pi -e 's|^#listen = \*$|listen = \*|' ${DOVECOT_PATH}/dovecot.conf
+    ${PERL} -pi -e 's|^listen = \*, ::$|#listen = \*, ::|' ${DOVECOT_PATH}/dovecot.conf
+  fi
 
   echo "listen = *, ::" > /usr/local/etc/dovecot/conf/ip.conf
 
@@ -922,8 +950,46 @@ sql_post_install() {
   ln -s /usr/local/bin/mysqldump /usr/local/mysql/bin/mysqldump
 }
 
-## Ensure my.cnf
-ensure_my_cnf() {
+freebsd_set_newsyslog() {
+  NSL_L=$1
+  NSL_V=$2
+  NSL=/usr/local/etc/newsyslog.d/directadmin.conf
+
+  if ! grep -q ${NSL_L} $NSL; then
+    echo -e "${NSL_L}\t${NSL_V}\t600\t4\t*\t@T00\t-" >> $NSL
+  fi
+
+  #replace whatever we may have with whatever we need, eg:
+  #/var/www/html/roundcube/logs/errors  webapps:webapps 600     4       *       @T00    -
+  #/var/www/html/roundcube/logs/errors  apache:apache 600     4       *       @T00    -
+  #/var/www/html/roundcube/logs/errors      600     4       *       @T00    -
+
+  ${PERL} -pi -e "s|^${NSL_L}\s+webapps:webapps\s+|${NSL_L}\t${NSL_V}\t|" ${NSL}
+  ${PERL} -pi -e "s|^${NSL_L}\s+apache:apache\s+|${NSL_L}\t${NSL_V}\t|" ${NSL}
+  ${PERL} -pi -e "s|^${NSL_L}\s+600\s+|${NSL_L}\t${NSL_V}\t600\t|" ${NSL}
+}
+
+## Verify Webapps Log Rotation (copied from CB2)
+ensure_webapps_logrotate() {
+    #by default it sets each log to webapps:webapps.
+    #swap it to apache:apache if needed
+    #else swap it to webapps:webapps from apache:apache.. or nothing
+
+    NSL_VALUE=webapps:webapps
+
+    # if [ "${PHP1_MODE_OPT}" = "mod_php" ] && [ "${MOD_RUID2_OPT}" = "no" ]; then
+    #   NSL_VALUE=apache:apache
+    # fi
+
+    freebsd_set_newsyslog /usr/local/www/roundcube/logs/errors ${NSL_VALUE}
+    #freebsd_set_newsyslog /usr/local/www/squirrelmail/data/squirrelmail_access_log ${NSL_VALUE}
+    freebsd_set_newsyslog /usr/local/www/phpMyAdmin/log/auth.log ${NSL_VALUE}
+
+    return
+}
+
+## Verify my.cnf (copied from CB2)
+verify_my_cnf() {
   #1 = path to cnf
   #2 = user
   #3 = pass
@@ -939,7 +1005,7 @@ ensure_my_cnf() {
 
   if [ "${W}" = "0" ] && [ "${4}" != "" ]; then
     if [ ! -s $4 ]; then
-      echo "ensure_my_cnf: cannot find $4"
+      echo "verify_my_cnf: cannot find $4"
       W=1
     else
       MY_CNF_T=$(${file_mtime} ${E_MY_CNF})
@@ -999,7 +1065,7 @@ get_sql_settings() {
     fi
   fi
 
-  #ensure_my_cnf ${DA_MYSQL_CNF} "${MYSQL_USER}" "${MYSQL_PASS}" "${DA_MYSQL_CONF}"
+  #verify_my_cnf ${DA_MYSQL_CNF} "${MYSQL_USER}" "${MYSQL_PASS}" "${DA_MYSQL_CONF}"
   chown diradmin:diradmin "${DA_MYSQL_CNF}"
 }
 
@@ -1008,7 +1074,8 @@ php_post_install() {
   ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
   #cp -f /usr/local/directadmin/custombuild/configure/fpm/conf/php-fpm.conf.56 /usr/local/etc/php-fpm.conf
 
-  PHP_PATH=/usr/local/php56
+  ## PHP1_VERSION="56"
+  PHP_PATH=/usr/local/php${PHP1_VERSION}
 
   ## Create CB2/DA directories for compat:
   mkdir -p ${PHP_PATH}
@@ -1062,6 +1129,10 @@ php_post_install() {
   setVal php_fpm_enable \"YES\" /etc/rc.conf
 }
 
+php_upgrade() {
+  pkg upgrade "$(pkg query %o | grep php${PHP1_VERSION})"
+}
+
 ## phpMyAdmin Post-Installation Tasks
 phpmyadmin_post_install() {
 
@@ -1075,91 +1146,88 @@ phpmyadmin_post_install() {
   # </Directory>
 
   ## Custom config from cb2/custom directory (if present):
-  CUSTOM_PMA_CONFIG=${CWD}/custom/phpmyadmin/config.inc.php
-  CUSTOM_PMA_THEMES=${CWD}/custom/phpmyadmin/themes
+  CUSTOM_PMA_CONFIG=${CB_PATH}/custom/phpmyadmin/config.inc.php
+  CUSTOM_PMA_THEMES=${CB_PATH}/custom/phpmyadmin/themes
 
-  ## Reference: Paths:
-
-  #WWWDIR=/usr/local/www
   ##REALPATH=${WWWDIR}/phpMyAdmin-${PHPMYADMIN_VER}
   #REALPATH=${WWW_DIR}/phpMyAdmin
-  ALIASPATH=${WWW_DIR}/phpmyadmin
-  REAL_CONFIG_FILE=${PMA_DIR}/config.inc.php
+  PMA_ALIAS_PATH=${WWW_DIR}/phpmyadmin
+
 
   ## Scripted reference:
 
   ## If custom config exists
   if [ -e "${CUSTOM_PMA_CONFIG}" ]; then
     echo "Installing custom phpMyAdmin configuration file: ${CUSTOM_PMA_CONFIG}"
-    cp -f "${CUSTOM_PMA_CONFIG}" ${PMA_DIR}/config.inc.php
+    cp -f "${CUSTOM_PMA_CONFIG}" ${PMA_CONFIG}
   else
-    cp -f ${PMA_DIR}/config.sample.inc.php ${PMA_DIR}/config.inc.php
-    ${PERL} -pi -e "s#\['host'\] = 'localhost'#\['host'\] = '${MYSQLHOST}'#" ${PMA_DIR}/config.inc.php
-    ${PERL} -pi -e "s#\['host'\] = ''#\['host'\] = '${MYSQLHOST}'#" ${PMA_DIR}/config.inc.php
-    ${PERL} -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${PMA_DIR}/config.inc.php
-    ${PERL} -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${PMA_DIR}/config.inc.php
+    cp -f ${PMA_PATH}/config.sample.inc.php ${PMA_CONFIG}
+    ${PERL} -pi -e "s#\['host'\] = 'localhost'#\['host'\] = '${MYSQL_HOST}'#" ${PMA_CONFIG}
+    ${PERL} -pi -e "s#\['host'\] = ''#\['host'\] = '${MYSQL_HOST}'#" ${PMA_CONFIG}
+    ${PERL} -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${PMA_CONFIG}
+    ${PERL} -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${PMA_CONFIG}
   fi
 
   ## Copy sample config:
-  cp ${PMA_DIR}/config.sample.inc.php ${PMA_DIR}/config.inc.php
+  cp ${PMA_PATH}/config.sample.inc.php ${PMA_CONFIG}
 
   ## Update phpMyAdmin configuration file:
-  ${PERL} -pi -e "s#\['host'\] = 'localhost'#\['host'\] = 'localhost'#" ${PMA_DIR}/config.inc.php
-  ${PERL} -pi -e "s#\['host'\] = ''#\['host'\] = 'localhost'#" ${PMA_DIR}/config.inc.php
-  ${PERL} -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${PMA_DIR}/config.inc.php
-  ${PERL} -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${PMA_DIR}/config.inc.php
+  ${PERL} -pi -e "s#\['host'\] = 'localhost'#\['host'\] = 'localhost'#" ${PMA_CONFIG}
+  ${PERL} -pi -e "s#\['host'\] = ''#\['host'\] = 'localhost'#" ${PMA_CONFIG}
+  ${PERL} -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${PMA_CONFIG}
+  ${PERL} -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${PMA_CONFIG}
 
   # Copy custom themes:
   if [ -d "${CUSTOM_PMA_THEMES}" ]; then
     echo "Installing custom PhpMyAdmin themes: ${PMA_THEMES}"
-    cp -Rf "${CUSTOM_PMA_THEMES}" ${PMA_DIR}
+    cp -Rf "${CUSTOM_PMA_THEMES}" ${PMA_PATH}
   fi
 
   ## Update alias path via symlink (not done):
-  rm -f ${ALIASPATH} >/dev/null 2>&1
-  ln -s ${PMA_DIR} ${ALIASPATH}
+  rm -f ${PMA_ALIAS_PATH} >/dev/null 2>&1
+  ln -s ${PMA_PATH} ${PMA_ALIAS_PATH}
 
   ## Create logs directory:
-  if [ ! -d ${PMA_DIR}/log ]; then
-    mkdir -p ${PMA_DIR}/log
+  if [ ! -d ${PMA_PATH}/log ]; then
+    mkdir -p ${PMA_PATH}/log
   fi
 
   ## Set permissions:
-  chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_DIR}
-  chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${ALIASPATH}
-  chmod 755 ${PMA_DIR}
+  chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_PATH}
+  chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_ALIAS_PATH}
+  chmod 755 ${PMA_PATH}
 
 
   ## Set permissions (same as above, remove this):
-  chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_DIR}
-  chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_DIR}
-  chmod 755 ${PMA_DIR}
+  chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_PATH}
+  chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_PATH}
+  chmod 755 ${PMA_PATH}
 
   ## Symlink:
-  ln -s ${PMA_DIR} ${WWW_DIR}/phpmyadmin
-  ln -s ${PMA_DIR} ${WWW_DIR}/pma
+  ln -s ${PMA_PATH} ${WWW_DIR}/phpmyadmin
+  ln -s ${PMA_PATH} ${WWW_DIR}/pma
 
-  ## verify:
-
-  # Disable scripts directory (path doesn't exist):
-  if [ -d ${PMA_DIR}/scripts ]; then
-    chmod 000 ${PMA_DIR}/scripts
+  ## Verify:
+  ## Disable/lockdown scripts directory (path doesn't exist):
+  if [ -d ${PMA_PATH}/scripts ]; then
+    chmod 000 ${PMA_PATH}/scripts
   fi
 
-  # Disable setup directory (done):
-  if [ -d ${PMA_DIR}/setup ]; then
-    chmod 000 ${PMA_DIR}/setup
+  ## Disable/lockdown setup directory (done):
+  if [ -d ${PMA_PATH}/setup ]; then
+    chmod 000 ${PMA_PATH}/setup
   fi
 
   ## Auth log patch for BFM compat (not done):
-  # Currently outputs to /var/log/auth.log
-  #getFile patches/pma_auth_logging.patch pma_auth_logging.patch
-  ${WGET} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+  ## Currently outputs to /var/log/auth.log
+  if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
+    ${WGET} "${WGET_CONNECT_OPTIONS}" -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+  fi
 
-  if [ -e patches/pma_auth_logging.patch ]; then
-    echo "Patching phpMyAdmin to log failed authentications for BFM..."
-    cd ${PMA_DIR} || exit
-    patch -p0 < "${WORKDIR}/patches/pma_auth_logging.patch"
+  if [ -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
+    echo "Patching phpMyAdmin to log failed authentications for BFM"
+    cd ${PMA_PATH} || exit
+    patch -p0 < "${PB_DIR}/patches/pma_auth_logging.patch"
   fi
 
   ## Update /etc/groups (verify):
@@ -1168,7 +1236,7 @@ phpmyadmin_post_install() {
 
 ## Apache Post-Installation Tasks
 apache_post_install() {
-  ## Symlink for backwards compatability:
+  ## Symlink for backwards compatibility:
   mkdir -p /etc/httpd/conf
   ln -s ${APACHE_DIR} /etc/httpd/conf
 
@@ -1247,13 +1315,15 @@ nginx_pre_install() {
 ## Nginx Post-Installation Tasks
 nginx_post_install() {
   ## Update directadmin.conf
-  nginxconf=/usr/local/etc/nginx/directadmin-vhosts.conf
-  nginxlogdir=/var/log/nginx/domains
-  nginxips=/usr/local/etc/nginx/directadmin-ips.conf
-  nginx_pid=/var/run/nginx.pid
-  nginx_cert=/usr/local/etc/nginx/ssl/server.crt
-  nginx_key=/usr/local/etc/nginx/ssl/server.key
-  nginx_ca=/usr/local/etc/nginx/ssl/server.ca
+  # nginxconf=/usr/local/etc/nginx/directadmin-vhosts.conf
+  # nginxlogdir=/var/log/nginx/domains
+  # nginxips=/usr/local/etc/nginx/directadmin-ips.conf
+  # nginx_pid=/var/run/nginx.pid
+  # nginx_cert=/usr/local/etc/nginx/ssl/server.crt
+  # nginx_key=/usr/local/etc/nginx/ssl/server.key
+  # nginx_ca=/usr/local/etc/nginx/ssl/server.ca
+
+  return;
 }
 
 ## ClamAV Post-Installation Tasks
@@ -1267,22 +1337,22 @@ roundcube_pre_install() {
   return;
 }
 
-setup_roundcube() {
+## RoundCube Post-Installation Tasks
+roundcube_post_install() {
 
   ## Clarifications
   # _CONF = RC's config.inc.php
   # _CNF  = MySQL settings
   # _PATH = path to RC
 
-  #ensure_webapps_logrotate
+  ## CB2: verify_webapps_logrotate
 
   ## Fetch MySQL Settings from directadmin/conf/my.cnf
   get_sql_settings
 
-  #REALPATH=/usr/local/www/roundcube
-  ALIASPATH=${WWW_DIR}/roundcube
-
-  ROUNDCUBE_PATH=${WWW_DIR}/roundcube
+  ## ROUNDCUBE_ALIAS_PATH=${WWW_DIR}/roundcube
+  ## ROUNDCUBE_CONFIG_DB= custom config from CB2
+  #ROUNDCUBE_PATH=${WWW_DIR}/roundcube
 
   ## Create & generate credentials for the database:
   ROUNDCUBE_DB=da_roundcube
@@ -1290,6 +1360,7 @@ setup_roundcube() {
   ROUNDCUBE_DB_PASS=$(random_pass 12)
   ROUNDCUBE_DES_KEY=$(random_pass 24)
   ROUNDCUBE_MY_CNF=${ROUNDCUBE_PATH}/config/my.cnf
+  ROUNDCUBE_CONF_SAMPLE=${ROUNDCUBE_PATH}/config/config.inc.php.sample
 
   # if [ -e ${ROUNDCUBE_PATH} ]; then
   #     if [ -d ${ROUNDCUBE_PATH}/logs ]; then
@@ -1323,14 +1394,19 @@ setup_roundcube() {
       ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
 
       if [ "${MYSQL_HOST}" != "localhost" ]; then
-        for access_host_ip in `grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2`; do {
+        grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2 | while IFS= read -r access_host_ip
+        do
           ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
-        }; done
+        done
+
+        # for access_host_ip in $(grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2); do {
+        #   ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
+        # }; done
       fi
 
       ## Needed?
       rm -f ${ROUNDCUBE_MY_CNF}
-      #ensure_my_cnf ${ROUNDCUBE_MY_CNF} "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
+      #verify_my_cnf ${ROUNDCUBE_MY_CNF} "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
 
       ## Import RoundCube's initial.sql file to create the necessary database tables.
       ${MYSQL} --defaults-extra-file=${ROUNDCUBE_MY_CNF} -e "use ${ROUNDCUBE_DB}; source SQL/mysql.initial.sql;" --host=${MYSQL_HOST} 2>&1
@@ -1341,7 +1417,7 @@ setup_roundcube() {
       exit 0
     fi
   else
-    ## RoundCube database already exists:
+    ## RoundCube config & database already exists, so fetch existing values:
     if [ -e "${ROUNDCUBE_CONF}" ]; then
       COUNT_MYSQL=$(grep -m1 -c 'mysql://' ${ROUNDCUBE_CONF})
       if [ "${COUNT_MYSQL}" -gt 0 ]; then
@@ -1357,68 +1433,69 @@ setup_roundcube() {
     ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
     ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST}
 
+    ## External SQL server
     if [ "${MYSQL_HOST}" != "localhost" ]; then
-      for access_host_ip in `grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2`; do {
+      grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2 | while IFS= read -r access_host_ip
+      do
         ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
         ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST} 2>&1
-      }; done
+      done
     fi
 
     #in case anyone uses it for backups
     rm -f ${ROUNDCUBE_MY_CNF}
-    #ensure_my_cnf ${ROUNDCUBE_MY_CNF} "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
+    #verify_my_cnf ${ROUNDCUBE_MY_CNF} "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
   fi
 
   # Cleanup config
   #rm -f ${ROUNDCUBE_CONF}
 
-  ## Install the proper config:
+  ## Install the proper config (e.g. custom):
   if [ -d ../roundcube ]; then
     echo "Editing roundcube configuration..."
 
     cd ${ROUNDCUBE_PATH}/config || exit
 
-    if [ -e "${ROUNDCUBE_CONFIG}" ]; then
-      echo "Installing custom RoundCube Config: ${ROUNDCUBE_CONFIG}"
-     cp -f ${ROUNDCUBE_CONFIG} ${ROUNDCUBE_CONF}
+    if [ -e "${ROUNDCUBE_CONF_CUSTOM}" ]; then
+      echo "Installing custom RoundCube Config: ${ROUNDCUBE_CONF_CUSTOM}"
+     cp -f ${ROUNDCUBE_CONF_CUSTOM} ${ROUNDCUBE_CONF}
     fi
 
     if [ -e "${ROUNDCUBE_CONFIG_DB}" ]; then
-      if [ ! -e ${EDIT_DB} ]; then
-        /bin/cp -f "${ROUNDCUBE_CONFIG_DB}" ${EDIT_DB}
+      if [ ! -e ${ROUNDCUBE_CONF} ]; then
+        /bin/cp -f "${ROUNDCUBE_CONFIG_DB}" ${ROUNDCUBE_CONF}
       fi
-      if [ "${COUNT_MYSQL}" -eq 0 ]; then
-        echo "\$config['db_dsnw'] = 'mysql://${ROUNDCUBE_DB_USER}:${ROUNDCUBE_DB_PASS}@${MYSQLHOST}/${ROUNDCUBE_DB}';" >> ${EDIT_DB}
+
+      if [ "${COUNT_MYSQL}" -eq 0 ]; then ## if no "mysql://"" is found (tested above)
+        echo "\$config['db_dsnw'] = 'mysql://${ROUNDCUBE_DB_USER}:${ROUNDCUBE_DB_PASS}@${MYSQL_HOST}/${ROUNDCUBE_DB}';" >> ${ROUNDCUBE_CONF}
       fi
     else
-      if [ ! -e ${EDIT_DB} ]; then
-        /bin/cp -f ${DB_DIST} ${EDIT_DB}
-        ${PERL} -pi -e "s|mysql://roundcube:pass\@localhost/roundcubemail|mysql://${ROUNDCUBE_DB_USER}:\\Q${ROUNDCUBE_DB_PASS}\\E\@${MYSQL_HOST}/${ROUNDCUBE_DB}|" ${EDIT_DB} > /dev/null
-        ${PERL} -pi -e "s/\'mdb2\'/\'db\'/" ${EDIT_DB} > /dev/null
+      if [ ! -e ${ROUNDCUBE_CONF} ]; then
+        /bin/cp -f ${ROUNDCUBE_CONF_SAMPLE} ${ROUNDCUBE_CONF}
+        ${PERL} -pi -e "s|mysql://roundcube:pass\@localhost/roundcubemail|mysql://${ROUNDCUBE_DB_USER}:\\Q${ROUNDCUBE_DB_PASS}\\E\@${MYSQL_HOST}/${ROUNDCUBE_DB}|" ${ROUNDCUBE_CONF} > /dev/null
+        ${PERL} -pi -e "s/\'mdb2\'/\'db\'/" ${ROUNDCUBE_CONF} > /dev/null
       fi
     fi
 
-    SPAM_INBOX_PREFIX_OPT=$(getDA_Opt spam_inbox_prefix 1)
+    SPAM_INBOX_PREFIX=$(getDA_Opt spam_inbox_prefix 1)
     SPAM_FOLDER="INBOX.spam"
 
-    if [ "${SPAM_INBOX_PREFIX_OPT}" = "0" ]; then
-        SPAM_FOLDER="Junk"
+    if [ "${SPAM_INBOX_PREFIX}" = "0" ]; then
+      SPAM_FOLDER="Junk"
     fi
 
     ${PERL} -pi -e "s|rcmail-\!24ByteDESkey\*Str|\\Q${ROUNDCUBE_DES_KEY}\\E|" ${ROUNDCUBE_CONF}
 
     if [ ! -e "${ROUNDCUBE_CONF}" ]; then
-      #default_host is set to localhost by default in RC 1.0.0, so we don't echo it to the file
-
-      # These ones are already in config.inc.php.sample file, so we just use perl-regex to change them
+      ## CB2: These ones are already in config.inc.php.sample file, so we just use perl-regex to change them
       ${PERL} -pi -e "s|\['smtp_port'] = 25|\['smtp_port'] = 587|" ${ROUNDCUBE_CONF} > /dev/null
       ${PERL} -pi -e "s|\['smtp_server'] = ''|\['smtp_server'] = 'localhost'|" ${ROUNDCUBE_CONF} > /dev/null
       ${PERL} -pi -e "s|\['smtp_user'] = ''|\['smtp_user'] = '%u'|" ${ROUNDCUBE_CONF} > /dev/null
       ${PERL} -pi -e "s|\['smtp_pass'] = ''|\['smtp_pass'] = '%p'|" ${ROUNDCUBE_CONF} > /dev/null
 
-      #Changing default options, that are set in defaults.inc.php
-      #IMAP folders
-      if [ "${WEBAPPS_INBOX_PREFIX_OPT}" = "yes" ]; then
+      ## CB2: Changing default options that are set in defaults.inc.php
+      ## Add "Inbox" prefix to IMAP folders (if requested)
+      if [ "${WEBAPPS_INBOX_PREFIX}" = "YES" ]; then
         {
           echo "\$config['drafts_mbox'] = 'INBOX.Drafts';"
           echo "\$config['junk_mbox'] = '${SPAM_FOLDER}';"
@@ -1431,6 +1508,7 @@ setup_roundcube() {
         echo "\$config['default_folders'] = array('INBOX', 'Drafts', 'Sent', '${SPAM_FOLDER}', 'Trash');" >> ${ROUNDCUBE_CONF}
       fi
 
+      ## Hostname used for SMTP helo host:
       HN_T=$(hostname)
 
       {
@@ -1444,24 +1522,26 @@ setup_roundcube() {
         echo "\$config['email_dns_check'] = true;"
       } >> ${ROUNDCUBE_CONF}
 
+      ## Get recipients_max from exim.conf
       if grep -q '^recipients_max' ${EXIM_CONF}; then
-        RECIPIENTS_MAX="$(grep -m1 '^recipients_max' /etc/exim.conf | cut -d= -f2 | tr -d ' ')"
-        echo "\$config['max_recipients'] = ${RECIPIENTS_MAX};" >> ${ROUNDCUBE_CONF}
-        echo "\$config['max_group_members'] = ${RECIPIENTS_MAX};" >> ${ROUNDCUBE_CONF}
+        EXIM_RECIPIENTS_MAX="$(grep -m1 '^recipients_max' ${EXIM_CONF} | cut -d= -f2 | tr -d ' ')"
+        echo "\$config['max_recipients'] = ${EXIM_RECIPIENTS_MAX};" >> ${ROUNDCUBE_CONF}
+        echo "\$config['max_group_members'] = ${EXIM_RECIPIENTS_MAX};" >> ${ROUNDCUBE_CONF}
       fi
 
-      if [ ! -s mime.types ]; then
+      ## mime.types
+      if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
         #if [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "litespeed" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
           if [ -s ${APACHE_MIME_TYPES} ]; then
             if grep -m1 -q 'application/java-archive' ${APACHE_MIME_TYPES}; then
-              cp -f ${APACHE_MIME_TYPES} ./mime.types
+              cp -f ${APACHE_MIME_TYPES} ${ROUNDCUBE_PATH}/config/mime.types
             fi
           fi
         #fi
       fi
 
-      if [ ! -s mime.types ]; then
-        wget ${WGET_CONNECT_OPTIONS} -O mime.types http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
+      if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
+        wget "${WGET_CONNECT_OPTIONS}" -O mime.types http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
       fi
 
       echo "\$config['mime_types'] = '${ROUNDCUBE_PATH}/config/mime.types';" >> ${ROUNDCUBE_CONF}
@@ -1478,7 +1558,7 @@ setup_roundcube() {
 
         ${PERL} -pi -e "s|\['password_driver'] = 'sql'|\['password_driver'] = 'directadmin'|" ${ROUNDCUBE_CONF} > /dev/null
 
-        if [ -e /usr/local/directadmin/directadmin ]; then
+        if [ -e ${DA_BIN} ]; then
           DA_PORT=$(/usr/local/directadmin/directadmin c | grep -m1 -e '^port=' | cut -d= -f2)
           ${PERL} -pi -e "s|\['password_directadmin_port'] = 2222|\['password_directadmin_port'] = $DA_PORT|" ${ROUNDCUBE_CONF} > /dev/null
 
@@ -1490,105 +1570,109 @@ setup_roundcube() {
         cd ${ROUNDCUBE_PATH}/config || exit
       fi
 
-          # Pigeonhole plugin
-          if [ "${PIGEONHOLE_OPT}" = "yes" ]; then
-              if [ -d ${ROUNDCUBE_PATH}/plugins/managesieve ]; then
+      ## Pigeonhole plugin (untested):
+      if [ "${PIGEONHOLE_ENABLE}" = "YES" ]; then
+        if [ -d ${ROUNDCUBE_PATH}/plugins/managesieve ]; then
 
-                  if [ `grep -m1 -c "'managesieve'" ${ROUNDCUBE_CONF}` -eq 0 ]; then
-                      ${PERL} -pi -e "s|\['plugins'] = array\(\n|\['plugins'] = array\(\n    'managesieve',\n|" ${ROUNDCUBE_CONF} > /dev/null
-                  fi
-
-                  cd ${ROUNDCUBE_PATH}/plugins/managesieve || exit
-
-                  if [ ! -e config.inc.php ]; then
-                      cp config.inc.php.dist config.inc.php
-                  fi
-
-                  ${PERL} -pi -e "s|\['managesieve_port'] = null|\['managesieve_port'] = 4190|" config.inc.php > /dev/null
-
-                  cd ${ROUNDCUBE_PATH}/config || exit
-              fi
+          if [ "$(grep -m1 -c "'managesieve'" ${ROUNDCUBE_CONF})" -eq 0 ]; then
+              ${PERL} -pi -e "s|\['plugins'] = array\(\n|\['plugins'] = array\(\n    'managesieve',\n|" ${ROUNDCUBE_CONF} > /dev/null
           fi
-      fi
 
-      if [ -d ${ROUNDCUBE_PLUGINS} ]; then
-          echo "Copying files from ${ROUNDCUBE_PLUGINS} to ${ROUNDCUBE_PATH}/plugins"
-          cp -Rp ${ROUNDCUBE_PLUGINS}/* ${ROUNDCUBE_PATH}/plugins
-      fi
+          cd ${ROUNDCUBE_PATH}/plugins/managesieve || exit
 
-      if [ -d ${ROUNDCUBE_SKINS} ]; then
-          echo "Copying files from ${ROUNDCUBE_SKINS} to ${ROUNDCUBE_PATH}/skins"
-          cp -Rp ${ROUNDCUBE_SKINS}/* ${ROUNDCUBE_PATH}/skins
-      fi
+          if [ ! -e config.inc.php ]; then
+            cp config.inc.php.dist config.inc.php
+          fi
 
-      if [ -d ${ROUNDCUBE_PROGRAM} ]; then
-          echo "Copying files from ${ROUNDCUBE_PROGRAM} to ${ROUNDCUBE_PATH}/program"
-          cp -Rp ${ROUNDCUBE_PROGRAM}/* ${ROUNDCUBE_PATH}/program
-      fi
+          ${PERL} -pi -e "s|\['managesieve_port'] = null|\['managesieve_port'] = 4190|" config.inc.php > /dev/null
 
-      if [ -e ${ROUNDCUBE_HTACCESS} ]; then
-          echo "Copying .htaccess file from ${ROUNDCUBE_HTACCESS} to ${ROUNDCUBE_PATH}/.htaccess"
-          cp -pf ${ROUNDCUBE_HTACCESS} ${ROUNDCUBE_PATH}/.htaccess
+          cd ${ROUNDCUBE_PATH}/config || exit
+        fi
       fi
+    fi
 
-      echo "Roundcube ${ROUNDCUBE_VER} has been installed successfully."
+    ## Custom configurations for RoundCube:
+    if [ -d "${ROUNDCUBE_PLUGINS}" ]; then
+      echo "Copying files from ${ROUNDCUBE_PLUGINS} to ${ROUNDCUBE_PATH}/plugins"
+      cp -Rp ${ROUNDCUBE_PLUGINS}/* ${ROUNDCUBE_PATH}/plugins
+    fi
+
+    if [ -d "${ROUNDCUBE_SKINS}" ]; then
+      echo "Copying files from ${ROUNDCUBE_SKINS} to ${ROUNDCUBE_PATH}/skins"
+      cp -Rp ${ROUNDCUBE_SKINS}/* ${ROUNDCUBE_PATH}/skins
+    fi
+
+    if [ -d ${ROUNDCUBE_PROGRAM} ]; then
+      echo "Copying files from ${ROUNDCUBE_PROGRAM} to ${ROUNDCUBE_PATH}/program"
+      cp -Rp ${ROUNDCUBE_PROGRAM}/* ${ROUNDCUBE_PATH}/program
+    fi
+
+    if [ -e ${ROUNDCUBE_HTACCESS} ]; then
+      echo "Copying .htaccess file from ${ROUNDCUBE_HTACCESS} to ${ROUNDCUBE_PATH}/.htaccess"
+      cp -pf ${ROUNDCUBE_HTACCESS} ${ROUNDCUBE_PATH}/.htaccess
+    fi
+
+    #echo "Roundcube ${ROUNDCUBE_VER} has been installed successfully."
   fi
 
   #systems with "system()" in disable_functions need to use no php.ini:
   if [ "`have_php_system`" = "0" ]; then
-      ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' "${ROUNDCUBE_PATH}/bin/update.sh"
+    ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' "${ROUNDCUBE_PATH}/bin/update.sh"
   fi
 
-  # Systems with suhosin cannot have PHP memory_limit set to -1, we need not to load suhosin for RoundCube .sh scripts
-  if [ "${SUHOSIN_OPT}" = "yes" ]; then
-      ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/msgimport.sh
-      ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/indexcontacts.sh
-      ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/msgexport.sh
+  ## Systems with suhosin cannot have PHP memory_limit set to -1. Must prevent suhosin from loading for RoundCube's .sh scripts
+  if [ "${SUHOSIN_ENABLE}" = "YES" ]; then
+    ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/msgimport.sh
+    ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/indexcontacts.sh
+    ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/msgexport.sh
   fi
 
-  # Update if needed
-  ${ROUNDCUBE_PATH}/bin/update.sh '--version=?'
+  ## Update if needed:
+  # ${ROUNDCUBE_PATH}/bin/update.sh '--version=?'
 
-  # Cleanup
+  ## Cleanup
   rm -rf ${ROUNDCUBE_PATH}/installer
 
-  #set the permissions:
+  ## Set the permissions:
   chown -R ${WEBAPPS_USER}:${WEBAPPS_USER} ${ROUNDCUBE_PATH}
+
+  ## Verify this (770 compatible with FPM?):
   if [ "${WEBAPPS_GROUP}" = "apache" ]; then
-      chown -R apache ${ROUNDCUBE_PATH}/temp ${ROUNDCUBE_PATH}/logs
-      /bin/chmod -R 770 ${ROUNDCUBE_PATH}/temp
-      /bin/chmod -R 770 ${ROUNDCUBE_PATH}/logs
+    chown -R apache ${ROUNDCUBE_PATH}/temp ${ROUNDCUBE_PATH}/logs
+    /bin/chmod -R 770 ${ROUNDCUBE_PATH}/temp
+    /bin/chmod -R 770 ${ROUNDCUBE_PATH}/logs
   fi
 
-  # Secure configuration file
-  if [ -s ${EDIT_DB} ]; then
-      chmod 440 ${EDIT_DB}
-      if [ "${WEBAPPS_GROUP}" = "apache" ]; then
-          echo "**********************************************************************"
-          echo "* "
-          echo "* ${boldon}SECURITY: ${ROUNDCUBE_PATH}/config/${EDIT_DB} is readable by apache.${boldoff}"
-          echo "* Recommended: use a php type that runs php scripts as the User, then re-install roundcube."
-          echo "*"
-          echo "**********************************************************************"
-      fi
+  ## Secure the configuration file:
+  if [ -s ${ROUNDCUBE_CONF} ]; then
+    chmod 440 ${ROUNDCUBE_CONF}
 
-      chown ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${EDIT_DB}
+    # if [ "${WEBAPPS_GROUP}" = "apache" ]; then
+    #   echo "**********************************************************************"
+    #   echo "* "
+    #   echo "* SECURITY: ${ROUNDCUBE_PATH}/config/${EDIT_DB} is readable by apache."
+    #   echo "* Recommended: use a php type that runs php scripts as the User, then re-install roundcube."
+    #   echo "*"
+    #   echo "**********************************************************************"
+    # fi
 
-      if [ "${WEBAPPS_GROUP}" = "apache" ]; then
-          ls -la ${ROUNDCUBE_PATH}/config/${EDIT_DB}
-          sleep 5
-      fi
+    chown ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${ROUNDCUBE_CONF}
+
+    if [ "${WEBAPPS_GROUP}" = "apache" ]; then
+      ls -la ${ROUNDCUBE_PATH}/config/${ROUNDCUBE_CONF}
+      sleep 5
+    fi
   fi
 
   RC_HTACCESS=${ROUNDCUBE_PATH}/.htaccess
 
   if [ -s "${RC_HTACCESS}" ]; then
-      if grep -m1 -q upload_max_filesize ${RC_HTACCESS}; then
-          ${PERL} -pi -e 's/^php_value\supload_max_filesize/#php_value       upload_max_filesize/' ${RC_HTACCESS}
-          ${PERL} -pi -e 's/^php_value\spost_max_size/#php_value       post_max_size/' ${RC_HTACCESS}
-      fi
+    if grep -m1 -q upload_max_filesize ${RC_HTACCESS}; then
+      ${PERL} -pi -e 's/^php_value\supload_max_filesize/#php_value       upload_max_filesize/' ${RC_HTACCESS}
+      ${PERL} -pi -e 's/^php_value\spost_max_size/#php_value       post_max_size/' ${RC_HTACCESS}
+    fi
 
-      ${PERL} -pi -e 's/FollowSymLinks/SymLinksIfOwnerMatch/' ${RC_HTACCESS}
+    ${PERL} -pi -e 's/FollowSymLinks/SymLinksIfOwnerMatch/' ${RC_HTACCESS}
   fi
 
   ensure_webapps_tmp
@@ -1597,11 +1681,6 @@ setup_roundcube() {
 }
 
 
-## RoundCube Post-Installation Tasks
-roundcube_post_install() {
-  return;
-}
-
 ## Webapps Pre-Installation Tasks
 webapps_pre_install() {
   ## Create user and group:
@@ -1609,10 +1688,15 @@ webapps_pre_install() {
   pw useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
 
   ## Set permissions on temp directory:
-  chmod 777 ${WWW_DIR}/tmp
+  if [ ${PHP1_MODE} = "FPM" ]; then
+    chmod 755 ${WWW_DIR}/tmp
+  else
+    chmod 777 ${WWW_DIR}/tmp
+  fi
 
   ## Temp path: /usr/local/www/webmail/tmp
   ## Create webmail/tmp directory:
+  ## Verify whether 770 will work or not (750 for FPM?)
   mkdir -p ${WWW_DIR}/webmail/tmp
   chmod -R 770 ${WWW_DIR}/webmail/tmp;
   chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail
@@ -1623,15 +1707,15 @@ webapps_pre_install() {
 ## Webapps Post-Installation Tasks
 webapps_post_install() {
   ## Increase the timeout from 10 minutes to 24
-  ${PERL} -pi -e 's/idle_timeout = 10/idle_timeout = 24/' "${DEST}/webmail/inc/config.security.php"
+  ${PERL} -pi -e 's/idle_timeout = 10/idle_timeout = 24/' "${$WWW_DIR}/webmail/inc/config.security.php"
 
-  ${PERL} -pi -e 's#\$temporary_directory = "./database/";#\$temporary_directory = "./tmp/";#' "${DEST}/webmail/inc/config.php"
-  ${PERL} -pi -e 's/= "ONE-FOR-EACH";/= "ONE-FOR-ALL";/' "${DEST}/webmail/inc/config.php"
-  ${PERL} -pi -e 's#\$smtp_server = "SMTP.DOMAIN.COM";#\$smtp_server = "localhost";#' "${DEST}/webmail/inc/config.php"
-  # ${PERL} -pi -e 's#\$default_mail_server = "POP3.DOMAIN.COM";#\$default_mail_server = "localhost";#' "${DEST}/webmail/inc/config.php"
-  ${PERL} -pi -e 's/POP3.DOMAIN.COM/localhost/' "${DEST}/webmail/inc/config.php"
+  ${PERL} -pi -e 's#\$temporary_directory = "./database/";#\$temporary_directory = "./tmp/";#' "${WWW_DIR}/webmail/inc/config.php"
+  ${PERL} -pi -e 's/= "ONE-FOR-EACH";/= "ONE-FOR-ALL";/' "${WWW_DIR}/webmail/inc/config.php"
+  ${PERL} -pi -e 's#\$smtp_server = "SMTP.DOMAIN.COM";#\$smtp_server = "localhost";#' "${WWW_DIR}/webmail/inc/config.php"
+  # ${PERL} -pi -e 's#\$default_mail_server = "POP3.DOMAIN.COM";#\$default_mail_server = "localhost";#' "${WWW_DIR}/webmail/inc/config.php"
+  ${PERL} -pi -e 's/POP3.DOMAIN.COM/localhost/' "${WWW_DIR}/webmail/inc/config.php"
 
-  rm -rf "${DEST}/webmail/install"
+  rm -rf "${WWW_DIR}/webmail/install"
 
   ## Copy redirect.php (done):
   cp -f ${DA_PATH}/scripts/redirect.php ${WWW_DIR}/redirect.php
@@ -1691,6 +1775,7 @@ verify_webapps_tmp() {
     mkdir -p ${WWW_TMP_DIR}
   fi
 
+  ## Verify: 770 compatible with FPM?
   chmod 770 ${WWW_TMP_DIR}
   chown ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_TMP_DIR}
 
@@ -1699,31 +1784,32 @@ verify_webapps_tmp() {
 
 ## Apache Host Configuration (copied from CB2)
 do_ApacheHostConf() {
-  HOSTCONF=${APACHE_DIR}/extra/httpd-hostname.conf
+  APACHE_HOST_CONF=${APACHE_DIR}/extra/httpd-hostname.conf
 
   ## Set this for now since PB only supports 1 instance of PHP.
-  PHP1_MODE_OPT="php-fpm"
-  PHP1_MODE="FPM"
+  #PHP1_MODE_OPT="php-fpm"
+  #PHP1_MODE="FPM"
   PHP1_VERSION="56"
 
   ## Copy custom/ file
+  ## APACHE_HOST_CONF_CUSTOM
   if [ -e "${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf" ]; then
-    cp -pf "${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf" ${HOSTCONF}
+    cp -pf "${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf" ${APACHE_HOST_CONF}
   else
-    echo '' > ${HOSTCONF}
+    echo '' > ${APACHE_HOST_CONF}
 
     # if [ "${HAVE_FPM_CGI}" = "yes" ]; then
-    #   echo 'SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1' >> ${HOSTCONF}
+    #   echo 'SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1' >> ${APACHE_HOST_CONF}
     # fi
 
-    echo "<Directory ${WWW_DIR}>" >> ${HOSTCONF}
+    echo "<Directory ${WWW_DIR}>" >> ${APACHE_HOST_CONF}
 
     if [ "${PHP1_MODE}" = "FPM" ]; then
       {
         echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">';
         echo "AddHandler \"proxy:unix:/usr/local/php${PHP1_VERSION}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${PHP1_VERSION} .phtml";
         echo "</FilesMatch>";
-      } >> ${HOSTCONF}
+      } >> ${APACHE_HOST_CONF}
     fi
 
     {
@@ -1736,13 +1822,13 @@ do_ApacheHostConf() {
       echo "      suPHP_Engine On";
       echo "      suPHP_UserGroup ${WEBAPPS_USER} ${WEBAPPS_GROUP}";
       echo "  </IfModule>";
-    } >> ${HOSTCONF}
-    # echo '    <IfModule mod_ruid2.c>'                 >> ${HOSTCONF}
-    # echo '        RUidGid webapps webapps'            >> ${HOSTCONF}
-    # echo '    </IfModule>'                            >> ${HOSTCONF}
-    # echo '    <IfModule mod_lsapi.c>'                 >> ${HOSTCONF}
-    # echo '        lsapi_user_group webapps webapps'   >> ${HOSTCONF}
-    # echo '    </IfModule>'                            >> ${HOSTCONF}
+    } >> ${APACHE_HOST_CONF}
+    # echo '    <IfModule mod_ruid2.c>'                 >> ${APACHE_HOST_CONF}
+    # echo '        RUidGid webapps webapps'            >> ${APACHE_HOST_CONF}
+    # echo '    </IfModule>'                            >> ${APACHE_HOST_CONF}
+    # echo '    <IfModule mod_lsapi.c>'                 >> ${APACHE_HOST_CONF}
+    # echo '        lsapi_user_group webapps webapps'   >> ${APACHE_HOST_CONF}
+    # echo '    </IfModule>'                            >> ${APACHE_HOST_CONF}
 
     ensure_webapps_tmp
 
@@ -1754,32 +1840,32 @@ do_ApacheHostConf() {
     fi
 
     # if [ "${PHP1_MODE_OPT}" = "fastcgi" ]; then
-    #   echo '  <IfModule mod_fcgid.c>' >> ${HOSTCONF}
-    #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP1_VERSION}.sh .php" >> ${HOSTCONF}
+    #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
+    #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP1_VERSION}.sh .php" >> ${APACHE_HOST_CONF}
     #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
-    #       echo '    SuexecUserGroup webapps webapps' >> ${HOSTCONF}
+    #       echo '    SuexecUserGroup webapps webapps' >> ${APACHE_HOST_CONF}
     #   fi
-    #   echo '      <FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${HOSTCONF}
-    #   echo '          Options +ExecCGI' >> ${HOSTCONF}
-    #   echo '          AddHandler fcgid-script .php' >> ${HOSTCONF}
-    #   echo '      </FilesMatch>' >> ${HOSTCONF}
-    #   echo '  </IfModule>' >> ${HOSTCONF}
+    #   echo '      <FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${APACHE_HOST_CONF}
+    #   echo '          Options +ExecCGI' >> ${APACHE_HOST_CONF}
+    #   echo '          AddHandler fcgid-script .php' >> ${APACHE_HOST_CONF}
+    #   echo '      </FilesMatch>' >> ${APACHE_HOST_CONF}
+    #   echo '  </IfModule>' >> ${APACHE_HOST_CONF}
     # fi
 
     # if [ "${PHP2_MODE_OPT}" = "fastcgi" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
-    #   echo '  <IfModule mod_fcgid.c>' >> ${HOSTCONF}
-    #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP2_SHORTRELEASE}.sh .php${PHP2_SHORTRELEASE}" >> ${HOSTCONF}
+    #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
+    #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP2_SHORTRELEASE}.sh .php${PHP2_SHORTRELEASE}" >> ${APACHE_HOST_CONF}
     #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
-    #   echo '      SuexecUserGroup webapps webapps' >> ${HOSTCONF}
+    #   echo '      SuexecUserGroup webapps webapps' >> ${APACHE_HOST_CONF}
     #   fi
-    #   echo "   <FilesMatch \"\.php${PHP2_SHORTRELEASE}\$\">" >> ${HOSTCONF}
-    #   echo '          Options +ExecCGI' >> ${HOSTCONF}
-    #   echo "          AddHandler fcgid-script .php${PHP2_SHORTRELEASE}" >> ${HOSTCONF}
-    #   echo '      </FilesMatch>' >> ${HOSTCONF}
-    #   echo '  </IfModule>' >> ${HOSTCONF}
+    #   echo "   <FilesMatch \"\.php${PHP2_SHORTRELEASE}\$\">" >> ${APACHE_HOST_CONF}
+    #   echo '          Options +ExecCGI' >> ${APACHE_HOST_CONF}
+    #   echo "          AddHandler fcgid-script .php${PHP2_SHORTRELEASE}" >> ${APACHE_HOST_CONF}
+    #   echo '      </FilesMatch>' >> ${APACHE_HOST_CONF}
+    #   echo '  </IfModule>' >> ${APACHE_HOST_CONF}
     # fi
 
-    echo "</Directory>" >> ${HOSTCONF}
+    echo "</Directory>" >> ${APACHE_HOST_CONF}
   fi
 }
 
@@ -1898,6 +1984,22 @@ echo "script update"
 # wget
 }
 
+## Upgrade an application or service
+upgrade_app() {
+  case "$2" in
+    "php") php_upgrade ;;
+  esac
+}
+
+## Upgrade an application or service
+upgrade() {
+
+  ## $1: appname
+  ## $2:
+
+  return
+}
+
 
 ## ./portsbuild selection screen
 case "$1" in
@@ -1908,6 +2010,7 @@ case "$1" in
   echo " install"
   echo " setup"
   echo " update"
+  echo " upgrade"
   echo " verify"
   echo " outdated"
   echo " version"
@@ -1918,6 +2021,7 @@ case "$1" in
   install) install ;; ## install PB+DirectAdmin
   setup) setup ;; ## (alias for 'install'?)
   update) update ;; ## update PB script
+  upgrade) upgrade ;; ## let portsbuild upgrade an app/service (e.g. php via pkg)
   verify) verify ;; ## verify system state
   version) show_version ;;
   all) ;;
