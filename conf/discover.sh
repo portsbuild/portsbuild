@@ -83,6 +83,7 @@ fi
 ################################################################################################################################
 
 ## Have PHP System (from CB2)
+## Needed?
 have_php_system() {
   ## Checks to see if we can use system() based on the disable_functions
   if [ ! -s "${PHP_INI}" ]; then
@@ -105,3 +106,14 @@ have_php_system() {
   echo 1
   return
 }
+
+
+## Parse Defaults and User Options, then pass computed values to PB
+
+OPT_PREFER_APACHE_SSL_CERTS="NO"
+OPT_PREFER_EXIM_SSL_CERTS="NO"
+OPT_PREFER_CUSTOM_SSL_CERTS="NO"
+
+if [ "${DA_ADMIN_EMAIL}" = "" ]; then
+  DA_ADMIN_EMAIL=${DA_ADMIN_USERNAME}@${SERVER_DOMAIN}
+fi

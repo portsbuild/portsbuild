@@ -99,16 +99,18 @@ fi
 
 ################################################################################################################################
 
-## Get DA Options (copied from CB2)
+## Get DirectAdmin Option Values (copied from CB2)
 getDA_Opt() {
   ## $1 is option name
   ## $2 is default value
 
-  if [ ! -s ${DA_CONF_FILE} ]; then
+  ## Make sure directadmin.conf exists and is greater than zero bytes.
+  if [ ! -s ${DA_CONF} ]; then
     echo "$2"
     return
   fi
 
+  ## Check for value in ./directadmin c
   if ! ${DA_BIN} c | grep -m1 -q -e "^$1="; then
     echo "$2"
     return
@@ -127,6 +129,8 @@ getDA_Opt() {
 #     echo "${newval}"
 #   fi
 # }
+
+################################################################################################################################
 
 ## Get Option (copied from CB2)
 ## Used to retrieve CB/PB options.conf
@@ -149,23 +153,13 @@ setOpt() {
   ## $1 = option name
   ## $2 = value
 
-  ## Handle email field seperately
-  # if [ "$1" = "email" ]; then
-  #     OPT_VALUE1="`grep -m1 "^$1=" ${OPTIONS_CONF} | cut -d= -f2 | cut -d\@ -f 1`"
-  #     OPT_VALUE2="`grep -m1 "^$1=" ${OPTIONS_CONF} | cut -d= -f2 | cut -d\@ -f 2`"
-  #     OPT_NEW_VALUE1="`echo "$2" | cut -d\@ -f 1`"
-  #     OPT_NEW_VALUE2="`echo "$2" | cut -d\@ -f 2`"
-  #     ${PERL} -pi -e "s#$1=${OPT_VALUE1}\@${OPT_VALUE2}#$1=${OPT_NEW_VALUE1}\@${OPT_NEW_VALUE2}#" ${PB_CONF}
-  #     # if [ "${HIDE_CHANGES}" = "0" ]; then
-  #     #     echo "Changed ${boldon}$1${boldoff} option from ${boldon}${OPT_VALUE1}@${OPT_VALUE2}${boldoff} to ${boldon}$2${boldoff}"
-  #     # fi
-  # else
     VAR=$(echo "$1" | tr "'a-z'" "'A-Z'")
     if [ -z "$(eval_var ${VAR}_DEF)" ]; then
       echo "${1} is not a valid option."
       #EXIT_CODE=50
       return
     fi
+
     VALID="no"
     for i in $(eval_var "${VAR}_SET"); do
       if [ "${i}" = "${2}" ] || [ "${i}" = "userinput" ]; then
@@ -173,19 +167,18 @@ setOpt() {
         break
       fi
     done
+
     if [ "${VALID}" = "no" ]; then
       echo "${2} is not a valid setting for ${1} option."
       #EXIT_CODE=51
       return
     fi
+
     OPT_VALUE=$(grep -m1 "^$1=" "${OPTIONS_CONF}" | cut -d= -f2)
     ${PERL} -pi -e "s#$1=${OPT_VALUE}#$1=$2#" ${PB_CONF}
-    # if [ "${HIDE_CHANGES}" = "0" ]; then
-    #     echo "Changed ${boldon}$1${boldoff} option from ${boldon}${OPT_VALUE}${boldoff} to ${boldon}$2${boldoff}"
-    # fi
-  # fi
 }
 
+################################################################################################################################
 
 ## Set Value (copied from CB2)
 ## Sets the value of $1 to $2 in the file $3
@@ -279,7 +272,6 @@ ask_user() {
 }
 
 
-
 ################################################################################################################################
 
 ## Enable a service in /etc/rc.conf
@@ -295,14 +287,14 @@ service_off() {
 ################################################################################################################################
 
 ## pkg bootstrap
-setup_pkg() {
+pkg_setup() {
   echo "Bootstrapping and updating pkg"
   /usr/bin/env ASSUME_ALWAYS_YES=YES pkg bootstrap
-  update_pkg
+  pkg_update
 }
 
 ## pkg update
-update_pkg() {
+pkg_update() {
   ${PKG} update
 }
 
@@ -312,12 +304,12 @@ pkgi() {
 }
 
 ## Setup /usr/ports
-setup_ports() {
+ports_setup() {
   ${PORTSNAP} fetch extract
 }
 
 ## Update /usr/ports
-update_ports() {
+ports_update() {
   ${PORTSNAP} fetch update
 }
 
@@ -328,8 +320,11 @@ clean_stale_ports() {
 
 ## Reinstall all ports "in place" (from manual)
 reinstall_all_ports() {
+  ## Consider -R
   ${PORTMASTER} -a -f -d
 }
+
+################################################################################################################################
 
 ## Random Password Generator (from CB2)
 random_pass() {
@@ -347,13 +342,7 @@ random_pass() {
 ################################################################################################################################
 
 ## Pre-Install Tasks
-pre_install() {
-  ## Need to create a blank /etc/auth.conf file for DA compatibility.
-  echo "Pre-Install Task: checking for /etc/auth.conf"
-  if [ ! -e /etc/auth.conf ]; then
-    /usr/bin/touch /etc/auth.conf;
-    /bin/chmod 644 /etc/auth.conf;
-  fi
+global_pre_install() {
 
   ## Symlink Perl for DA compat
   echo "Pre-Install Task: checking for /usr/bin/perl symlink"
@@ -370,20 +359,23 @@ pre_install() {
 
   ## Check for /etc/rc.conf
   if [ ! -e /etc/rc.conf ]; then
+    echo "Creating /etc/rc.conf"
     touch /etc/rc.conf
   fi
 
   ## Check for /etc/make.conf
   if [ ! -e /etc/make.conf ]; then
+    echo "Creating /etc/make.conf"
     touch /etc/make.conf
   fi
 
+  echo "Setting ipv6_ipv4mapping=YES in /etc/rc.conf"
   setVal ipv6_ipv4mapping \"YES\" /etc/rc.conf
   setVal net.inet6.ip6.v6only 0 /etc/sysctl.conf
 
   /sbin/sysctl net.inet6.ip6.v6only=0
 
-  disable_sendmail
+  disable_sendmail;
 
   ## Ethernet Device checking here
   ##
@@ -397,35 +389,67 @@ global_setup() {
   ## $4 = server_hostname
   ## $5 = eth_dev
   ## $6 = ip_address
+  ## Note to self: 'shift'
 
+  ## Make sure all inputs are entered (get rid of IP?)
   if [ "${1}" = "" ] || [ "${2}" = "" ] || [ "${3}" = "" ] || [ "${4}" = "" ] || [ "${5}" = "" ] || [ "${6}" = "" ]; then
     show_menu_setup
+    return;
   fi
 
-  echo "${1} ${2} ${3} ${4} ${5} ${6} "
+  printf "Setup arguments received:\n User ID: %s\n License ID: %s\n Hostname: %s\n Ethernet Device: %s\n Server IP Address: %s\n\n" $2 $3 $4 $5 $6
 
-  exit;
+  echo "Please make sure these values are correct and that they match the records in your DirectAdmin Client License Portal."
+  echo "If in doubt, visit: https://www.directadmin.com/clients/"
+  echo ""
+  echo "About to setup PortsBuild+Directadmin for the first time."
+  echo "This will install and configure the following services:"
+  ## Process chosen options
+  echo "DirectAdmin, Named, Exim 4.8, Dovecot2, Apache 2.4, PHP-FPM 5.6, MariaDB 10.0, phpMyAdmin, RoundCube and SpamAssassin"
 
-  update_ports
+  ask_user "Do you want to continue?"
 
-  install_deps;
-  install_compats;
+  if [ $? -eq 1 ]; then
+    if [ ${FOUND_PORTS} -eq 0 ]; then
+      ports_setup;
+    fi
 
-  if [ "${OPT_INSTALL_CCACHE}" = "YES" ]; then
-    install_ccache;
+    ports_update;
+
+    install_deps;
+    install_compats;
+
+    if [ "${OPT_INSTALL_CCACHE}" = "YES" ]; then
+      install_ccache;
+    fi
+
+    global_pre_install;
+
+    bind_setup;
+
+    directadmin_pre_install;
+    directadmin_install;
+    create_cb_options;
+    exec_da_permissions;
+
+    global_post_install;
+  else
+    printf "PortsBuild installation canceled\n\n"
+    show_main_menu;
   fi
 
-  pre_install;
-  directadmin_pre_install;
-  directadmin_install;
-  create_cb_options;
-  exec_da_permissions;
-  post_install;
 }
 
+## Post-Install Tasks
+global_post_install() {
+  ## cleanup leftover files?
+  echo "All done!"
+  exit 0;
+}
 
 ## Install Dependencies
 install_deps() {
+  echo "Installing required dependencies"
   if [ "${OS_MAJ}" -eq 10 ]; then
     /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx dns/bind99
   elif [ "${OS_MAJ}" -eq 9 ]; then
@@ -435,6 +459,7 @@ install_deps() {
 
 ## Install Compat Libraries
 install_compats() {
+  echo "Installing misc/compats"
   if [ "${OS_MAJ}" -eq 10 ]; then
     /usr/sbin/pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
   elif [ "${OS_MAJ}" -eq 9 ]; then
@@ -444,6 +469,8 @@ install_compats() {
 
 ## Install CCache
 install_ccache() {
+
+  echo "Installing devel/ccache"
 
   pkgi devel/ccache
 
@@ -455,15 +482,10 @@ install_ccache() {
   fi
 }
 
-## Post-Install Tasks
-post_install() {
-  ## cleanup leftover files?
-  echo "All done."
-  exit 0;
-}
-
 ## Disable sendmail
 disable_sendmail() {
+
+  echo "Disabling sendmail from running (updating /etc/rc.conf)"
   setVal sendmail_enable \"NONE\" /etc/rc.conf
   setVal sendmail_submit_enable \"NO\" /etc/rc.conf
   setVal sendmail_outbound_enable \"NO\" /etc/rc.conf
@@ -474,6 +496,8 @@ disable_sendmail() {
 
 ## Enable SSH Daemon
 enable_sshd() {
+
+  echo "Enabling sshd in /etc/rc.conf"
   setVal sshd_enable \"YES\" /etc/rc.conf
 
   ${SERVICE} sshd start
@@ -483,12 +507,71 @@ enable_sshd() {
 update_rc() {
   ## Go through installed/enabled services and make sure they're all enabled.
   ## Perhaps rename this function to verify_rc?
+
+  ## Todo: refactor with "${SERVICE_NAME}_ENABLE"
+
+  if [ "${NAMED_ENABLE}" = "YES" ]; then
+    setVal named_enable \"YES\" /etc/rc.conf
+  fi
+
+  if [ "${APACHE_ENABLE}" = "YES" ]; then
+    setVal apache24_enable \"YES\" /etc/rc.conf
+    setVal apache24_http_accept_enable \"YES\" /etc/rc.conf
+  fi
+
+  if [ "${MYSQL_ENABLE}" = "YES" ] || [ "${MARIADB_ENABLE}" = "YES" ]; then
+    setVal mysql_enable \"YES\" /etc/rc.conf
+  fi
+
+  if [ "${NGINX_ENABLE}" = "YES" ]; then
+    setVal nginx_enable \"YES\" /etc/rc.conf
+  fi
+
+  if [ "${PHP_ENABLE}" = "YES" ]; then
+    setVal php_fpm_enable \"YES\" /etc/rc.conf
+  fi
+
+  if [ "${EXIM_ENABLE}" = "YES" ]; then
+    setVal exim_enable \"YES\" /etc/rc.conf
+    setval exim_flags \"-bd -q1h\" /etc/rc.conf
+  fi
+
+  if [ "${DOVECOT_ENABLE}" = "YES" ]; then
+    setVal dovecot_enable \"YES\" /etc/rc.conf
+  fi
+
+  if [ "${PUREFTPD_ENABLE}" = "YES" ]; then
+    setVal pureftpd_enable \"YES\" /etc/rc.conf
+    setVal ftpd_enable \"NO\" /etc/rc.conf
+  fi
+
+  if [ "${PROFTPD_ENABLE}" = "YES" ]; then
+    setVal proftpd_enable \"YES\" /etc/rc.conf
+    setVal ftpd_enable \"NO\" /etc/rc.conf
+  fi
+
+  if [ "${SPAMASSASSIN_ENABLE}" = "YES" ]; then
+    setVal spamd_enable \"YES\" /etc/rc.conf
+    setVal spamd_flags \"-c -m 15\" /etc/rc.conf
+  fi
+
+  if [ "${CLAMAV_ENABLE}" = "YES" ]; then
+    setVal clamav_clamd_enable \"YES\" /etc/rc.conf
+    setVal clamav_freshclam_enable \"YES\" /etc/rc.conf
+  fi
+
+  if [ "${MEMCACHED_ENABLE}" = "YES" ]; then
+    setVal memcached_enable \"YES\" /etc/rc.conf
+    setVal memcached_flags \"-m 256 -d\" /etc/rc.conf
+  fi
+
   return;
 }
 
 ## Update /etc/make.conf
 update_make() {
   if [ ! -e /etc/make.conf ]; then
+    echo "Creating /etc/make.conf"
     touch /etc/make.conf
   fi
 
@@ -499,7 +582,9 @@ update_make() {
 
 ## Make set options
 make_set() {
-  # make set
+  ## $1 = port code
+  ## $2 = set option(s)
+  ## e.g.: LANG_PHP5
   return;
 }
 
@@ -513,9 +598,12 @@ make_unset() {
 update_hosts() {
   COUNT=$(grep 127.0.0.1 /etc/hosts | grep -c localhost)
   if [ "$COUNT" -eq 0 ]; then
+    echo "Updating /etc/hosts"
     printf "127.0.0.1\t\tlocalhost" >> /etc/hosts
   fi
 }
+
+################################################################################################################################
 
 ## Create a spoof CustomBuild2 options.conf for DirectAdmin compatibility.
 create_cb_options() {
@@ -538,7 +626,7 @@ create_pb_options() {
 ################################################################################################################################
 
 ## Setup BIND (named)
-setup_bind() {
+bind_setup() {
   ## BIND (named)
   if [ "${OS_MAJ}" -eq 10 ]; then
     if [ ! -e /usr/local/sbin/named ]; then
@@ -573,8 +661,10 @@ setup_bind() {
     rndc-confgen -a -s ${DA_SERVER_IP}
   fi
 
+  echo "Updating /etc/rc.conf with named_enable=YES"
   setVal named_enable \"YES\" /etc/rc.conf
 
+  echo "Restarting named"
   ${SERVICE} named start
 }
 
@@ -584,13 +674,21 @@ setup_bind() {
 
 ## DirectAdmin Pre-Installation Tasks (replaces setup.sh)
 directadmin_pre_install() {
+
+  ## Need to create a blank /etc/auth.conf file for DA compatibility.
+  echo "Pre-Install Task: checking for /etc/auth.conf"
+  if [ ! -e /etc/auth.conf ]; then
+    /usr/bin/touch /etc/auth.conf;
+    /bin/chmod 644 /etc/auth.conf;
+  fi
+
   ## Update /etc/aliases
   if [ -e /etc/aliases ]; then
-      COUNT=$(grep -c diradmin /etc/aliases)
-      if [ "$COUNT" -eq 0 ]; then
-          echo "diradmin: :blackhole:" >> /etc/aliases
-      fi
-      /usr/bin/newaliases
+    COUNT=$(grep -c diradmin /etc/aliases)
+    if [ "$COUNT" -eq 0 ]; then
+      echo "diradmin: :blackhole:" >> /etc/aliases
+    fi
+    /usr/bin/newaliases
   fi
 
   ## Create the directory
@@ -742,6 +840,8 @@ directadmin_post_install() {
   mkdir -p ${DA_PATH}/data/users/admin/packages
   chown diradmin:diradmin ${DA_PATH}/data/users/admin/packages
   chmod 700 ${DA_PATH}/data/users/admin/packages
+
+  return;
 }
 
 ## DirectAdmin Upgrade
@@ -770,6 +870,8 @@ install_cron() {
     fi
   fi
 }
+
+################################################################################################################################
 
 ## Setup newsyslog configuration
 ## Additional include directories in /etc/newsyslog.conf are:
@@ -937,26 +1039,33 @@ spamassassin_post_install() {
 blockcracking_install() {
 
   ## Check for Exim
+  pkg query %n "exim"
 
-  ## Download files
+  if [ -x ${EXIM_BIN} ]; then
 
-  # mkdir -p /usr/local/etc/exim/exim.blockcracking
+    wget_with_options -O ${PB_MIRROR}/exim/exim.blockcracking.tar.gz
 
-  # tar xzf exim.blockcracking-${BLOCKCRACKING_VER}.tar.gz -C /etc/exim.blockcracking
+    mkdir -p ${EXIM_PATH}/exim.blockcracking
 
-  # BC_DP_SRC=/etc/exim.blockcracking/script.denied_paths.default.txt
-  # if [ -e /etc/exim.blockcracking/script.denied_paths.custom.txt ]; then
-  #   echo "Using custom BC script.denied_paths.custom.txt"
-  #   BC_DP_SRC=/etc/exim.blockcracking/script.denied_paths.custom.txt
-  # fi
-  # cp -fp ${BC_DP_SRC} /etc/exim.blockcracking/script.denied_paths.txt
+    ## Extract
+    tar xzf exim.blockcracking-${BLOCKCRACKING_VER}.tar.gz -C ${EXIM_PATH}/exim.blockcracking
 
-  # if [ "$1" != "norestart" ]; then
-  #   echo "Restarting exim."
-  #   service exim restart
-  # fi
+    BC_DP_SRC=${EXIM_PATH}/exim.blockcracking/script.denied_paths.default.txt
+    if [ -e ${EXIM_PATH}/exim.blockcracking/script.denied_paths.custom.txt ]; then
+      echo "Using custom BlockCracking script.denied_paths.custom.txt"
+      BC_DP_SRC=${EXIM_PATH}/exim.blockcracking/script.denied_paths.custom.txt
+    fi
+    cp -fp ${BC_DP_SRC} ${EXIM_PATH}/exim.blockcracking/script.denied_paths.txt
 
-  # echo "BlockCracking is now enabled."
+    echo "Restarting exim."
+
+    service exim restart
+
+    echo "BlockCracking is now enabled."
+
+  else
+    echo "*** Error: Exim is not installed; can't continue (the binary was not found)."
+  fi
 
   return;
 }
@@ -967,44 +1076,52 @@ blockcracking_install() {
 easyspamfighter_install() {
 
   ## Check for Exim
+  if [ -x ${EXIM_BIN} ]; then
+    ## See if SPF and SRS has been enabled (compiled in).
+    EXIM_SPF_SUPPORT="$(/usr/local/sbin/exim --version | grep -m1 -c SPF)"
+    EXIM_SRS_SUPPORT="$(/usr/local/sbin/exim --version | grep -m1 -c SRS)"
 
-  EXIM_SPF_SUPPORT="$(/usr/local/sbin/exim --version | grep -m1 -c SPF)"
-  EXIM_SRS_SUPPORT="$(/usr/local/sbin/exim --version | grep -m1 -c SRS)"
+    if [ "${EXIM_SPF_SUPPORT}" = "0" ]; then
+      echo "Your version of Exim does not support SPF. This is needed for Easy Spam Fighter."
+      echo "Please rebuild Exim with SPF support."
+      exit 1;
+    fi
 
-  if [ "${EXIM_SPF_SUPPORT}" = "0" ]; then
-    echo "Your version of Exim does not support SPF, which is needed for Easy Spam Fighter."
-    exit 1;
+    if [ "${EXIM_SRS_SUPPORT}" = "0" ]; then
+      echo "Your version of Exim does not support SRS. This is needed for Easy Spam Fighter."
+      echo "Please rebuild Exim with SRS support."
+      exit 1;
+    fi
+
+    # if [ "${EXIMCONF_RELEASE_OPT}" = "2.1" ] || [ "${EXIMCONF_RELEASE_OPT}" = "4.2" ]; then
+    #   echo "${boldon}WARNING:${boldoff} Your exim.conf version might be incompatible with Easy Spam Fighter. Please make sure that your exim.conf release is 4.3 or higher."
+    # fi
+
+    # if [ ! -d ${WORKDIR}/easy_spam_fighter ]; then
+    #   mkdir -p ${WORKDIR}/easy_spam_fighter
+    #   chmod 700 ${WORKDIR}/easy_spam_fighter
+    # fi
+
+    # cd ${WORKDIR}
+    echo "Enabling Easy Spam Fighter..."
+
+    ## Download ESF files
+    # getFile easy_spam_fighter/exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz easy_spam_figther exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz
+
+    #wget_with_options -O esf.tar.gz ${PB_MIRROR}/exim/esf.tar.gz
+
+    mkdir -p ${EXIM_PATH}/exim.easy_spam_fighter
+
+    tar xzf exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz -C ${EXIM_PATH}/exim.easy_spam_fighter
+
+    echo "Restarting Exim."
+
+    service exim restart
+
+    echo "Easy Spam Fighter is now enabled."
+  else
+    echo "*** Error: Exim is not installed; can't continue (the binary was not found)."
   fi
-
-  if [ "${EXIM_SRS_SUPPORT}" = "0" ]; then
-    echo "Your version of Exim does not support SRS, which is needed for Easy Spam Fighter."
-    exit 1;
-  fi
-
-  # if [ "${EXIMCONF_RELEASE_OPT}" = "2.1" ] || [ "${EXIMCONF_RELEASE_OPT}" = "4.2" ]; then
-  #   echo "${boldon}WARNING:${boldoff} Your exim.conf version might be incompatible with Easy Spam Fighter. Please make sure that your exim.conf release is 4.3 or higher."
-  # fi
-
-  # if [ ! -d ${WORKDIR}/easy_spam_fighter ]; then
-  #   mkdir -p ${WORKDIR}/easy_spam_fighter
-  #   chmod 700 ${WORKDIR}/easy_spam_fighter
-  # fi
-
-  # cd ${WORKDIR}
-  # echo "Enabling Easy Spam Fighter..."
-
-  ## Download ESF files
-  # getFile easy_spam_fighter/exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz easy_spam_figther exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz
-
-  # mkdir -p /usr/local/etc/exim/exim.easy_spam_fighter
-  # tar xzf exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz -C /etc/exim.easy_spam_fighter
-
-  # if [ "$1" != "norestart" ]; then
-  #   echo "Restarting exim."
-  #   service exim restart
-  # fi
-
-  # echo "Easy Spam Fighter is now enabled."
 
   return;
 }
@@ -1032,17 +1149,21 @@ dovecot_post_install() {
   ## Add Dovecot quota support to the directadmin.conf template:
   echo "add_userdb_quota=1" >> ${DA_CONF_TEMPLATE}
 
-  ## Update dovecot.conf for SSL support using existing Apache 2.4 certs:
-  # ssl_cert = <${APACHE_DIR}/ssl/server.crt
-  # ssl_key = <${APACHE_DIR}/ssl/server.key
-
-  ## or using existing Exim certs:
-  # ssl_cert = </usr/local/etc/exim/exim.crt
-  # ssl_key = </usr/local/etc/exim/exim.key
-
-  ## or using your own custom certs:
-  # ssl_cert = </usr/local/etc/ssl/server.crt
-  # ssl_key = </usr/local/etc/ssl/server.key
+  ## Todo/verify:
+  ## Update dovecot.conf (and conf/ssl.conf?) for SSL support
+  if [ "${OPT_PREFER_APACHE_SSL_CERTS}" = "YES" ]; then
+    ## using existing Apache certs:
+    ssl_cert = <${APACHE_DIR}/ssl/server.crt
+    ssl_key = <${APACHE_DIR}/ssl/server.key
+  elif [ "${OPT_PREFER_EXIM_SSL_CERTS}" = "YES" ]; then
+    ## or using existing Exim certs:
+    ssl_cert = <${EXIM_PATH}/exim.crt
+    ssl_key = <${EXIM_PATH}/exim.key
+  elif [ "${OPT_PREFER_CUSTOM_SSL_CERTS}" = "YES" ]; then
+    ## or using your own custom certs:
+    ssl_cert = </usr/local/etc/ssl/server.crt
+    ssl_key = </usr/local/etc/ssl/server.key
+  fi
 
   ## Prepare Dovecot directories:
   mkdir -p /etc/dovecot/
@@ -1053,6 +1174,10 @@ dovecot_post_install() {
   ln -s ${DOVECOT_CONF} /etc/dovecot/dovecot.conf
   # Skipped: ln -s /etc/dovecot/dovecot.conf /etc/dovecot.conf
 
+
+  ## Verify: use conf/ or conf.d/?
+
+  ## Verify
   cp -rf ${DA_PATH}/custombuild/configure/dovecot/conf ${DOVECOT_PATH}
 
   echo "mail_plugins = \$mail_plugins quota" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
@@ -1066,7 +1191,7 @@ dovecot_post_install() {
   chmod 600 /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
 
   ## Modifications (done):
-  ${PERL} -pi -e 's#transport = dovecot_lmtp_udp#transport = virtual_localdelivery#' /usr/local/etc/exim/exim.conf
+  ${PERL} -pi -e 's#transport = dovecot_lmtp_udp#transport = virtual_localdelivery#' ${EXIM_CONF}
   ${PERL} -pi -e 's/driver = shadow/driver = passwd/' ${DOVECOT_CONF}
   ${PERL} -pi -e 's/passdb shadow/passdb passwd/' ${DOVECOT_CONF}
 
@@ -1184,6 +1309,12 @@ get_sql_settings() {
 
 ################################################################################################################################
 
+
+sql_pre_install() {
+return
+}
+
+
 ## SQL Post-Installation Tasks
 sql_post_install() {
   ## Secure Installation (replace it with scripted method below)
@@ -1226,6 +1357,8 @@ sql_post_install() {
   ## Symlink the `mysqldump` binary for compat. This is used by DirectAdmin during SQL backup functions (may not be needed since we can set the binary path in directadmin.conf):
   mkdir -p /usr/local/mysql/bin
   ln -s /usr/local/bin/mysqldump /usr/local/mysql/bin/mysqldump
+  ln -s /usr/local/bin/mysql /usr/local/mysql/bin/mysql
+
 }
 
 ################################################################################################################################
@@ -1873,7 +2006,7 @@ roundcube_post_install() {
     ${PERL} -pi -e 's/FollowSymLinks/SymLinksIfOwnerMatch/' ${RC_HTACCESS}
   fi
 
-  ensure_webapps_tmp
+  verify_webapps_tmp
 
   #cd ${CWD}
 }
@@ -2076,7 +2209,7 @@ do_ApacheHostConf() {
 ################################################################################################################################
 
 ## Setup Brute-Force Monitor
-setup_bfm() {
+bfm_setup() {
   ## Defaults:
   # brute_force_roundcube_log=/var/www/html/roundcube/logs/errors
   # brute_force_squirrelmail_log=/var/www/html/squirrelmail/data/squirrelmail_access_log
@@ -2084,11 +2217,16 @@ setup_bfm() {
 
   ## Update directadmin.conf
   brute_force_roundcube_log=${WWW_DIR}/roundcube/logs/errors
-  brute_force_squirrelmail_log=${WWW_DIR}/squirrelmail/data/squirrelmail_access_log
+  #brute_force_squirrelmail_log=${WWW_DIR}/squirrelmail/data/squirrelmail_access_log
   brute_force_pma_log=${WWW_DIR}/phpMyAdmin/log/auth.log
 
+  setVal brute_force_roundcube_log ${WWW_DIR}/roundcube/logs/errors ${DA_CONF}
+  setVal brute_force_pma_log ${WWW_DIR}/phpMyAdmin/log/auth.log ${DA_CONF}
+
+
+
   if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    echo "get file"
+    wget_with_options -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
   fi
 
   #pure_pw=/usr/bin/pure-pw
@@ -2133,6 +2271,9 @@ install_app() {
     "php56")
       portmaster -d ${PORT_PHP56}
       ;;
+    "php70")
+      portmaster -d ${PORT_PHP70}
+      ;;
     "ioncube")
       pkgi ${PORT_IONCUBE}
       ;;
@@ -2145,10 +2286,10 @@ install_app() {
       portmaster -d ${PORT_SPAMASSASSIN}
       spamassassin_post_install
       ;;
-    "libspf2") ;;
-    "dkim") ;;
-    "blockcracking") ;;
-    "easy_spam_fighter") ;;
+    "libspf2") pkgi ${PORT_LIBSPF2} ;;
+    "dkim") pkgi ${PORT_LIBDKIM} ;;
+    "blockcracking") blockcracking_install ;;
+    "easy_spam_fighter") easyspamfighter_install ;;
     "exim")
       exim_pre_install
       portmaster -d ${PORT_EXIM}
@@ -2156,19 +2297,23 @@ install_app() {
       ;;
     "mariadb55")
       # portmaster -d ${PORT_MARIADB55}
-      pkg install -y ${PORT_MARIADB55} databases/mariadb55-client
+      pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
       ;;
     "mariadb100")
       # portmaster -d ${PORT_MARIADB100}
-      pkg install -y ${PORT_MARIADB100} databases/mariadb100-client
+      pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
       ;;
     "mysql55")
       # portmaster -d ${PORT_MYSQL55}
-      pkg install -y ${PORT_MYSQL55} databases/mysql55-client
+      pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
       ;;
     "mysql56")
       # portmaster -d ${PORT_MYSQL56}
-      pkg install -y ${PORT_MYSQL56} databases/mysql56-client
+      pkgi ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
+      ;;
+    "mysql57")
+      # portmaster -d ${PORT_MYSQL56}
+      pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
       ;;
     "phpmyadmin")
       phpmyadmin_pre_install
@@ -2182,8 +2327,9 @@ install_app() {
       portmaster -d ${PORT_PROFTPD}
       ;;
     "bfm")
-      setup_bfm
+      bfm_setup
       ;;
+      *) echo "Script error"; break;
   esac
 }
 
@@ -2263,15 +2409,15 @@ upgrade_app() {
 ## Show Menu for Upgrades
 show_menu_upgrade() {
   echo ""
-  echo "possible upgrades"
+  echo "Listing possible upgrades"
 
   return;
 }
 
 ## Show Setup Menu
 show_menu_setup() {
-  echo "To setup PortsBuild and Directadmin, run:"
-  echo "  ./portsbuild setup <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> (<IP_ADDRESS>)"
+  echo "To setup PortsBuild and DirectAdmin for the first time, run:"
+  echo "  ./portsbuild setup <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> <IP_ADDRESS>"
   echo ""
   return;
 }
@@ -2352,6 +2498,13 @@ show_menu() {
   return;
 }
 
+## Show the main menu
+show_main_menu() {
+  show_logo;
+  show_version;
+  show_menu;
+}
+
 
 ## ./portsbuild selection screen
 case "$1" in
@@ -2374,7 +2527,7 @@ case "$1" in
   "version") show_version ;;       ## show portsbuild version
   "versions") show_app_versions ;; ## app/service versions via pkg
 
-  *) show_logo; show_version; show_menu; ;;
+  *) show_main_menu ;;
 esac
 
 ################################################################################################################################

@@ -1,4 +1,5 @@
 #!/bin/sh
+
 if [ "$spam" = "ON" ]; then
    DIR="/home/${username}/.spamassassin"
    mkdir "${DIR}"
@@ -17,8 +18,8 @@ fi
 
 ## note to self: perhaps add a "sleep 10" here to give DA enough time to do its thing
 ## also add checks to see if php-fpm/apache24 is actually installed (same for nginx)
-/sbin/service php-fpm reload
-/sbin/service apache24 graceful
-/sbin/service named restart
+/usr/sbin/service php-fpm reload
+/usr/sbin/service apache24 graceful
+/usr/sbin/service named restart
 
 exit 0;
