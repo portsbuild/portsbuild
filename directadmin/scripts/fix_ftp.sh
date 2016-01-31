@@ -10,28 +10,27 @@
 
 PF=/etc/proftpd.passwd
 
-cd /usr/local/directadmin/data/users
-for u in `ls`; do
-{
-          if [ ! -d $u ]; then
-                    continue;
-          fi
+cd /usr/local/directadmin/data/users || exit
 
-          SHADOW=/home/$u/.shadow
-          if [ ! -e $SHADOW ]; then
-                    continue;
-          fi
+for u in "$(ls)"; do {
+  if [ ! -d "$u" ]; then
+    continue;
+  fi
 
-          #make sure it doesn't already exist
-          COUNT=`grep -c -e "^${u}:" $PF`
-          if [ "$COUNT" -ne 0 ]; then
-                    continue;
-          fi
+  SHADOW=/home/$u/.shadow
+  if [ ! -e "$SHADOW" ]; then
+    continue;
+  fi
 
-          UUID=`id -u $u`
-          UGID=`id -g $u`
+  #make sure it doesn't already exist
+  COUNT=$(grep -c -e "^${u}:" $PF)
+  if [ "$COUNT" -ne 0 ]; then
+    continue;
+  fi
 
-          echo "${u}:`cat /home/$u/.shadow`:${UUID}:${UGID}:system:/home/${u}:/bin/false";
+  UUID=$(id -u $u)
+  UGID=$(id -g $u)
 
+  echo "${u}:`cat /home/$u/.shadow`:${UUID}:${UGID}:system:/home/${u}:/bin/false";
 };
 done;

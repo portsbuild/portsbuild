@@ -22,8 +22,8 @@
 #  - chmod +x portsbuild.sh
 #  - Patience.
 #
-#  Installation:
-#  - New installs, run: ./portsbuild install <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> (<IP_ADDRESS>)
+#  New Installations:
+#  - Run: ./portsbuild setup <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> (<IP_ADDRESS>)
 #
 #  Existing users:
 #  - Update: ./portsbuild update
@@ -35,11 +35,18 @@
 #
 
 # Script is incomplete. :)
-exit;
+if [ "$(hostname)" != "pb.fallout.local" ]; then
+  exit;
+fi
 
 ### If you want to modify PortsBuild settings, please check out 'conf/options.conf'
 
+################################################################################################################################
+
 ### PortsBuild ###
+
+PB_VER="0.1.0"
+PB_BUILD_DATE=20160130
 
 if [ "$(id -u)" != "0" ]; then
   echo "Must run this script as the root user.";
@@ -57,7 +64,8 @@ OS_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
 if [ "${OS}" = "FreeBSD" ]; then
   if [ "${OS_B64}" -eq 1 ]; then
     if [ "$OS_VER" = "10.1" ] || [ "$OS_VER" = "10.2" ] || [ "$OS_VER" = "9.3" ]; then
-      echo "FreeBSD $OS_VER x64 operating system detected."
+      # echo "FreeBSD $OS_VER x64 operating system detected."
+      echo ""
     else
       echo "Warning: Unsupported FreeBSD operating system detected."
       echo "PortsBuild is tested to work with FreeBSD versions 9.3, 10.1 and 10.2 amd64 only."
@@ -75,37 +83,26 @@ else
   exit 1;
 fi
 
-## Source (include) additional files:
+if [ ! -f conf/defaults.conf ] || [ ! -f conf/ports.conf ] || [ ! -f conf/options.conf ]; then
+ echo "Missing files in conf/"
+ exit;
+fi
+
+## Source (include) additional files into the script:
 . conf/defaults.conf
 . conf/ports.conf
 . conf/options.conf
 . conf/discover.sh
 #. conf/make.conf
+#. lang/en.txt ## strings files for multilingual support (planned)
 
-## Verify if /usr/ports exists:
-if [ ! -d ${PORTS_BASE}/ ]; then
-  if [ "${AUTO_MODE}" -eq 0 ]; then
-    echo "Error: FreeBSD Ports system not installed. PortsBuild needs this to continue."
-    echo "Please run the following command to install Ports:"
-    echo "  portsnap fetch extract"
-    echo "or visit: https://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/ports-using.html"
-    exit 1;
-  else
-    ## Automatically install & update /usr/ports/
-    setup_ports
-  fi
-fi
 
-if [ ! -f conf/defaults.conf ] || [ ! -f conf/ports.conf ] || [ ! -f conf/options.conf ]; then
- echo "Missing files in conf/"
-fi
-
-################################################################
+################################################################################################################################
 
 ## Get DA Options (copied from CB2)
 getDA_Opt() {
-  #$1 is option name
-  #$2 is default value
+  ## $1 is option name
+  ## $2 is default value
 
   if [ ! -s ${DA_CONF_FILE} ]; then
     echo "$2"
@@ -255,7 +252,35 @@ getVal() {
 #     fi
 # }
 
-################################################################
+################################################################################################################################
+
+## Ask User a Question
+ask_user() {
+  ## $1 = question string
+  ## not done: $2 = expected answer: "yn", "custom", etc. (optional)
+  ## not done: $3 = execute command (optional)
+
+  RESPONSE=""
+
+  if [ "${1}" = "" ]; then
+    ASK_QUESTION="Do you want to continue?"
+  else
+    ASK_QUESTION=${1}
+  fi
+
+  while true; do
+    read -p "${ASK_QUESTION} (y/n): " -r RESPONSE
+    case $RESPONSE in
+      [Yy]* ) return 1; break ;;
+      [Nn]* ) return 0; break ;;
+      * ) echo "Please answer with yes or no." ;;
+    esac
+  done
+}
+
+
+
+################################################################################################################################
 
 ## Enable a service in /etc/rc.conf
 service_on() {
@@ -267,7 +292,7 @@ service_off() {
   setVal "${1}_enable" \"NO\" /etc/rc.conf
 }
 
-################################################################
+################################################################################################################################
 
 ## pkg bootstrap
 setup_pkg() {
@@ -319,7 +344,7 @@ random_pass() {
   ${PERL} -le"print map+(A..Z,a..z,0..9)[rand 62],0..${MAX_PASS_LENGTH}"
 }
 
-################################################################
+################################################################################################################################
 
 ## Pre-Install Tasks
 pre_install() {
@@ -364,8 +389,25 @@ pre_install() {
   ##
 }
 
-## Setup
-setup() {
+## Setup PortsBuild and DirectAdmin
+## Possible arguments: <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> (<IP_ADDRESS>)"
+global_setup() {
+  ## $2 = user_id
+  ## $3 = license_id
+  ## $4 = server_hostname
+  ## $5 = eth_dev
+  ## $6 = ip_address
+
+  if [ "${1}" = "" ] || [ "${2}" = "" ] || [ "${3}" = "" ] || [ "${4}" = "" ] || [ "${5}" = "" ] || [ "${6}" = "" ]; then
+    show_menu_setup
+  fi
+
+  echo "${1} ${2} ${3} ${4} ${5} ${6} "
+
+  exit;
+
+  update_ports
+
   install_deps;
   install_compats;
 
@@ -375,7 +417,7 @@ setup() {
 
   pre_install;
   directadmin_pre_install;
-  install_directadmin;
+  directadmin_install;
   create_cb_options;
   exec_da_permissions;
   post_install;
@@ -385,7 +427,7 @@ setup() {
 ## Install Dependencies
 install_deps() {
   if [ "${OS_MAJ}" -eq 10 ]; then
-    /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx dns/bind910
+    /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx dns/bind99
   elif [ "${OS_MAJ}" -eq 9 ]; then
     /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx
   fi
@@ -402,6 +444,7 @@ install_compats() {
 
 ## Install CCache
 install_ccache() {
+
   pkgi devel/ccache
 
   if [ $? = 0 ]; then
@@ -470,10 +513,29 @@ make_unset() {
 update_hosts() {
   COUNT=$(grep 127.0.0.1 /etc/hosts | grep -c localhost)
   if [ "$COUNT" -eq 0 ]; then
-    #echo -e "127.0.0.1\t\tlocalhost" >> /etc/hosts
     printf "127.0.0.1\t\tlocalhost" >> /etc/hosts
   fi
 }
+
+## Create a spoof CustomBuild2 options.conf for DirectAdmin compatibility.
+create_cb_options() {
+  if [ ! -d ${CB_PATH} ]; then
+    mkdir -p ${CB_PATH}
+  fi
+
+  ${WGET} -O ${CB_CONF} "${PB_MIRROR}/conf/cb-options.conf"
+
+  if [ -e "${CB_CONF}" ]; then
+    chmod 755 "${CB_CONF}"
+  fi
+}
+
+## Create portsbuild/options.conf
+create_pb_options() {
+  touch ${DA_PATH}/portsbuild/options.conf
+}
+
+################################################################################################################################
 
 ## Setup BIND (named)
 setup_bind() {
@@ -516,24 +578,7 @@ setup_bind() {
   ${SERVICE} named start
 }
 
-## Create a spoof CustomBuild2 options.conf for DirectAdmin compatibility.
-create_cb_options() {
-  if [ ! -d ${CB_PATH} ]; then
-    mkdir -p ${CB_PATH}
-  fi
-
-  ${WGET} -O ${CB_CONF} "${PB_MIRROR}/conf/cb-options.conf"
-
-  if [ -e "${CB_OPTIONS}" ]; then
-    chmod 755 "${CB_OPTIONS}"
-  fi
-}
-
-
-## Create portsbuild/options.conf
-create_pb_options() {
-  touch ${DA_PATH}/portsbuild/options.conf
-}
+################################################################################################################################
 
 ### DirectAdmin Installation ###
 
@@ -620,7 +665,7 @@ directadmin_pre_install() {
 
 ## Install DirectAdmin (replaces scripts/install.sh)
 ## Create necessary users & groups
-install_directadmin() {
+directadmin_install() {
   ## Add the DirectAdmin user & group:
   pw groupadd diradmin
   pw useradd -g diradmin -n diradmin -d /usr/local/directadmin -s /sbin/nologin
@@ -680,9 +725,13 @@ install_directadmin() {
 
   SSHROOT=$(grep -c 'AllowUsers root' < /etc/ssh/sshd_config);
   if [ "${SSHROOT}" = 0 ]; then
-    echo "AllowUsers root" >> /etc/ssh/sshd_config
-    echo "AllowUsers ${DA_ADMIN_USERNAME}" >> /etc/ssh/sshd_config
-    ## echo "AllowUsers YOUR_OTHER_ADMIN_ACCOUNT" >> /etc/ssh/sshd_config
+    {
+      echo "AllowUsers root";
+      echo "AllowUsers ${DA_ADMIN_USERNAME}";
+      echo "AllowUsers $(logname)";
+      ## echo "AllowUsers YOUR_OTHER_ADMIN_ACCOUNT" >> /etc/ssh/sshd_config
+    } >> /etc/ssh/sshd_config
+
     ## Set SSH folder permissions (is this needed?):
     # chmod 710 /etc/ssh
   fi
@@ -695,6 +744,12 @@ directadmin_post_install() {
   chmod 700 ${DA_PATH}/data/users/admin/packages
 }
 
+## DirectAdmin Upgrade
+directadmin_upgrade() {
+  return;
+}
+
+################################################################################################################################
 
 ## Install DA cron (from: scripts/install.sh)
 install_cron() {
@@ -729,6 +784,50 @@ setup_newsyslog() {
 
   /usr/sbin/newsyslog
 }
+
+
+################################################################################################################################
+
+## FreeBSD Set NewSyslog (Copied from CB2)
+freebsd_set_newsyslog() {
+  NSL_L=$1
+  NSL_V=$2
+  NSL=/usr/local/etc/newsyslog.d/directadmin.conf
+
+  if ! grep -q ${NSL_L} $NSL; then
+    echo "${NSL_L}\t${NSL_V}\t600\t4\t*\t@T00\t-" >> $NSL
+  fi
+
+  #replace whatever we may have with whatever we need, eg:
+  #/var/www/html/roundcube/logs/errors  webapps:webapps 600     4       *       @T00    -
+  #/var/www/html/roundcube/logs/errors  apache:apache 600     4       *       @T00    -
+  #/var/www/html/roundcube/logs/errors      600     4       *       @T00    -
+
+  ${PERL} -pi -e "s|^${NSL_L}\s+webapps:webapps\s+|${NSL_L}\t${NSL_V}\t|" ${NSL}
+  ${PERL} -pi -e "s|^${NSL_L}\s+apache:apache\s+|${NSL_L}\t${NSL_V}\t|" ${NSL}
+  ${PERL} -pi -e "s|^${NSL_L}\s+600\s+|${NSL_L}\t${NSL_V}\t600\t|" ${NSL}
+}
+
+## Verify Webapps Log Rotation (copied from CB2)
+verify_webapps_logrotate() {
+    #by default it sets each log to webapps:webapps.
+    #swap it to apache:apache if needed
+    #else swap it to webapps:webapps from apache:apache.. or nothing
+
+    NSL_VALUE=webapps:webapps
+
+    # if [ "${PHP1_MODE_OPT}" = "mod_php" ] && [ "${MOD_RUID2_OPT}" = "no" ]; then
+    #   NSL_VALUE=apache:apache
+    # fi
+
+    freebsd_set_newsyslog /usr/local/www/roundcube/logs/errors ${NSL_VALUE}
+    #freebsd_set_newsyslog /usr/local/www/squirrelmail/data/squirrelmail_access_log ${NSL_VALUE}
+    freebsd_set_newsyslog /usr/local/www/phpMyAdmin/log/auth.log ${NSL_VALUE}
+
+    return
+}
+
+################################################################################################################################
 
 ## Exim Pre-Installation Tasks
 exim_pre_install() {
@@ -818,6 +917,7 @@ exim_post_install() {
   setVal daily_clean_hoststat_enable \"NO\" /etc/periodic.conf
 }
 
+################################################################################################################################
 
 ## SpamAssassin Pre-Installation Tasks
 spamassassin_pre_install() {
@@ -829,6 +929,87 @@ spamassassin_post_install() {
   setVal spamd_enable \"YES\" /etc/rc.conf
   setVal spamd_flags \"-c -m 15\" /etc/rc.conf
 }
+
+
+################################################################################################################################
+
+## Install Exim BlockCracking
+blockcracking_install() {
+
+  ## Check for Exim
+
+  ## Download files
+
+  # mkdir -p /usr/local/etc/exim/exim.blockcracking
+
+  # tar xzf exim.blockcracking-${BLOCKCRACKING_VER}.tar.gz -C /etc/exim.blockcracking
+
+  # BC_DP_SRC=/etc/exim.blockcracking/script.denied_paths.default.txt
+  # if [ -e /etc/exim.blockcracking/script.denied_paths.custom.txt ]; then
+  #   echo "Using custom BC script.denied_paths.custom.txt"
+  #   BC_DP_SRC=/etc/exim.blockcracking/script.denied_paths.custom.txt
+  # fi
+  # cp -fp ${BC_DP_SRC} /etc/exim.blockcracking/script.denied_paths.txt
+
+  # if [ "$1" != "norestart" ]; then
+  #   echo "Restarting exim."
+  #   service exim restart
+  # fi
+
+  # echo "BlockCracking is now enabled."
+
+  return;
+}
+
+################################################################################################################################
+
+## Install Easy Spam Figter (ESF)
+easyspamfighter_install() {
+
+  ## Check for Exim
+
+  EXIM_SPF_SUPPORT="$(/usr/local/sbin/exim --version | grep -m1 -c SPF)"
+  EXIM_SRS_SUPPORT="$(/usr/local/sbin/exim --version | grep -m1 -c SRS)"
+
+  if [ "${EXIM_SPF_SUPPORT}" = "0" ]; then
+    echo "Your version of Exim does not support SPF, which is needed for Easy Spam Fighter."
+    exit 1;
+  fi
+
+  if [ "${EXIM_SRS_SUPPORT}" = "0" ]; then
+    echo "Your version of Exim does not support SRS, which is needed for Easy Spam Fighter."
+    exit 1;
+  fi
+
+  # if [ "${EXIMCONF_RELEASE_OPT}" = "2.1" ] || [ "${EXIMCONF_RELEASE_OPT}" = "4.2" ]; then
+  #   echo "${boldon}WARNING:${boldoff} Your exim.conf version might be incompatible with Easy Spam Fighter. Please make sure that your exim.conf release is 4.3 or higher."
+  # fi
+
+  # if [ ! -d ${WORKDIR}/easy_spam_fighter ]; then
+  #   mkdir -p ${WORKDIR}/easy_spam_fighter
+  #   chmod 700 ${WORKDIR}/easy_spam_fighter
+  # fi
+
+  # cd ${WORKDIR}
+  # echo "Enabling Easy Spam Fighter..."
+
+  ## Download ESF files
+  # getFile easy_spam_fighter/exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz easy_spam_figther exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz
+
+  # mkdir -p /usr/local/etc/exim/exim.easy_spam_fighter
+  # tar xzf exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz -C /etc/exim.easy_spam_fighter
+
+  # if [ "$1" != "norestart" ]; then
+  #   echo "Restarting exim."
+  #   service exim restart
+  # fi
+
+  # echo "Easy Spam Fighter is now enabled."
+
+  return;
+}
+
+################################################################################################################################
 
 ## Dovecot Pre-Installation Tasks
 dovecot_pre_install() {
@@ -906,6 +1087,103 @@ dovecot_post_install() {
   setVal dovecot_enable \"YES\" /etc/rc.conf
 }
 
+## Dovecot Upgrade
+dovecot_upgrade() {
+  return;
+}
+
+## Dovecot Uninstall
+dovecot_uninstall() {
+  return;
+}
+
+################################################################################################################################
+
+## Verify my.cnf (copied from CB2)
+verify_my_cnf() {
+  #1 = path to cnf
+  #2 = user
+  #3 = pass
+  #4 = optional source file to compare with. update 1 if 4 is newer.
+  # host will be on the command line, as that's how DA already does it.
+
+  E_MY_CNF=$1
+
+  W=0
+  if [ ! -s ${E_MY_CNF} ]; then
+    W=1
+  fi
+
+  if [ "${W}" = "0" ] && [ "${4}" != "" ]; then
+    if [ ! -s $4 ]; then
+      echo "verify_my_cnf: cannot find $4"
+      W=1
+    else
+      MY_CNF_T=$(${file_mtime} ${E_MY_CNF})
+      SRC_CNF_T=$(${file_mtime} ${4})
+
+      if [ "${MY_CNF_T}" -lt "${SRC_CNF_T}" ]; then
+        echo "Found outdated ${E_MY_CNF}. Rewriting from ${4}"
+        W=1
+      fi
+    fi
+  fi
+
+  if [ "${W}" = "1" ]; then
+    echo '[client]' > ${E_MY_CNF}
+    chmod 600 "${E_MY_CNF}"
+    echo "user=${2}" >> "${E_MY_CNF}"
+    echo "password=${3}" >> "${E_MY_CNF}"
+  fi
+}
+
+################################################################################################################################
+
+## Initialize SQL Parameters (copied from CB2)
+get_sql_settings() {
+  # MySQL settings
+  ## DA_MYSQL=/usr/local/directadmin/conf/mysql.conf
+  ## Use: ${DA_MYSQL_CONF}
+
+  if [ -s ${DA_MYSQL_CONF} ]; then
+    MYSQL_USER=$(grep -m1 "^user=" ${DA_MYSQL_CONF} | cut -d= -f2)
+    MYSQL_PASS=$(grep -m1 "^passwd=" ${DA_MYSQL_CONF} | cut -d= -f2)
+  else
+    MYSQL_USER='da_admin'
+    MYSQL_PASS='nothing'
+  fi
+
+  if [ -s ${DA_MYSQL_CONF} ] && [ "$(grep -m1 -c -e "^host=" ${DA_MYSQL_CONF})" -gt "0" ]; then
+    MYSQL_HOST=$(grep -m1 "^host=" ${DA_MYSQL_CONF} | cut -d= -f2)
+  else
+    MYSQL_HOST=localhost
+  fi
+
+  # Where connections to MySQL are coming from. Usualy the server IP, unless on a LAN.
+  MYSQL_ACCESS_HOST=localhost
+  if [ "$MYSQL_HOST" != "localhost" ]; then
+    HOSTNAME=$(hostname)
+    MYSQL_ACCESS_HOST="$(grep -r -l -m1 '^status=server$' /usr/local/directadmin/data/admin/ips | cut -d/ -f8)"
+    if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
+      MYSQL_ACCESS_HOST="$(grep -m1 ${HOSTNAME} /etc/hosts | awk '{print $1}')"
+      if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
+        if [ -s "${WORKDIR}/scripts/setup.txt" ]; then
+          MYSQL_ACCESS_HOST=$(grep -m1 -e '^ip=' "${WORKDIR}/scripts/setup.txt" | cut -d= -f2)
+        fi
+        if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
+          echo "Unable to detect your server IP in /etc/hosts. Please enter it: "
+          read MYSQL_ACCESS_HOST
+        fi
+      fi
+    fi
+  fi
+
+  #verify_my_cnf ${DA_MYSQL_CNF} "${MYSQL_USER}" "${MYSQL_PASS}" "${DA_MYSQL_CONF}"
+  chown diradmin:diradmin "${DA_MYSQL_CNF}"
+}
+
+################################################################################################################################
+
 ## SQL Post-Installation Tasks
 sql_post_install() {
   ## Secure Installation (replace it with scripted method below)
@@ -950,124 +1228,7 @@ sql_post_install() {
   ln -s /usr/local/bin/mysqldump /usr/local/mysql/bin/mysqldump
 }
 
-freebsd_set_newsyslog() {
-  NSL_L=$1
-  NSL_V=$2
-  NSL=/usr/local/etc/newsyslog.d/directadmin.conf
-
-  if ! grep -q ${NSL_L} $NSL; then
-    echo -e "${NSL_L}\t${NSL_V}\t600\t4\t*\t@T00\t-" >> $NSL
-  fi
-
-  #replace whatever we may have with whatever we need, eg:
-  #/var/www/html/roundcube/logs/errors  webapps:webapps 600     4       *       @T00    -
-  #/var/www/html/roundcube/logs/errors  apache:apache 600     4       *       @T00    -
-  #/var/www/html/roundcube/logs/errors      600     4       *       @T00    -
-
-  ${PERL} -pi -e "s|^${NSL_L}\s+webapps:webapps\s+|${NSL_L}\t${NSL_V}\t|" ${NSL}
-  ${PERL} -pi -e "s|^${NSL_L}\s+apache:apache\s+|${NSL_L}\t${NSL_V}\t|" ${NSL}
-  ${PERL} -pi -e "s|^${NSL_L}\s+600\s+|${NSL_L}\t${NSL_V}\t600\t|" ${NSL}
-}
-
-## Verify Webapps Log Rotation (copied from CB2)
-ensure_webapps_logrotate() {
-    #by default it sets each log to webapps:webapps.
-    #swap it to apache:apache if needed
-    #else swap it to webapps:webapps from apache:apache.. or nothing
-
-    NSL_VALUE=webapps:webapps
-
-    # if [ "${PHP1_MODE_OPT}" = "mod_php" ] && [ "${MOD_RUID2_OPT}" = "no" ]; then
-    #   NSL_VALUE=apache:apache
-    # fi
-
-    freebsd_set_newsyslog /usr/local/www/roundcube/logs/errors ${NSL_VALUE}
-    #freebsd_set_newsyslog /usr/local/www/squirrelmail/data/squirrelmail_access_log ${NSL_VALUE}
-    freebsd_set_newsyslog /usr/local/www/phpMyAdmin/log/auth.log ${NSL_VALUE}
-
-    return
-}
-
-## Verify my.cnf (copied from CB2)
-verify_my_cnf() {
-  #1 = path to cnf
-  #2 = user
-  #3 = pass
-  #4 = optional source file to compare with. update 1 if 4 is newer.
-  # host will be on the command line, as that's how DA already does it.
-
-  E_MY_CNF=$1
-
-  W=0
-  if [ ! -s ${E_MY_CNF} ]; then
-    W=1
-  fi
-
-  if [ "${W}" = "0" ] && [ "${4}" != "" ]; then
-    if [ ! -s $4 ]; then
-      echo "verify_my_cnf: cannot find $4"
-      W=1
-    else
-      MY_CNF_T=$(${file_mtime} ${E_MY_CNF})
-      SRC_CNF_T=$(${file_mtime} ${4})
-
-      if [ "${MY_CNF_T}" -lt "${SRC_CNF_T}" ]; then
-        echo "Found outdated ${E_MY_CNF}. Rewriting from ${4}"
-        W=1
-      fi
-    fi
-  fi
-
-  if [ "${W}" = "1" ]; then
-    echo '[client]' > ${E_MY_CNF}
-    chmod 600 "${E_MY_CNF}"
-    echo "user=${2}" >> "${E_MY_CNF}"
-    echo "password=${3}" >> "${E_MY_CNF}"
-  fi
-}
-
-## Initialize SQL Parameters (copied from CB2)
-get_sql_settings() {
-  # MySQL settings
-  ## DA_MYSQL=/usr/local/directadmin/conf/mysql.conf
-  ## Use: ${DA_MYSQL_CONF}
-
-  if [ -s ${DA_MYSQL_CONF} ]; then
-    MYSQL_USER=$(grep -m1 "^user=" ${DA_MYSQL_CONF} | cut -d= -f2)
-    MYSQL_PASS=$(grep -m1 "^passwd=" ${DA_MYSQL_CONF} | cut -d= -f2)
-  else
-    MYSQL_USER='da_admin'
-    MYSQL_PASS='nothing'
-  fi
-
-  if [ -s ${DA_MYSQL_CONF} ] && [ "$(grep -m1 -c -e "^host=" ${DA_MYSQL_CONF})" -gt "0" ]; then
-    MYSQL_HOST=$(grep -m1 "^host=" ${DA_MYSQL_CONF} | cut -d= -f2)
-  else
-    MYSQL_HOST=localhost
-  fi
-
-  # Where connections to MySQL are coming from. Usualy the server IP, unless on a LAN.
-  MYSQL_ACCESS_HOST=localhost
-  if [ "$MYSQL_HOST" != "localhost" ]; then
-    HOSTNAME=$(hostname)
-    MYSQL_ACCESS_HOST="$(grep -r -l -m1 '^status=server$' /usr/local/directadmin/data/admin/ips | cut -d/ -f8)"
-    if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
-      MYSQL_ACCESS_HOST="$(grep -m1 ${HOSTNAME} /etc/hosts | awk '{print $1}')"
-      if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
-        if [ -s "${WORKDIR}/scripts/setup.txt" ]; then
-          MYSQL_ACCESS_HOST=$(grep -m1 -e '^ip=' "${WORKDIR}/scripts/setup.txt" | cut -d= -f2)
-        fi
-        if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
-          echo "Unable to detect your server IP in /etc/hosts. Please enter it: "
-          read MYSQL_ACCESS_HOST
-        fi
-      fi
-    fi
-  fi
-
-  #verify_my_cnf ${DA_MYSQL_CNF} "${MYSQL_USER}" "${MYSQL_PASS}" "${DA_MYSQL_CONF}"
-  chown diradmin:diradmin "${DA_MYSQL_CNF}"
-}
+################################################################################################################################
 
 ## PHP Post-Installation Tasks
 php_post_install() {
@@ -1129,9 +1290,14 @@ php_post_install() {
   setVal php_fpm_enable \"YES\" /etc/rc.conf
 }
 
+## Upgrade PHP and related components
 php_upgrade() {
   pkg upgrade "$(pkg query %o | grep php${PHP1_VERSION})"
+
+  #pkg query -i -x "%o %v" '(php)'
 }
+
+################################################################################################################################
 
 ## phpMyAdmin Post-Installation Tasks
 phpmyadmin_post_install() {
@@ -1234,6 +1400,13 @@ phpmyadmin_post_install() {
   #access:*:1164:apache,nobody,mail,majordomo,daemon,clamav
 }
 
+## Upgrade phpMyAdmin
+phpmyadmin_upgrade() {
+  return;
+}
+
+################################################################################################################################
+
 ## Apache Post-Installation Tasks
 apache_post_install() {
   ## Symlink for backwards compatibility:
@@ -1302,10 +1475,12 @@ apache_post_install() {
   setVal accf_httpd_load \"YES\" /boot/loader.conf
   setVal accf_data_load \"YES\" /boot/loader.conf
 
+  ## Update /etc/rc.conf
   setVal apache24_enable \"YES\" /etc/rc.conf
   setVal apache24_http_accept_enable \"YES\" /etc/rc.conf
 }
 
+################################################################################################################################
 
 ## Nginx Pre-Installation Tasks
 nginx_pre_install() {
@@ -1323,14 +1498,37 @@ nginx_post_install() {
   # nginx_key=/usr/local/etc/nginx/ssl/server.key
   # nginx_ca=/usr/local/etc/nginx/ssl/server.ca
 
+  setVal nginx_enable \"YES\" /etc/rc.conf
+
   return;
 }
+
+## Copied from CB2
+addNginxToAccess() {
+  # Check for nginx user in access group
+  if grep -m1 -q "^access" /etc/group; then
+    if ! grep -m1 "^access" /etc/group | grep -q nginx; then
+      usermod -G access nginx
+    fi
+  fi
+}
+
+## Uninstall nginx
+nginx_uninstall() {
+  return;
+}
+
+################################################################################################################################
 
 ## ClamAV Post-Installation Tasks
 clamav_post_install() {
   setVal clamav_clamd_enable \"YES\" /etc/rc.conf
   setVal clamav_freshclam_enable \"YES\" /etc/rc.conf
+
+  return;
 }
+
+################################################################################################################################
 
 ## RoundCube Pre-Installation Tasks
 roundcube_pre_install() {
@@ -1680,6 +1878,7 @@ roundcube_post_install() {
   #cd ${CWD}
 }
 
+################################################################################################################################
 
 ## Webapps Pre-Installation Tasks
 webapps_pre_install() {
@@ -1741,6 +1940,7 @@ secure_php_ini() {
   fi
 }
 
+################################################################################################################################
 
 ## Ensure Webapps php.ini (copied from CB2)
 verify_webapps_php_ini() {
@@ -1769,6 +1969,8 @@ verify_webapps_php_ini() {
   fi
 }
 
+################################################################################################################################
+
 ## Ensure Webapps tmp (copied from CB2)
 verify_webapps_tmp() {
   if [ ! -d "{$WWW_TMP_DIR}" ]; then
@@ -1781,6 +1983,8 @@ verify_webapps_tmp() {
 
   verify_webapps_php_ini
 }
+
+################################################################################################################################
 
 ## Apache Host Configuration (copied from CB2)
 do_ApacheHostConf() {
@@ -1869,18 +2073,28 @@ do_ApacheHostConf() {
   fi
 }
 
+################################################################################################################################
+
 ## Setup Brute-Force Monitor
 setup_bfm() {
   ## Defaults:
   # brute_force_roundcube_log=/var/www/html/roundcube/logs/errors
   # brute_force_squirrelmail_log=/var/www/html/squirrelmail/data/squirrelmail_access_log
   # brute_force_pma_log=/var/www/html/phpMyAdmin/log/auth.log
+
+  ## Update directadmin.conf
   brute_force_roundcube_log=${WWW_DIR}/roundcube/logs/errors
   brute_force_squirrelmail_log=${WWW_DIR}/squirrelmail/data/squirrelmail_access_log
   brute_force_pma_log=${WWW_DIR}/phpMyAdmin/log/auth.log
 
+  if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
+    echo "get file"
+  fi
+
   #pure_pw=/usr/bin/pure-pw
 }
+
+################################################################################################################################
 
 ## DirectAdmin Install
 exec_da_install() {
@@ -1893,6 +2107,8 @@ exec_da_permissions() {
   cd ${DA_PATH} || exit
   ./directadmin p
 }
+
+################################################################################################################################
 
 ## Install Application
 ## $1 = name of service
@@ -1975,58 +2191,192 @@ install_app() {
 ## $1 = name of service
 ## e.g. uninstall_app exim
 uninstall_app() {
+
+  case "$1" in
+    *) exit;
+  esac
+
   return;
 }
 
-## Update PortsBuild
+################################################################################################################################
+
+## Update PortsBuild Script
 update() {
-echo "script update"
-# wget
+  echo "PortsBuild script update"
+  # wget -O portsbuild.sh ${PB_MIRROR}/portsbuild.sh
+
+  if [ "${OPT_PB_SYMLINK}" = "YES" ]; then
+    ln -s /usr/local/directadmin/portsbuild/portsbuild.sh /usr/local/bin/pb
+  fi
+}
+
+################################################################################################################################
+
+## Upgrade
+upgrade() {
+    case "$2" in
+    "") show_menu_upgrade ;;
+    esac
 }
 
 ## Upgrade an application or service
 upgrade_app() {
   case "$2" in
+    "") show_menu_upgrade ;;
     "php") php_upgrade ;;
+    "suhosin") suhosin_upgrade ;;
+    "ioncube") ioncube_upgrade ;;
+    "modsecurity") modsecurity_upgrade ;;
+    "awstats") awstats_upgrade ;;
+    "webalizer") webalizer_upgrade ;;
+
+    "apache") apache_upgrade ;;
+    "nginx") nginx_upgrade ;;
+
+    "mysql") mysql_upgrade ;;
+    "mariadb") mariadb_upgrade ;;
+
+    "phpmyadmin") phpmyadmin_upgrade ;;
+
+    "exim") exim_upgrade ;;
+    "dovecot") dovecot_upgrade ;;
+    "roundcube") roundcube_upgrade ;;
+    "pigeonhole") pigeonhole_upgrade ;;
+
+    "spamassassin") spamassassin_upgrade ;;
+    "blockcracking") blockcracking_upgrade ;;
+    "easyspamfighter") easyspamfighter_upgrade ;;
+
+    "pureftpd") pureftpd_upgrade ;;
+    "proftpd") proftpd_upgrade ;;
+
+    "directadmin") directadmin_upgrade ;;
+    "portsbuild") portsbuild_upgrade ;;
+
+    *) show_menu_upgrade ;;
   esac
 }
 
-## Upgrade an application or service
-upgrade() {
+################################################################################################################################
 
-  ## $1: appname
-  ## $2:
+## Show Menu for Upgrades
+show_menu_upgrade() {
+  echo ""
+  echo "possible upgrades"
 
-  return
+  return;
+}
+
+## Show Setup Menu
+show_menu_setup() {
+  echo "To setup PortsBuild and Directadmin, run:"
+  echo "  ./portsbuild setup <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> (<IP_ADDRESS>)"
+  echo ""
+  return;
+}
+
+################################################################################################################################
+
+## Show logo :)
+show_logo() {
+  echo "               ___\/_ "
+  echo "              /  //\  "
+  echo "      _______/  /___  "
+  echo "     /  __  / ___  /  "
+  echo "    /  /_/ / /__/ /   "
+  echo "   /  ____/______/    "
+  echo "  /  /                "
+  echo " /__/                 "
+  echo ""
+}
+
+## Show version
+show_version() {
+  echo "portsbuild version ${PB_VER} build ${PB_BUILD_DATE}"
+}
+
+## Show versions
+show_versions() {
+  ## alternative way: awk '{printf("%15s %10s\n", $1, $2)}'
+  ( printf "Package Version Origin\n" ; pkg query -i -x "%n %v %o" '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
+}
+
+## Show outdated versions of packages
+show_outdated() {
+  echo "List of packages that are out of date"
+  ( printf "Package Outdated\n" ; pkg version -l '<' -x '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
+}
+
+## About PortsBuild
+about() {
+  show_version;
+  echo "visit portsbuild.org"
+}
+
+## Show selection menu
+show_menu() {
+  echo ""
+  echo "Usage: "
+  echo "  pb command [options] [arguments]"
+  echo ""
+  # echo "Options:"
+  # echo "  -h, --help"
+  # echo "  -q, --quiet"
+  # echo "  -v, --verbose"
+  # echo ""
+  echo "Available commands"
+  echo "  config      Display the current configuration option values"
+  echo "  help        Displays help information"
+  # echo "  info      Displays information about an application or service"
+  echo "  install     Install an application or service"
+  echo "  options     Show configured PortsBuild options"
+  echo "  outdated    Show outdated applications or services on the system"
+  echo "  rewrite     Rewrite (update) a configuration file for an application or service"
+  echo "  setup       Setup PortsBuild and DirectAdmin (first-time installations)"
+  echo "  update      Updates the portsbuild script"
+  echo "  upgrade     Upgrades an application or service"
+  #echo "  verify      Verify something"
+  # echo "  "
+  echo "  version     Show version information on all applications and services installed"
+  echo ""
+
+# menu_command
+# menu_command_desc
+# menu_command_option
+# menu_command_option_desc
+
+# menu_update_update = "update"
+# menu_update_desc = "Update an application or service"
+
+  return;
 }
 
 
 ## ./portsbuild selection screen
 case "$1" in
-  "")
-  echo "portsbuild 1.0"
-  echo "Usage: ./portsbuild.sh <command>"
-  echo "where <command> can be:"
-  echo " install"
-  echo " setup"
-  echo " update"
-  echo " upgrade"
-  echo " verify"
-  echo " outdated"
-  echo " version"
-  ;;
+  #"") show_logo; show_version; show_menu; ;;
   # create_options)  ;;
   # set)  ;;
   # check_options) ;;
-  install) install ;; ## install PB+DirectAdmin
-  setup) setup ;; ## (alias for 'install'?)
-  update) update ;; ## update PB script
-  upgrade) upgrade ;; ## let portsbuild upgrade an app/service (e.g. php via pkg)
-  verify) verify ;; ## verify system state
-  version) show_version ;;
-  all) ;;
+  "install") install ;;            ## install an application
+
+  "outdated") show_outdated ;;
+
+  "setup")
+   #echo "${2}";
+   global_setup "$@"
+   ;;                ## first time setup
+
+  "update") update ;;              ## update PB script
+  "upgrade") upgrade "$@" ;;            ## let portsbuild upgrade an app/service (e.g. php via pkg)
+  "verify") verify ;;              ## verify system state
+  "version") show_version ;;       ## show portsbuild version
+  "versions") show_app_versions ;; ## app/service versions via pkg
+
+  *) show_logo; show_version; show_menu; ;;
 esac
 
-################################################################
+################################################################################################################################
 
 ## EOF
