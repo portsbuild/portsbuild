@@ -4,7 +4,7 @@
 ## Introduction
 PortsBuild is an alternative to [DirectAdmin](http://www.directadmin.com)'s [CustomBuild](http://forum.directadmin.com/showthread.php?t=44743) for [FreeBSD](http://www.freebsd.org) installations using [Ports](http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/ports-overview.html) (and Packages) to improve the relationship between two fantastic systems.
 
-Automation and Integration is achieved by using simple shell scripts, along with the recommended practices of managing a FreeBSD system according to the FreeBSD Handbook. PortsBuild will use a combination of ports (using portmaster), packages (via pkg) and a slew of port option knobs (injected into /etc/make.conf) to install the necessary services on a FreeBSD system.
+Automation and integration is achieved by using simple shell scripts, along with the recommended practices of managing a FreeBSD system according to the [FreeBSD Handbook](https://www.freebsd.org/handbook). PortsBuild will use a combination of ports (using [synth](https://github.com/jrmarino/synth) and portmaster) and packages (via pkg) while configuration options are maintained in either /etc/make.conf or /var/db/ports/*/options to install the necessary services on a FreeBSD system.
 
 The source code for this project will be open source. A distribution & copyright license has not been chosen yet at this time.
 
@@ -33,6 +33,7 @@ curl | Supported
 RoundCube 1.1.3+ | In progress
 Majordomo (src) | Supported
 ionCube loaders | Supported
+ZendOpCache | Supported (php56-opcache)
 proftpd | Supported
 pure-FTPd | Supported
 sysbk | Installed with DirectAdmin
@@ -42,32 +43,25 @@ Phase 2
 
 Service 		| Status
 --------------- | ---------------
-nginx 1.8+ | 
-PigeonHole | 
+nginx 1.8+ | untested (www/nginx)
 AwStats | www/awstats
 Webalizer | www/webalizer
 Mailman | mail/mailman
-
-
-Untested
-
-Service 		| Status
---------------- | ---------------
-ZendOptimizer | unknown
-ZendOpCache | php56-opcache?
-suhosin patch | untested; php56-suhosin?
+suhosin | untested (security/php56-suhosin)
 suphp | redundant vs. fpm?
-mod_ruid2 | not supported?
+PigeonHole | untested (mail/pigeonhole)
 
 
 PortsBuild will NOT support:
 * SquirrelMail - last release in 2011, however a fork exists in CB2 (1.4.22-20140402_0200)
-
+* ZendOptimizer - unsupported on FreeBSD
+* mod_ruid2 - unsupported on FreeBSD
 
 ### Supported Operating Systems
 * FreeBSD 10.2 x64 (primary focus)
 * FreeBSD 9.3 x64 (working)
 
+Untested on upcoming FreeBSD 10.3 branch.
 
 ### Initial Build Environment Requirements
 * ports-mgmt/pkg

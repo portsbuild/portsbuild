@@ -36,6 +36,7 @@
 
 # Script is incomplete. :)
 if [ "$(hostname)" != "pb.fallout.local" ]; then
+  echo "PortsBuild is incomplete. If you want to play with it anyway, comment out line ~40's exit;"
   exit;
 fi
 
@@ -92,7 +93,7 @@ fi
 . conf/defaults.conf
 . conf/ports.conf
 . conf/options.conf
-. conf/discover.sh
+. conf/validate.sh
 #. conf/make.conf
 #. lang/en.txt ## strings files for multilingual support (planned)
 
@@ -286,42 +287,46 @@ service_off() {
 
 ################################################################################################################################
 
-## pkg bootstrap
-pkg_setup() {
-  echo "Bootstrapping and updating pkg"
-  /usr/bin/env ASSUME_ALWAYS_YES=YES pkg bootstrap
-  pkg_update
-}
-
 ## pkg update
 pkg_update() {
+  echo "Updating FreeBSD packages index"
   ${PKG} update
 }
 
-## Install package without prompts
+## Install packages without prompts
 pkgi() {
   ${PKG} install -y "$1"
 }
 
-## Setup /usr/ports
-ports_setup() {
-  ${PORTSNAP} fetch extract
-}
-
 ## Update /usr/ports
 ports_update() {
+  echo "Updating /usr/ports"
   ${PORTSNAP} fetch update
 }
 
-## Clean stale ports
+## Clean stale ports (deprecate soon)
 clean_stale_ports() {
+  echo "Cleaning stale ports"
   ${PORTMASTER} -s
 }
 
-## Reinstall all ports "in place" (from manual)
+## Reinstall all ports "in place" (deprecate soon)
+## Todo: migrate this process to synth
 reinstall_all_ports() {
   ## Consider -R
   ${PORTMASTER} -a -f -d
+
+  ## Synth command
+
+}
+
+## Update /etc/hosts
+update_hosts() {
+  COUNT=$(grep 127.0.0.1 /etc/hosts | grep -c localhost)
+  if [ "$COUNT" -eq 0 ]; then
+    echo "Updating /etc/hosts"
+    printf "127.0.0.1\t\tlocalhost" >> /etc/hosts
+  fi
 }
 
 ################################################################################################################################
@@ -331,55 +336,15 @@ random_pass() {
   ## $1 = length (default: 12)
 
   if [ "$1" = "" ]; then
-    MAX_PASS_LENGTH=12
+    MIN_PASS_LENGTH=12
   else
-    MAX_PASS_LENGTH=$1
+    MIN_PASS_LENGTH=$1
   fi
 
-  ${PERL} -le"print map+(A..Z,a..z,0..9)[rand 62],0..${MAX_PASS_LENGTH}"
+  ${PERL} -le"print map+(A..Z,a..z,0..9)[rand 62],0..${MIN_PASS_LENGTH}"
 }
 
 ################################################################################################################################
-
-## Pre-Install Tasks
-global_pre_install() {
-
-  ## Symlink Perl for DA compat
-  echo "Pre-Install Task: checking for /usr/bin/perl symlink"
-  if [ ! -e /usr/bin/perl ]; then
-    if [ -e /usr/local/bin/perl ]; then
-      ln -s /usr/local/bin/perl /usr/bin/perl
-    else
-      pkgi ${PORT_PERL}
-      if [ $? -eq 0 ]; then
-          ln -s /usr/local/bin/perl /usr/bin/perl
-      fi
-    fi
-  fi
-
-  ## Check for /etc/rc.conf
-  if [ ! -e /etc/rc.conf ]; then
-    echo "Creating /etc/rc.conf"
-    touch /etc/rc.conf
-  fi
-
-  ## Check for /etc/make.conf
-  if [ ! -e /etc/make.conf ]; then
-    echo "Creating /etc/make.conf"
-    touch /etc/make.conf
-  fi
-
-  echo "Setting ipv6_ipv4mapping=YES in /etc/rc.conf"
-  setVal ipv6_ipv4mapping \"YES\" /etc/rc.conf
-  setVal net.inet6.ip6.v6only 0 /etc/sysctl.conf
-
-  /sbin/sysctl net.inet6.ip6.v6only=0
-
-  disable_sendmail;
-
-  ## Ethernet Device checking here
-  ##
-}
 
 ## Setup PortsBuild and DirectAdmin
 ## Possible arguments: <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> (<IP_ADDRESS>)"
@@ -395,6 +360,16 @@ global_setup() {
   if [ "${1}" = "" ] || [ "${2}" = "" ] || [ "${3}" = "" ] || [ "${4}" = "" ] || [ "${5}" = "" ] || [ "${6}" = "" ]; then
     show_menu_setup
     return;
+  else
+    #echo "Arguments:"
+
+    DA_USER_ID=$2
+    DA_LICENSE_ID=$3
+    DA_SERVER_HOSTNAME=$4
+    ETHERNET_DEV=$5
+    DA_SERVER_IP=$6
+    DA_SERVER_IP_MASK=$7
+
   fi
 
   printf "Setup arguments received:\n User ID: %s\n License ID: %s\n Hostname: %s\n Ethernet Device: %s\n Server IP Address: %s\n\n" $2 $3 $4 $5 $6
@@ -403,36 +378,167 @@ global_setup() {
   echo "If in doubt, visit: https://www.directadmin.com/clients/"
   echo ""
   echo "About to setup PortsBuild+Directadmin for the first time."
-  echo "This will install and configure the following services:"
-  ## Process chosen options
-  echo "DirectAdmin, Named, Exim 4.8, Dovecot2, Apache 2.4, PHP-FPM 5.6, MariaDB 10.0, phpMyAdmin, RoundCube and SpamAssassin"
+  echo "This will install, setup and configure the following services:"
+  ## Todo: Process chosen options
+  echo "DirectAdmin, Named, Exim 4.8, Dovecot 2, Apache 2.4, PHP-FPM 5.6, MariaDB 10.0, phpMyAdmin, RoundCube and SpamAssassin"
 
   ask_user "Do you want to continue?"
 
+
+  ## Let's go! ##
+
+  echo "Bootstrapping and updating pkg"
+  /usr/bin/env ASSUME_ALWAYS_YES=YES pkg bootstrap
+
+  pkg_update;
+
   if [ $? -eq 1 ]; then
     if [ ${FOUND_PORTS} -eq 0 ]; then
-      ports_setup;
+      echo "Setting up /usr/ports for the first time"
+      ${PORTSNAP} fetch extract
     fi
 
     ports_update;
 
-    install_deps;
-    install_compats;
-
-    if [ "${OPT_INSTALL_CCACHE}" = "YES" ]; then
-      install_ccache;
+    ## Install Dependencies
+    echo "Installing required dependencies"
+    if [ "${OS_MAJ}" -eq 10 ]; then
+      /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx dns/bind99
+    elif [ "${OS_MAJ}" -eq 9 ]; then
+      /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx
     fi
 
-    global_pre_install;
+    ## Install Compat Libraries
+    echo "Installing misc/compats"
+    if [ "${OS_MAJ}" -eq 10 ]; then
+      /usr/sbin/pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
+    elif [ "${OS_MAJ}" -eq 9 ]; then
+      /usr/sbin/pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x
+    fi
 
+    if [ "${OPT_INSTALL_CCACHE}" = "YES" ]; then
+      echo "Installing devel/ccache"
+
+      pkgi devel/ccache
+
+      if [ $? = 0 ]; then
+        if [ ! -e /etc/make.conf ]; then
+          touch /etc/make.conf
+        fi
+        setVal WITH_CCACHE_BUILD yes /etc/make.conf
+      fi
+    fi
+
+    echo "Installing ports-mgmt/portmaster"
+    pkgi ports-mgmt/portmaster
+
+    ## Install Synth (https://github.com/jrmarino/synth)
+    ## Successor to portmaster
+    ## Usage examples:
+    ##  synth just-build editors/joe editors/nano editors/libreoffice
+    ##  synth just-build /tmp/build.list
+    ##  synth upgrade-system
+    ##  synth prepare-system
+
+    echo "Installing ports-mgmt/synth"
+    pkgi gcc6-aux ncurses
+
+    ## Eventually replace with binary when it's ready
+    cd /usr/ports/ports-mgmt/synth && make install
+
+    ## Configure synth
+    # synth configure
+
+    ## Symlink Perl for DA compat
+    echo "Pre-Install Task: checking for /usr/bin/perl symlink"
+    if [ ! -e /usr/bin/perl ]; then
+      if [ -e /usr/local/bin/perl ]; then
+        ln -s /usr/local/bin/perl /usr/bin/perl
+      else
+        pkgi ${PORT_PERL}
+        if [ $? -eq 0 ]; then
+            ln -s /usr/local/bin/perl /usr/bin/perl
+        fi
+      fi
+    fi
+
+    ## Check for /etc/rc.conf
+    ## Not necessary, but you never know
+    if [ ! -e /etc/rc.conf ]; then
+      echo "Creating /etc/rc.conf"
+      touch /etc/rc.conf
+    fi
+
+    ## Check for /etc/make.conf
+    if [ ! -e /etc/make.conf ]; then
+      echo "Creating /etc/make.conf"
+      touch /etc/make.conf
+    fi
+
+    ## IPV6 settings suggested by DA
+    echo "Setting ipv6_ipv4mapping=YES in /etc/rc.conf"
+    setVal ipv6_ipv4mapping \"YES\" /etc/rc.conf
+    setVal net.inet6.ip6.v6only 0 /etc/sysctl.conf
+
+    /sbin/sysctl net.inet6.ip6.v6only=0
+
+    ## Disable sendmail
+    echo "Disabling sendmail from running (updating /etc/rc.conf)"
+    setVal sendmail_enable \"NONE\" /etc/rc.conf
+    setVal sendmail_submit_enable \"NO\" /etc/rc.conf
+    setVal sendmail_outbound_enable \"NO\" /etc/rc.conf
+    setVal sendmail_msp_queue_enable \"NO\" /etc/rc.conf
+
+    ${SERVICE} sendmail onestop
+
+    ## Ethernet Device checking here
+    ## Skipping / avoiding this step as it's not that reliable of a process,
+    ## especially if you have multiple interfaces.
+
+    ## Make sure sshd is enabled
+    echo "Enabling sshd in /etc/rc.conf"
+    setVal sshd_enable \"YES\" /etc/rc.conf
+
+    ${SERVICE} sshd start
+
+    ## Configure named (BIND)
     bind_setup;
 
-    directadmin_pre_install;
-    directadmin_install;
-    create_cb_options;
-    exec_da_permissions;
 
-    global_post_install;
+
+
+    ## Install & configure services and applications
+
+
+
+
+    ## Go for the main attraction
+    directadmin_install;
+
+    ## Create a spoof CustomBuild2 options.conf for DirectAdmin compatibility.
+    if [ ! -d ${CB_PATH} ]; then
+      mkdir -p ${CB_PATH}
+    fi
+
+    ${WGET} -O ${CB_CONF} "${PB_MIRROR}/conf/cb-options.conf"
+
+    if [ -e "${CB_CONF}" ]; then
+      chmod 755 "${CB_CONF}"
+    fi
+
+
+    ## Skip: DirectAdmin Install
+    # cd ${DA_PATH} || exit
+    # ./directadmin i
+
+    ## Set DirectAdmin Permissions
+    cd ${DA_PATH} || exit
+    ./directadmin p
+
+    #${SERVICE} directadmin start
+
+    #global_post_install;
+
   else
     printf "PortsBuild installation canceled\n\n"
     show_main_menu;
@@ -440,68 +546,14 @@ global_setup() {
 
 }
 
-## Post-Install Tasks
+## Global Post-Install Tasks
 global_post_install() {
   ## cleanup leftover files?
   echo "All done!"
-  exit 0;
+  #exit 0;
 }
 
-## Install Dependencies
-install_deps() {
-  echo "Installing required dependencies"
-  if [ "${OS_MAJ}" -eq 10 ]; then
-    /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx dns/bind99
-  elif [ "${OS_MAJ}" -eq 9 ]; then
-    /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx
-  fi
-}
-
-## Install Compat Libraries
-install_compats() {
-  echo "Installing misc/compats"
-  if [ "${OS_MAJ}" -eq 10 ]; then
-    /usr/sbin/pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
-  elif [ "${OS_MAJ}" -eq 9 ]; then
-    /usr/sbin/pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x
-  fi
-}
-
-## Install CCache
-install_ccache() {
-
-  echo "Installing devel/ccache"
-
-  pkgi devel/ccache
-
-  if [ $? = 0 ]; then
-    if [ ! -e /etc/make.conf ]; then
-      touch /etc/make.conf
-    fi
-    setVal WITH_CCACHE_BUILD yes /etc/make.conf
-  fi
-}
-
-## Disable sendmail
-disable_sendmail() {
-
-  echo "Disabling sendmail from running (updating /etc/rc.conf)"
-  setVal sendmail_enable \"NONE\" /etc/rc.conf
-  setVal sendmail_submit_enable \"NO\" /etc/rc.conf
-  setVal sendmail_outbound_enable \"NO\" /etc/rc.conf
-  setVal sendmail_msp_queue_enable \"NO\" /etc/rc.conf
-
-  ${SERVICE} sendmail onestop
-}
-
-## Enable SSH Daemon
-enable_sshd() {
-
-  echo "Enabling sshd in /etc/rc.conf"
-  setVal sshd_enable \"YES\" /etc/rc.conf
-
-  ${SERVICE} sshd start
-}
+################################################################################################################################
 
 ## Update /etc/rc.conf
 update_rc() {
@@ -513,6 +565,9 @@ update_rc() {
   if [ "${NAMED_ENABLE}" = "YES" ]; then
     setVal named_enable \"YES\" /etc/rc.conf
   fi
+
+  ## Todo: write directadmin startup script
+  # setVal directadmin_enable \"YES\" /etc/rc.conf
 
   if [ "${APACHE_ENABLE}" = "YES" ]; then
     setVal apache24_enable \"YES\" /etc/rc.conf
@@ -568,6 +623,8 @@ update_rc() {
   return;
 }
 
+################################################################################################################################
+
 ## Update /etc/make.conf
 update_make() {
   if [ ! -e /etc/make.conf ]; then
@@ -578,69 +635,38 @@ update_make() {
   ## magic goes here
 }
 
-## [CATEGORY]_[PORT]_[SET|UNSET]=OPTION1 OPTION2 ...
+## Set PORT options, either in /etc/make.conf
+## or /var/db/ports/$portcode/options
+configure_ports() {
 
-## Make set options
-make_set() {
-  ## $1 = port code
-  ## $2 = set option(s)
-  ## e.g.: LANG_PHP5
-  return;
+  ## Set options in /etc/make.conf
+  ## [CATEGORY]_[PORT]_[SET|UNSET]=OPTION1 OPTION2 ...
+  ## root@test:/usr/ports/www/apache24 # make config OPTIONS_SET="SUEXEC MPM_EVENT" OPTIONS_UNSET="MPM_PREFORK"
+
+  cd ${PORTS_BASE} || exit
 }
 
-## Make unset options
-make_unset() {
-  # make unset
-  return;
-}
-
-## Update /etc/hosts
-update_hosts() {
-  COUNT=$(grep 127.0.0.1 /etc/hosts | grep -c localhost)
-  if [ "$COUNT" -eq 0 ]; then
-    echo "Updating /etc/hosts"
-    printf "127.0.0.1\t\tlocalhost" >> /etc/hosts
-  fi
-}
-
-################################################################################################################################
-
-## Create a spoof CustomBuild2 options.conf for DirectAdmin compatibility.
-create_cb_options() {
-  if [ ! -d ${CB_PATH} ]; then
-    mkdir -p ${CB_PATH}
-  fi
-
-  ${WGET} -O ${CB_CONF} "${PB_MIRROR}/conf/cb-options.conf"
-
-  if [ -e "${CB_CONF}" ]; then
-    chmod 755 "${CB_CONF}"
-  fi
-}
-
-## Create portsbuild/options.conf
-create_pb_options() {
-  touch ${DA_PATH}/portsbuild/options.conf
-}
 
 ################################################################################################################################
 
 ## Setup BIND (named)
 bind_setup() {
-  ## BIND (named)
+
   if [ "${OS_MAJ}" -eq 10 ]; then
     if [ ! -e /usr/local/sbin/named ]; then
       echo "*** Error: Cannot find the named binary.";
+      return;
     fi
     if [ ! -e /usr/local/etc/namedb/named.conf ]; then
-      echo "*** Error: Cannot find /usr/local/etc/namedb/named.conf.";
+      echo "*** Warning: Cannot find /usr/local/etc/namedb/named.conf.";
     fi
   elif [ "$OS_MAJ" -eq 9 ]; then
     if [ ! -e /usr/sbin/named ]; then
       echo "*** Error: Cannot find the named binary.";
+      return;
     fi
     if [ ! -e /var/named/etc/namedb/named.conf ]; then
-      echo "*** Error: Cannot find /var/named/etc/namedb/named.conf. Make sure Bind is completely installed.";
+      echo "*** Warning: Cannot find /var/named/etc/namedb/named.conf.";
     fi
   fi
 
@@ -658,25 +684,31 @@ bind_setup() {
 
   ## Generate BIND's rndc.key
   if [ ! -e /usr/local/etc/namedb/rndc.key ] || [ ! -e /etc/namedb/rndc.key ]; then
-    rndc-confgen -a -s ${DA_SERVER_IP}
+    echo "Generating rndc.key for the first time"
+    rndc-confgen -a -s "${DA_SERVER_IP}"
   fi
 
   echo "Updating /etc/rc.conf with named_enable=YES"
   setVal named_enable \"YES\" /etc/rc.conf
 
-  echo "Restarting named"
+  echo "Starting named"
   ${SERVICE} named start
+
+  return;
 }
 
 ################################################################################################################################
 
 ### DirectAdmin Installation ###
 
-## DirectAdmin Pre-Installation Tasks (replaces setup.sh)
-directadmin_pre_install() {
+## Install DirectAdmin (replaces scripts/install.sh)
+## Create necessary users & groups
+directadmin_install() {
+
+  ## DirectAdmin Pre-Installation Tasks (replaces setup.sh)
 
   ## Need to create a blank /etc/auth.conf file for DA compatibility.
-  echo "Pre-Install Task: checking for /etc/auth.conf"
+  echo "Checking for /etc/auth.conf"
   if [ ! -e /etc/auth.conf ]; then
     /usr/bin/touch /etc/auth.conf;
     /bin/chmod 644 /etc/auth.conf;
@@ -688,10 +720,10 @@ directadmin_pre_install() {
     if [ "$COUNT" -eq 0 ]; then
       echo "diradmin: :blackhole:" >> /etc/aliases
     fi
+    ## Update aliases database
     /usr/bin/newaliases
   fi
 
-  ## Create the directory
   mkdir ${DA_PATH}
 
   ## Get DirectAdmin License
@@ -709,7 +741,7 @@ directadmin_pre_install() {
   COUNT=$(head -n 4 ${DA_PATH}/update.tar.gz | grep -c "* You are not allowed to run this program *");
   if [ "$COUNT" -ne 0 ]; then
     echo "";
-    echo "You are not authorized to download the update package with that Client ID and License ID for this IP address. Please email sales@directadmin.com";
+    echo "You are not authorized to download the update package with that Client ID and License ID for this IP address.";
     exit 4;
   fi
 
@@ -719,11 +751,12 @@ directadmin_pre_install() {
 
   ## See if the binary exists:
   if [ ! -e ${DA_PATH}/directadmin ]; then
-    echo "Cannot find the DirectAdmin binary. Extraction failed";
+    echo "Cannot find the DirectAdmin binary. Extraction failed.";
     exit 5;
   fi
 
   ## These were in do_checks()
+
   ## Check for a separate /home partition (for quota support).
   #HOME_YES=`cat /etc/fstab | grep -c /home`;
   HOME_YES=$(grep -c /home < /etc/fstab)
@@ -731,12 +764,15 @@ directadmin_pre_install() {
     echo 'quota_partition=/' >> ${DA_CONF_TEMPLATE};
   fi
 
-  ## Detect the ethernet interfaces that are available on the system (NOTE: can return more than 1 interface, even commented).
-  ETH_DEV="$(grep ifconfig < /etc/rc.conf | cut -d= -f1 | cut -d_ -f2)"
-  if [ "$ETH_DEV" != "" ]; then
-    COUNT=$(grep -c ethernet_dev < $DA_CONF_TEMPLATE);
-    if [ "$COUNT" -eq 0 ]; then
-      echo ethernet_dev="${ETH_DEV}" >> ${DA_CONF_TEMPLATE};
+  ## Detect the ethernet interfaces that are available on the system (or use the one supplied by the user)
+  ## NOTE: can return more than 1 interface, even commented, from /etc/rc.conf
+  if [ ! -e "${ETHERNET_DEV}" ]; then
+    ETH_DEV="$(grep ifconfig < /etc/rc.conf | cut -d= -f1 | cut -d_ -f2)"
+    if [ "$ETH_DEV" != "" ]; then
+      COUNT=$(grep -c ethernet_dev < $DA_CONF_TEMPLATE);
+      if [ "$COUNT" -eq 0 ]; then
+        echo ethernet_dev="${ETH_DEV}" >> ${DA_CONF_TEMPLATE};
+      fi
     fi
   fi
 
@@ -758,18 +794,13 @@ directadmin_pre_install() {
   } > ${SETUP_TXT};
 
   chmod 600 ${SETUP_TXT};
-}
 
-
-## Install DirectAdmin (replaces scripts/install.sh)
-## Create necessary users & groups
-directadmin_install() {
   ## Add the DirectAdmin user & group:
   pw groupadd diradmin
   pw useradd -g diradmin -n diradmin -d /usr/local/directadmin -s /sbin/nologin
 
-  ## Mail User & Group
-  ## NOTE: FreeBSD already comes with a "mail" group (ID: 6)
+  ## Mail User & Group creation
+  ## NOTE: FreeBSD already comes with a "mail" group (ID: 6) and a "mailnull" user (ID: 26)
   pw groupadd mail 2> /dev/null
   pw useradd -g mail -u 12 -n mail -d /var/mail -s /sbin/nologin 2> /dev/null
 
@@ -809,7 +840,7 @@ directadmin_install() {
   touch ${DA_PATH}/data/users/admin/u_welcome.txt
   touch ${DA_PATH}/data/admin/r_welcome.txt
 
-  #Verify: Create backup.conf (wasn't created?)
+  ## Verify: Create backup.conf (wasn't created?)
   chown diradmin:diradmin ${DA_PATH}/data/users/admin/backup.conf
 
   ## Create logs directory:
@@ -833,16 +864,15 @@ directadmin_install() {
     ## Set SSH folder permissions (is this needed?):
     # chmod 710 /etc/ssh
   fi
-}
 
-## DirectAdmin Post-Installation Tasks
-directadmin_post_install() {
+
+  ## DirectAdmin Post-Installation Tasks
   mkdir -p ${DA_PATH}/data/users/admin/packages
   chown diradmin:diradmin ${DA_PATH}/data/users/admin/packages
   chmod 700 ${DA_PATH}/data/users/admin/packages
 
-  return;
 }
+
 
 ## DirectAdmin Upgrade
 directadmin_upgrade() {
@@ -910,11 +940,13 @@ freebsd_set_newsyslog() {
   ${PERL} -pi -e "s|^${NSL_L}\s+600\s+|${NSL_L}\t${NSL_V}\t600\t|" ${NSL}
 }
 
+
 ## Verify Webapps Log Rotation (copied from CB2)
 verify_webapps_logrotate() {
-    #by default it sets each log to webapps:webapps.
-    #swap it to apache:apache if needed
-    #else swap it to webapps:webapps from apache:apache.. or nothing
+
+    # By default it sets each log to webapps:webapps.
+    # Swap it to apache:apache if needed
+    # else swap it to webapps:webapps from apache:apache... or do nothing
 
     NSL_VALUE=webapps:webapps
 
@@ -922,9 +954,17 @@ verify_webapps_logrotate() {
     #   NSL_VALUE=apache:apache
     # fi
 
-    freebsd_set_newsyslog /usr/local/www/roundcube/logs/errors ${NSL_VALUE}
-    #freebsd_set_newsyslog /usr/local/www/squirrelmail/data/squirrelmail_access_log ${NSL_VALUE}
-    freebsd_set_newsyslog /usr/local/www/phpMyAdmin/log/auth.log ${NSL_VALUE}
+    if [ "${ROUNDCUBE_ENABLE}" = "YES" ]; then
+      freebsd_set_newsyslog /usr/local/www/roundcube/logs/errors ${NSL_VALUE}
+    fi
+
+    if [ "${SQUIRRELMAIL_ENABLE}" = "YES" ]; then
+      freebsd_set_newsyslog /usr/local/www/squirrelmail/data/squirrelmail_access_log ${NSL_VALUE}
+    fi
+
+    if [ "${PHPMYADMIN_ENABLE}" = "YES" ]; then
+      freebsd_set_newsyslog /usr/local/www/phpMyAdmin/log/auth.log ${NSL_VALUE}
+    fi
 
     return
 }
@@ -933,31 +973,38 @@ verify_webapps_logrotate() {
 
 ## Exim Pre-Installation Tasks
 exim_pre_install() {
-  mkdir -p ${VIRTUAL};
-  chown ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL};
-  chmod 755 ${VIRTUAL};
+
+  mkdir -p ${VIRTUAL_PATH};
+  chown ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH};
+  chmod 755 ${VIRTUAL_PATH};
 
   ## replace $(hostname)
-  hostname >> ${VIRTUAL}/domains;
+  hostname >> ${VIRTUAL_PATH}/domains;
 
-  if [ ! -s ${VIRTUAL}/limit ]; then
-    echo "${LIMIT_DEFAULT}" > ${VIRTUAL}/limit
+  if [ ! -s ${VIRTUAL_PATH}/limit ]; then
+    echo "${LIMIT_DEFAULT}" > ${VIRTUAL_PATH}/limit
   fi
 
-  if [ ! -s ${VIRTUAL}/limit_unknown ]; then
-    echo "${LIMIT_UNKNOWN}" > ${VIRTUAL}/limit_unknown
+  if [ ! -s ${VIRTUAL_PATH}/limit_unknown ]; then
+    echo "${LIMIT_UNKNOWN}" > ${VIRTUAL_PATH}/limit_unknown
   fi
 
-  chmod 755 ${VIRTUAL}/*
-  mkdir ${VIRTUAL}/usage
-  chmod 750 ${VIRTUAL}/usage
+  chmod 755 ${VIRTUAL_PATH}/*
+  mkdir ${VIRTUAL_PATH}/usage
+  chmod 750 ${VIRTUAL_PATH}/usage
 
   for i in domains domainowners pophosts blacklist_domains whitelist_from use_rbl_domains bad_sender_hosts bad_sender_hosts_ip blacklist_senders whitelist_domains whitelist_hosts whitelist_hosts_ip whitelist_senders skip_av_domains skip_rbl_domains; do
-    touch ${VIRTUAL}/$i;
-    chmod 600 ${VIRTUAL}/$i;
+    touch ${VIRTUAL_PATH}/$i;
+    chmod 600 ${VIRTUAL_PATH}/$i;
   done
 
-  chown ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL}/*;
+  chown ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}/*;
+}
+
+exim_install() {
+
+  cd /usr/ports/mail/exim || exit
+  make config EXIM_USER=mail EXIM_GROUP=mail
 }
 
 ## Exim Post-Installation Tasks
@@ -972,6 +1019,7 @@ exim_post_install() {
   ## See: http://help.directadmin.com/item.php?id=245
   /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout /usr/local/etc/exim/exim.key -out /usr/local/etc/exim/exim.cert -days 9000 -nodes
 
+  ## Symlink for DA compat
   ln -s /usr/local/etc/exim/exim.key /etc/exim.key
   ln -s /usr/local/etc/exim/exim.cert /etc/exim.cert
 
@@ -983,17 +1031,21 @@ exim_post_install() {
   ## Reference: Verify Exim config:
   exim -C ${EXIM_CONF} -bV
 
+  ## Update /etc/rc.conf
+  echo "Enabling Exim startup (updating /etc/rc.conf)"
   setVal exim_enable \"YES\" /etc/rc.conf
   setVal exim_flags \"-bd -q1h\" /etc/rc.conf
 
-  service exim start
+  echo "Starting Exim"
+  ${SERVICE} exim start
 
   ## Tel DA new path to Exim binary.
   setVal mq_exim_bin "/usr/local/sbin/exim" >> ${DA_CONF}
 
   ## Replace sendmail programs with Exim binaries.
-  ## There's another way to do this via mail/exim and typing "make something"
+  ## If I recall correctly, there's another way to do this via mail/exim and typing "make something"
   if [ ! -e /etc/mail/mailer.conf ]; then
+    echo "Creating /etc/mail/mailer.conf"
     touch /etc/mail/mailer.conf
   fi
 
@@ -1209,6 +1261,7 @@ dovecot_post_install() {
 
   echo "listen = *, ::" > /usr/local/etc/dovecot/conf/ip.conf
 
+  echo "Enabling Dovecot startup (upating /etc/rc.conf)"
   setVal dovecot_enable \"YES\" /etc/rc.conf
 }
 
@@ -1266,7 +1319,6 @@ verify_my_cnf() {
 
 ## Initialize SQL Parameters (copied from CB2)
 get_sql_settings() {
-  # MySQL settings
   ## DA_MYSQL=/usr/local/directadmin/conf/mysql.conf
   ## Use: ${DA_MYSQL_CONF}
 
@@ -1287,17 +1339,17 @@ get_sql_settings() {
   # Where connections to MySQL are coming from. Usualy the server IP, unless on a LAN.
   MYSQL_ACCESS_HOST=localhost
   if [ "$MYSQL_HOST" != "localhost" ]; then
-    HOSTNAME=$(hostname)
+    SERVER_HOSTNAME=$(hostname)
     MYSQL_ACCESS_HOST="$(grep -r -l -m1 '^status=server$' /usr/local/directadmin/data/admin/ips | cut -d/ -f8)"
     if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
-      MYSQL_ACCESS_HOST="$(grep -m1 ${HOSTNAME} /etc/hosts | awk '{print $1}')"
+      MYSQL_ACCESS_HOST=$(grep -m1 "${SERVER_HOSTNAME}" /etc/hosts | awk '{print $1}')
       if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
         if [ -s "${WORKDIR}/scripts/setup.txt" ]; then
           MYSQL_ACCESS_HOST=$(grep -m1 -e '^ip=' "${WORKDIR}/scripts/setup.txt" | cut -d= -f2)
         fi
         if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
           echo "Unable to detect your server IP in /etc/hosts. Please enter it: "
-          read MYSQL_ACCESS_HOST
+          read -r MYSQL_ACCESS_HOST
         fi
       fi
     fi
@@ -1368,10 +1420,16 @@ php_post_install() {
   ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
   #cp -f /usr/local/directadmin/custombuild/configure/fpm/conf/php-fpm.conf.56 /usr/local/etc/php-fpm.conf
 
+  if [ "${PHP_INI_TYPE}" = "production" ]; then
+    cp /usr/local/etc/php.ini-production /usr/local/etc/php.ini
+  elif [ "${PHP_INI_TYPE}" = "development" ]; then
+    cp /usr/local/etc/php.ini-development /usr/local/etc/php.ini
+  fi
+
   ## PHP1_VERSION="56"
   PHP_PATH=/usr/local/php${PHP1_VERSION}
 
-  ## Create CB2/DA directories for compat:
+  ## Create directories for DA compat:
   mkdir -p ${PHP_PATH}
   mkdir -p ${PHP_PATH}/bin
   mkdir -p ${PHP_PATH}/etc
@@ -1385,8 +1443,7 @@ php_post_install() {
   #mkdir -p ${PHP_PATH}/lib/php.conf.d/
   mkdir -p ${PHP_PATH}/lib/php/
 
-  ## Symlink for compat (replace php56 with your appropriate version):
-
+  ## Symlink for compat
   ln -s /usr/local/bin/php ${PHP_PATH}/bin/php
   ln -s /usr/local/bin/php-cgi ${PHP_PATH}/bin/php-cgi
   ln -s /usr/local/bin/php-config ${PHP_PATH}/bin/php-config
@@ -1420,6 +1477,7 @@ php_post_install() {
 
   secure_php_ini ${PHP_INI}
 
+  echo "Enabling PHP-FPM startup (updating /etc/rc.conf)"
   setVal php_fpm_enable \"YES\" /etc/rc.conf
 }
 
@@ -2120,8 +2178,10 @@ verify_webapps_tmp() {
 ################################################################################################################################
 
 ## Apache Host Configuration (copied from CB2)
-do_ApacheHostConf() {
-  APACHE_HOST_CONF=${APACHE_DIR}/extra/httpd-hostname.conf
+#do_ApacheHostConf() {
+rewrite_apache_conf() {
+
+  APACHE_HOST_CONF=${APACHE_PATH}/extra/httpd-hostname.conf
 
   ## Set this for now since PB only supports 1 instance of PHP.
   #PHP1_MODE_OPT="php-fpm"
@@ -2232,19 +2292,12 @@ bfm_setup() {
   #pure_pw=/usr/bin/pure-pw
 }
 
-################################################################################################################################
-
-## DirectAdmin Install
-exec_da_install() {
-  cd ${DA_PATH} || exit
-  ./directadmin i
+## IPFW Setup
+ipfw_setup() {
+  return;
 }
 
-## DirectAdmin Permissions
-exec_da_permissions() {
-  cd ${DA_PATH} || exit
-  ./directadmin p
-}
+
 
 ################################################################################################################################
 
@@ -2266,14 +2319,16 @@ install_app() {
       portmaster -d ${PORT_NGINX}
       ;;
     "php55")
-      portmaster -d ${PORT_PHP55}
+      cd /usr/ports/lang/php55 && make config && make install
+      # portmaster -d ${PORT_PHP55}
       ;;
     "php56")
-      portmaster -d ${PORT_PHP56}
+      cd /usr/ports/lang/php56 && make config && make install
+      # portmaster -d ${PORT_PHP56}
       ;;
-    "php70")
-      portmaster -d ${PORT_PHP70}
-      ;;
+    # "php70")
+    #   cd /usr/ports/lang/php70 && make config && make install
+    #   ;;
     "ioncube")
       pkgi ${PORT_IONCUBE}
       ;;
@@ -2283,7 +2338,8 @@ install_app() {
       roundcube_post_install
       ;;
     "spamassassin")
-      portmaster -d ${PORT_SPAMASSASSIN}
+      cd /usr/ports/mail/spamassassin && make config && make install
+      # portmaster -d ${PORT_SPAMASSASSIN}
       spamassassin_post_install
       ;;
     "libspf2") pkgi ${PORT_LIBSPF2} ;;
@@ -2292,7 +2348,8 @@ install_app() {
     "easy_spam_fighter") easyspamfighter_install ;;
     "exim")
       exim_pre_install
-      portmaster -d ${PORT_EXIM}
+      cd /usr/ports/mail/exim && make config && make install
+      # portmaster -d ${PORT_EXIM}
       exim_post_install
       ;;
     "mariadb55")
@@ -2317,10 +2374,12 @@ install_app() {
       ;;
     "phpmyadmin")
       phpmyadmin_pre_install
-      portmaster -d ${PORT_PHPMYADMIN}
+      cd /usr/ports/databases/phpMyAdmin && make config && make install
+      # portmaster -d ${PORT_PHPMYADMIN}
       phpmyadmin_post_install
       ;;
     "pureftpd")
+      #cd /usr/ports/ftp/pureftpd && make config && make install
       portmaster -d ${PORT_PUREFTPD}
       ;;
     "proftpd")
@@ -2329,7 +2388,7 @@ install_app() {
     "bfm")
       bfm_setup
       ;;
-      *) echo "Script error"; break;
+      *) echo "Script error"; return;
   esac
 }
 

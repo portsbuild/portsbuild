@@ -1,8 +1,8 @@
 #!/bin/sh
-## discover.sh
+## validate.sh
 ## Please do not modify this file.
 ##
-## Discover features and options on the current system.
+## Discover & validate features and options on the current system.
 
 ## System level
 #FOUND_HOSTNAME=$(hostname)
@@ -117,3 +117,6 @@ OPT_PREFER_CUSTOM_SSL_CERTS="NO"
 if [ "${DA_ADMIN_EMAIL}" = "" ]; then
   DA_ADMIN_EMAIL=${DA_ADMIN_USERNAME}@${SERVER_DOMAIN}
 fi
+
+SERVER_IP=${DA_SERVER_IP}
+SERVER_IP_MASK=${DA_SERVER_IP_MASK}
