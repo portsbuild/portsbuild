@@ -387,12 +387,13 @@ global_setup() {
 
   ## Let's go! ##
 
-  echo "Bootstrapping and updating pkg"
-  /usr/bin/env ASSUME_ALWAYS_YES=YES pkg bootstrap
-
-  pkg_update;
-
   if [ $? -eq 1 ]; then
+
+    echo "Bootstrapping and updating pkg"
+    /usr/bin/env ASSUME_ALWAYS_YES=YES pkg bootstrap
+
+    pkg_update;
+
     if [ ${FOUND_PORTS} -eq 0 ]; then
       echo "Setting up /usr/ports for the first time"
       ${PORTSNAP} fetch extract
@@ -416,15 +417,24 @@ global_setup() {
       /usr/sbin/pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x
     fi
 
+    ## Check for /etc/rc.conf
+    if [ ! -e /etc/rc.conf ]; then
+      echo "Creating /etc/rc.conf"
+      touch /etc/rc.conf
+    fi
+
+    ## Check for /etc/make.conf
+    if [ ! -e /etc/make.conf ]; then
+      echo "Creating /etc/make.conf"
+      touch /etc/make.conf
+    fi
+
     if [ "${OPT_INSTALL_CCACHE}" = "YES" ]; then
       echo "Installing devel/ccache"
 
       pkgi devel/ccache
 
       if [ $? = 0 ]; then
-        if [ ! -e /etc/make.conf ]; then
-          touch /etc/make.conf
-        fi
         setVal WITH_CCACHE_BUILD yes /etc/make.conf
       fi
     fi
@@ -462,19 +472,6 @@ global_setup() {
       fi
     fi
 
-    ## Check for /etc/rc.conf
-    ## Not necessary, but you never know
-    if [ ! -e /etc/rc.conf ]; then
-      echo "Creating /etc/rc.conf"
-      touch /etc/rc.conf
-    fi
-
-    ## Check for /etc/make.conf
-    if [ ! -e /etc/make.conf ]; then
-      echo "Creating /etc/make.conf"
-      touch /etc/make.conf
-    fi
-
     ## IPV6 settings suggested by DA
     echo "Setting ipv6_ipv4mapping=YES in /etc/rc.conf"
     setVal ipv6_ipv4mapping \"YES\" /etc/rc.conf
@@ -482,17 +479,19 @@ global_setup() {
 
     /sbin/sysctl net.inet6.ip6.v6only=0
 
-    ## Disable sendmail
-    echo "Disabling sendmail from running (updating /etc/rc.conf)"
-    setVal sendmail_enable \"NONE\" /etc/rc.conf
-    setVal sendmail_submit_enable \"NO\" /etc/rc.conf
-    setVal sendmail_outbound_enable \"NO\" /etc/rc.conf
-    setVal sendmail_msp_queue_enable \"NO\" /etc/rc.conf
+    ## Disable sendmail if Exim is enabled
+    if [ "${EXIM_ENABLE}" = "YES" ] || [ "${DISABLE_SENDMAIL}" = "YES" ] ; then
+      echo "Disabling sendmail from running (updating /etc/rc.conf)"
+      setVal sendmail_enable \"NONE\" /etc/rc.conf
+      setVal sendmail_submit_enable \"NO\" /etc/rc.conf
+      setVal sendmail_outbound_enable \"NO\" /etc/rc.conf
+      setVal sendmail_msp_queue_enable \"NO\" /etc/rc.conf
 
-    ${SERVICE} sendmail onestop
+      ${SERVICE} sendmail onestop
+    fi
 
     ## Ethernet Device checking here
-    ## Skipping / avoiding this step as it's not that reliable of a process,
+    ## Skipping/avoiding this step as it's not that reliable of a process,
     ## especially if you have multiple interfaces.
 
     ## Make sure sshd is enabled
@@ -864,7 +863,6 @@ directadmin_install() {
     ## Set SSH folder permissions (is this needed?):
     # chmod 710 /etc/ssh
   fi
-
 
   ## DirectAdmin Post-Installation Tasks
   mkdir -p ${DA_PATH}/data/users/admin/packages
@@ -1655,6 +1653,15 @@ apache_post_install() {
   ## Already done (default):
   ${PERL} -pi -e 's/^DefaultType/#DefaultType/' ${APACHE_DIR}/httpd.conf
   chmod 710 ${APACHE_DIR}
+
+  ## Update directadmin.conf with new SSL paths
+  # setVal apacheconf /usr/local/etc/apache24/httpd.conf
+  # setVal apacheips /usr/local/etc/apache24/ips.conf
+  # setVal apachemimetypes /usr/local/etc/apache24/mime.types
+  # setVal apachecert /usr/local/etc/apache24/ssl/server.crt
+  # setVal apachekey /usr/local/etc/apache24/ssl/server.key
+  # setVal apacheca /usr/local/etc/apache24/ssl/server.ca
+
 
   ## Rewrite Apache 2.4 configuration files
   ## Perhaps skip this? No need I think -sg
