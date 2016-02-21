@@ -1,5 +1,5 @@
 #!/bin/sh
-# Script to install majordomo
+# Script to install Majordomo
 # PortsBuild edition
 
 # This script is written originally by DirectAdmin

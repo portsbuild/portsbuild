@@ -575,6 +575,8 @@ update_rc() {
 
   if [ "${MYSQL_ENABLE}" = "YES" ] || [ "${MARIADB_ENABLE}" = "YES" ]; then
     setVal mysql_enable \"YES\" /etc/rc.conf
+    setval mysql_dbdir \"/var/db/mysql\" /etc/rc.conf
+    setVal mysql_optfile \"/usr/local/etc/my.cnf\" /etc/rc.conf
   fi
 
   if [ "${NGINX_ENABLE}" = "YES" ]; then

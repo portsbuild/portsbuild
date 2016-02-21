@@ -1,4 +1,4 @@
-#!/bin/sh 
+#!/bin/sh
 
 # Source: http://help.directadmin.com/item.php?id=330
 #
@@ -24,7 +24,7 @@ for DA_USER in `ls ${DA_USERS_DIR}`; do
                               if [ "$IP" = "" ]; then
                                          IP=`cat ${DA_USERS_DIR}/${DA_USER}/user.conf | grep ip= | cut -d= -f2`
                               fi
-                              
+
                               echo "\$TTL 14400"  >  ${NAMED_DIR}/${DOMAIN}.db
                               echo "@         IN      SOA     ${NS1}.         hostmaster.${DOMAIN}. ("        >> ${NAMED_DIR}/${DOMAIN}.db
                               echo "                                                          2010101901"                     >> ${NAMED_DIR}/${DOMAIN}.db
@@ -45,7 +45,7 @@ for DA_USER in `ls ${DA_USERS_DIR}`; do
                               echo "www               14400   IN              A       ${IP}"                             >> ${NAMED_DIR}/${DOMAIN}.db
                               echo ""  >> ${NAMED_DIR}/${DOMAIN}.db
                               echo "${DOMAIN}.        14400   IN              MX      10 mail"                                >> ${NAMED_DIR}/${DOMAIN}.db
-                              echo "${DOMAIN}.        14400   IN              TXT     \"v=spf1 a mx ip4:${IP} ~all\""    >> ${NAMED_DIR}/${DOMAIN}.db
+                              echo "${DOMAIN}.        14400   IN              TXT     \"v=spf1 a mx ip4:${IP} -all\""    >> ${NAMED_DIR}/${DOMAIN}.db
 
                               echo ""  >> ${NAMED_DIR}/${DOMAIN}.db
 

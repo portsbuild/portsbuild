@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# 2016-02-20: Modified for PortsBuild
+
 DA_PATH=/usr/local/directadmin
 DA_SCRIPTS=${DA_PATH}/scripts
 DA_TQ=${DA_PATH}/data/task.queue
@@ -7,14 +9,16 @@ DA_TQ=${DA_PATH}/data/task.queue
 #added new options to templates
 #echo 'action=rewrite&value=httpd' >> $DA_TQ
 
-echo "action=cache&value=showallusers" >> $DA_TQ
-echo "action=cache&value=safemode" >> $DA_TQ
-echo "action=convert&value=cronbackups" >> $DA_TQ
-echo "action=convert&value=suspendedmysql" >> $DA_TQ
-echo "action=syscheck" >> $DA_TQ
+{
+  echo "action=cache&value=showallusers"
+  echo "action=cache&value=safemode"
+  echo "action=convert&value=cronbackups"
+  echo "action=convert&value=suspendedmysql"
+  echo "action=syscheck"
+} >> $DA_TQ
 
 if [ ! -d /usr/local/sysbk ]; then
-        cd $DA_SCRIPTS
+        cd $DA_SCRIPTS || exit
         ./sysbk.sh
 fi
 
@@ -35,16 +39,16 @@ $DA_SCRIPTS/newsyslog.sh
 rm -f /usr/local/directadmin/data/skins/*/ssi_test.html 2> /dev/null
 perl -pi -e 's/trusted_users = mail:majordomo:apache$/trusted_users = mail:majordomo:apache:diradmin/' /etc/exim.conf
 
-COUNT=`grep uid_exempt /etc/exim.pl | grep -c yes`
-FILE=/etc/exim.pl.1.24.0.back
-if [ $COUNT -eq 0 ]; then
+COUNT=$(grep uid_exempt /usr/local/etc/exim/exim.pl | grep -c yes)
+FILE=/usr/local/etc/exim/exim.pl.1.24.0.back
+if [ "$COUNT" -eq 0 ]; then
         if [ ! -e $FILE ]; then
-                cp -f /etc/exim.pl $FILE
-                wget -q -O /etc/exim.pl.new http://files.directadmin.com/services/exim.pl
+                cp -f /usr/local/etc/exim/exim.pl $FILE
+                wget -q -O /usr/local/etc/exim/exim.pl.new http://files.directadmin.com/services/exim.pl
                 RET=$?
                 if [ $RET -eq 0 ]; then
-                        mv -f /etc/exim.pl.new /etc/exim.pl
-                        chmod 755 /etc/exim.pl
+                        mv -f /usr/local/etc/exim/exim.pl.new /usr/local/etc/exim/exim.pl
+                        chmod 755 /usr/local/etc/exim/exim.pl
                         echo "action=restart&value=exim" >> $DA_TQ
                 fi
         fi
@@ -58,7 +62,7 @@ if [ -e /var/spool/virtual ]; then
         chmod 1777 /var/spool/virtual
 fi
 
-perl -pi -e "s/userlog \"%u %b\"/userlog \"%u %b %m\"/" /etc/proftpd.conf
+perl -pi -e "s/userlog \"%u %b\"/userlog \"%u %b %m\"/" /usr/local/etc/proftpd.conf
 echo "action=proftpd&value=restart" >> /usr/local/directadmin/data/task.queue
 
 if [ ! -e /usr/local/mysql/bin/mysqld ] && [ -e /usr/local/mysql/libexec/mysqld ]; then
@@ -71,12 +75,12 @@ fi
 
 #1.37.1
 #very important update to allow DA to listen correctly on IPv4 and IPv6
-COUNT=`grep -c ipv6_ipv4mapping /etc/rc.conf`
+COUNT=$(grep -c ipv6_ipv4mapping /etc/rc.conf)
 if [ "$COUNT" -eq 0 ]; then
         echo "ipv6_ipv4mapping=\"YES\"" >> /etc/rc.conf
 fi
 
-COUNT=`grep -c net.inet6.ip6.v6only /etc/sysctl.conf`
+COUNT=$(grep -c net.inet6.ip6.v6only /etc/sysctl.conf)
 if [ "$COUNT" -eq 0 ]; then
         echo "net.inet6.ip6.v6only=0" >> /etc/sysctl.conf
         /etc/rc.d/sysctl restart
