@@ -12,6 +12,13 @@
 #FOUND_SETUP_TXT=
 
 
+## Verify if PortsBuild direcotry exists.
+if [ ! -d "/usr/local/directadmin/portsbuild" ]; then
+    FOUND_PORTSBUILD=0
+else
+  FOUND_PORTSBUILD=1
+fi
+
 ## Keep track of existing binaries and configuration files.
 FOUND_NAMED=0
 FOUND_NAMED_CONF=0
@@ -120,3 +127,34 @@ fi
 
 SERVER_IP=${DA_SERVER_IP}
 SERVER_IP_MASK=${DA_SERVER_IP_MASK}
+
+## Check chosen PHP version
+if [ ! "${PHP1_VER}" = "55" ] || [ ! "${PHP1_VER}" = "56" ] || [ ! "${PHP1_VER}" = "70" ]; then
+ return;
+fi
+
+
+if [ "${PB_SYMLINK}" = "" ]; then
+  OPT_PB_SYMLINK="YES"
+fi
+
+if [ "${INSTALL_CCACHE}" = "" ]; then
+  OPT_INSTALL_CCACHE="YES"
+fi
+
+
+################################################################################################################################
+DA_LAN=0
+if [ -s /root/.lan ]; then
+  DA_LAN=$(cat /root/.lan)
+fi
+
+INSECURE=0
+if [ -s /root/.insecure_download ]; then
+        INSECURE=$(cat /root/.insecure_download)
+fi
+
+# BIND_ADDRESS=--bind-address=$IP
+# if [ "${DA_LAN}" -eq 1 ]; then
+#   BIND_ADDRESS="";
+# fi

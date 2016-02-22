@@ -34,12 +34,6 @@
 # *************************************************************************************************
 #
 
-# Script is incomplete. :)
-if [ "$(hostname)" != "pb.fallout.local" ]; then
-  echo "PortsBuild is incomplete. If you want to play with it anyway, comment out line ~40's exit;"
-  exit;
-fi
-
 ### If you want to modify PortsBuild settings, please check out 'conf/options.conf'
 
 ################################################################################################################################
@@ -97,6 +91,13 @@ fi
 #. conf/make.conf
 #. lang/en.txt ## strings files for multilingual support (planned)
 
+# Script is incomplete. :)
+if [ "$(hostname)" != "pb.fallout.local" ]; then
+  echo "PortsBuild is incomplete. If you want to play with it anyway, comment out line 97's exit;"
+  exit;
+
+  DA_LAN=1
+fi
 
 ################################################################################################################################
 
@@ -451,12 +452,14 @@ global_setup() {
     ##  synth prepare-system
 
     echo "Installing ports-mgmt/synth"
-    pkgi gcc6-aux ncurses
+    pkgi lang/gcc6-aux devel/ncurses
 
     ## Eventually replace with binary when it's ready
-    cd /usr/ports/ports-mgmt/synth && make install
+    if [ ! -e /usr/local/bin/synth ]; then
+      cd /usr/ports/ports-mgmt/synth && make install
+    fi
 
-    ## Configure synth
+    ## Todo: Configure synth (copy Live system profile?)
     # synth configure
 
     ## Symlink Perl for DA compat
@@ -519,7 +522,11 @@ global_setup() {
       mkdir -p ${CB_PATH}
     fi
 
-    ${WGET} -O ${CB_CONF} "${PB_MIRROR}/conf/cb-options.conf"
+    if [ ! -e "${PB_DIR}/conf/cb-options.conf" ]; then
+      ${wget_with_options} -O ${CB_CONF} "${PB_MIRROR}/conf/cb-options.conf"
+    else
+      cp
+    fi
 
     if [ -e "${CB_CONF}" ]; then
       chmod 755 "${CB_CONF}"
@@ -658,16 +665,30 @@ bind_setup() {
       echo "*** Error: Cannot find the named binary.";
       return;
     fi
+
     if [ ! -e /usr/local/etc/namedb/named.conf ]; then
       echo "*** Warning: Cannot find /usr/local/etc/namedb/named.conf.";
+      ${WGET} -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.100.conf
+    fi
+
+    if [ ! -e /usr/local/etc/namedb/rndc.key ]; then
+      echo "Generating rndc.key for the first time"
+     rndc-confgen -a -s "${DA_SERVER_IP}"
     fi
   elif [ "$OS_MAJ" -eq 9 ]; then
     if [ ! -e /usr/sbin/named ]; then
       echo "*** Error: Cannot find the named binary.";
       return;
+
     fi
     if [ ! -e /var/named/etc/namedb/named.conf ]; then
       echo "*** Warning: Cannot find /var/named/etc/namedb/named.conf.";
+      ${WGET} -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
+    fi
+
+    if [ ! -e /etc/namedb/rndc.key ]; then
+      echo "Generating rndc.key for the first time"
+      rndc-confgen -a -s "${DA_SERVER_IP}"
     fi
   fi
 
@@ -675,19 +696,19 @@ bind_setup() {
   ## 10.2: /var/named/etc/namedb/named.conf
   ## 9.3: /etc/namedb/named.conf
 
-  if [ "${OS_MAJ}" -eq 10 ]; then
-    ## FreeBSD 10.2 with BIND 9.9.5 from ports
-    ${WGET} -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.100.conf
-  elif [ "${OS_MAJ}" -eq 9 ]; then
-    ## FreeBSD 9.3 with BIND 9.9.5 from base
-    ${WGET} -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
-  fi
+  # if [ "${OS_MAJ}" -eq 10 ]; then
+  #   ## FreeBSD 10.2 with BIND 9.9.5 from ports
+  #   ${WGET} -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.100.conf
+  # elif [ "${OS_MAJ}" -eq 9 ]; then
+  #   ## FreeBSD 9.3 with BIND 9.9.5 from base
+  #   ${WGET} -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
+  # fi
 
-  ## Generate BIND's rndc.key
-  if [ ! -e /usr/local/etc/namedb/rndc.key ] || [ ! -e /etc/namedb/rndc.key ]; then
-    echo "Generating rndc.key for the first time"
-    rndc-confgen -a -s "${DA_SERVER_IP}"
-  fi
+  ## Generate BIND's rndc.key ("/usr/local/etc/namedb/rndc.key")
+  # if [ ! -e /usr/local/etc/namedb/rndc.key ] || [ ! -e /etc/namedb/rndc.key ]; then
+  #   echo "Generating rndc.key for the first time"
+  #   rndc-confgen -a -s "${DA_SERVER_IP}"
+  # fi
 
   echo "Updating /etc/rc.conf with named_enable=YES"
   setVal named_enable \"YES\" /etc/rc.conf
@@ -706,7 +727,7 @@ bind_setup() {
 ## Create necessary users & groups
 directadmin_install() {
 
-  ## DirectAdmin Pre-Installation Tasks (replaces setup.sh)
+  ## Pre-Installation Tasks (replaces setup.sh)
 
   ## Need to create a blank /etc/auth.conf file for DA compatibility.
   echo "Checking for /etc/auth.conf"
@@ -715,7 +736,7 @@ directadmin_install() {
     /bin/chmod 644 /etc/auth.conf;
   fi
 
-  ## Update /etc/aliases
+  ## Update /etc/aliases:
   if [ -e /etc/aliases ]; then
     COUNT=$(grep -c diradmin /etc/aliases)
     if [ "$COUNT" -eq 0 ]; then
@@ -727,22 +748,25 @@ directadmin_install() {
 
   mkdir ${DA_PATH}
 
-  ## Get DirectAdmin License
-  if [ $DA_LAN -eq 0 ]; then
-    ${WGET} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address=${DA_SERVER_IP} "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
-  elif [ $DA_LAN -eq 1 ]; then
-    ${WGET} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+  DA_LAN=1
+  echo "Debugging: ${DA_LAN}"
+
+  ## Get DirectAdmin binary:
+  if [ "${DA_LAN}" -eq 0 ]; then
+    ${wget_with_options} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address="${DA_SERVER_IP}" "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+  elif [ "${DA_LAN}" -eq 1 ]; then
+    ${wget_with_options} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
   fi
 
   if [ ! -e ${DA_PATH}/update.tar.gz ]; then
-    echo "Unable to download ${DA_PATH}/update.tar.gz";
+    echo "*** Error: Unable to download ${DA_PATH}/update.tar.gz";
     exit 3;
   fi
 
   COUNT=$(head -n 4 ${DA_PATH}/update.tar.gz | grep -c "* You are not allowed to run this program *");
   if [ "$COUNT" -ne 0 ]; then
     echo "";
-    echo "You are not authorized to download the update package with that Client ID and License ID for this IP address.";
+    echo "*** Error: You are not authorized to download the update package with that Client ID and License ID from this IP address.";
     exit 4;
   fi
 
@@ -752,7 +776,7 @@ directadmin_install() {
 
   ## See if the binary exists:
   if [ ! -e ${DA_PATH}/directadmin ]; then
-    echo "Cannot find the DirectAdmin binary. Extraction failed.";
+    echo "*** Error: Cannot find the DirectAdmin binary. Extraction failed.";
     exit 5;
   fi
 
@@ -797,34 +821,34 @@ directadmin_install() {
   chmod 600 ${SETUP_TXT};
 
   ## Add the DirectAdmin user & group:
-  pw groupadd diradmin
-  pw useradd -g diradmin -n diradmin -d /usr/local/directadmin -s /sbin/nologin
+  /usr/sbin/pw groupadd diradmin 2>&1
+  /usr/sbin/pw useradd -g diradmin -n diradmin -d ${DA_PATH} -s /sbin/nologin 2>&1
 
   ## Mail User & Group creation
   ## NOTE: FreeBSD already comes with a "mail" group (ID: 6) and a "mailnull" user (ID: 26)
-  pw groupadd mail 2> /dev/null
-  pw useradd -g mail -u 12 -n mail -d /var/mail -s /sbin/nologin 2> /dev/null
+  /usr/sbin/pw groupadd mail 2> /dev/null
+  /usr/sbin/pw useradd -g mail -u 12 -n mail -d /var/mail -s /sbin/nologin 2> /dev/null
 
   ## NOTE: FreeBSD already includes a "ftp" group (ID: 14)
-  # pw groupadd ftp 2> /dev/null
-  # pw useradd -g ftp -n ftp -s /sbin/nologin 2> /dev/null
+  # /usr/sbin/pw groupadd ftp 2> /dev/null
+  # /usr/sbin/pw useradd -g ftp -n ftp -s /sbin/nologin 2> /dev/null
 
   ## Apache user/group creation (changed /var/www to /usr/local/www)
   ## NOTE: Using "apache" user instead of "www" for now
-  pw groupadd apache 2> /dev/null
-  pw useradd -g apache -n apache -d ${WWW_DIR} -s /sbin/nologin 2> /dev/null
+  /usr/sbin/pw groupadd apache 2> /dev/null
+  /usr/sbin/pw useradd -g apache -n apache -d ${WWW_DIR} -s /sbin/nologin 2> /dev/null
 
   ## Set DirectAdmin Folder permissions:
-  chmod 755 /usr/local/directadmin
-  chown diradmin:diradmin /usr/local/directadmin
+  chmod -f 755 ${DA_PATH}
+  chown -f diradmin:diradmin ${DA_PATH}
 
   ## Create directories and set permissions:
   mkdir -p /var/log/directadmin
   mkdir -p ${DA_PATH}/conf
-  chown diradmin:diradmin ${DA_PATH}/*;
-  chown diradmin:diradmin /var/log/directadmin;
-  chmod 700 ${DA_PATH}/conf;
-  chmod 700 /var/log/directadmin;
+  chown -f diradmin:diradmin ${DA_PATH}/*;
+  chown -f diradmin:diradmin /var/log/directadmin;
+  chmod -f 700 ${DA_PATH}/conf;
+  chmod -f 700 /var/log/directadmin;
 
   #mkdir -p ${DA_PATH}/scripts/packages
   mkdir -p ${DA_PATH}/data/admin
@@ -834,15 +858,8 @@ directadmin_install() {
   chown -R diradmin:diradmin ${DA_PATH}/data/
 
   ## No conf files in a fresh install:
-  chown diradmin:diradmin ${DA_PATH}/conf/* 2> /dev/null > /dev/null;
-  chmod 600 ${DA_PATH}/conf/* 2> /dev/null > /dev/null;
-
-  ## Create User and Reseller Welcome message (need to download/copy these files):
-  touch ${DA_PATH}/data/users/admin/u_welcome.txt
-  touch ${DA_PATH}/data/admin/r_welcome.txt
-
-  ## Verify: Create backup.conf (wasn't created?)
-  chown diradmin:diradmin ${DA_PATH}/data/users/admin/backup.conf
+  chown -f diradmin:diradmin ${DA_PATH}/conf/* 2> /dev/null > /dev/null;
+  chmod -f 600 ${DA_PATH}/conf/* 2> /dev/null > /dev/null;
 
   ## Create logs directory:
   mkdir -p /var/log/httpd/domains
@@ -850,8 +867,15 @@ directadmin_install() {
 
   ## NOTE: /home => /usr/home
   mkdir -p /home/tmp
-  chmod 1777 /home/tmp
+  chmod -f 1777 /home/tmp
   chmod 711 /home
+
+  ## PB: Create User and Reseller Welcome message (need to download/copy these files):
+  touch ${DA_PATH}/data/users/admin/u_welcome.txt
+  touch ${DA_PATH}/data/admin/r_welcome.txt
+
+  ## PB: Create backup.conf (wasn't created? need to verify)
+  chown -f diradmin:diradmin ${DA_PATH}/data/users/admin/backup.conf
 
   SSHROOT=$(grep -c 'AllowUsers root' < /etc/ssh/sshd_config);
   if [ "${SSHROOT}" = 0 ]; then
@@ -862,9 +886,47 @@ directadmin_install() {
       ## echo "AllowUsers YOUR_OTHER_ADMIN_ACCOUNT" >> /etc/ssh/sshd_config
     } >> /etc/ssh/sshd_config
 
-    ## Set SSH folder permissions (is this needed?):
-    # chmod 710 /etc/ssh
+    ## Set SSH folder permissions (needed?):
+    chmod 710 /etc/ssh
   fi
+
+
+
+  ## Get the DirectAdmin License Key File (untested)
+  ${wget_with_options} ${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE} -O ${DA_LICENSE_FILE} ${BIND_ADDRESS}
+
+  if [ $? -ne 0 ]; then
+    echo "*** Error: Unable to download the license file.";
+    da_myip;
+    echo "Trying license relay server...";
+
+    ${wget_with_options} ${HTTP}://license.directadmin.com/licenseupdate.php?lid=${2}\&uid=${1}${EXTRA_VALUE} -O $DA_LICENSE_FILE ${BIND_ADDRESS}
+
+    if [ $? -ne 0 ]; then
+      echo "*** Error: Unable to download the license file from relay server as well.";
+      myip;
+      exit 2;
+    fi
+  fi
+
+
+  COUNT=$(grep -c "* You are not allowed to run this program *" ${DA_LICENSE_FILE});
+  if [ "${COUNT}" -ne 0 ]; then
+    echo "*** Error: You are not authorized to download the license with that Client ID and License ID (and/or IP address). Please email sales@directadmin.com";
+    echo "";
+    echo "If you are having connection issues, please see this guide:";
+    echo "    http://help.directadmin.com/item.php?id=30";
+    echo "";
+    da_myip;
+    exit 3;
+  fi
+
+  ## Set permissions on license.key:
+  chmod 600 $DA_LICENSE_FILE
+  chown diradmin:diradmin $DA_LICENSE_FILE
+
+
+
 
   ## DirectAdmin Post-Installation Tasks
   mkdir -p ${DA_PATH}/data/users/admin/packages
@@ -873,6 +935,17 @@ directadmin_install() {
 
 }
 
+## Copied from DA/scripts/getLicense.sh
+da_myip() {
+  IP=$($WGET_PATH $WGET_OPTION ${BIND_ADDRESS} -qO - ${HTTP}://myip.directadmin.com)
+
+  if [ "${IP}" = "" ]; then
+    echo "*** Error: Cannot determine the server's IP address via myip.directadmin.com";
+    return;
+  fi
+
+  echo "IP used to connect out: ${IP}";
+}
 
 ## DirectAdmin Upgrade
 directadmin_upgrade() {
@@ -971,11 +1044,14 @@ verify_webapps_logrotate() {
 
 ################################################################################################################################
 
-## Exim Pre-Installation Tasks
-exim_pre_install() {
+## Exim Installation
+exim_install() {
 
+  ### Pre-Installation Tasks
+
+  ## From: DA/scripts/install.sh
   mkdir -p ${VIRTUAL_PATH};
-  chown ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH};
+  chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH};
   chmod 755 ${VIRTUAL_PATH};
 
   ## replace $(hostname)
@@ -998,17 +1074,19 @@ exim_pre_install() {
     chmod 600 ${VIRTUAL_PATH}/$i;
   done
 
-  chown ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}/*;
-}
+  chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}/*;
 
-exim_install() {
 
+  ### Main Installation
+
+  # Alternative: make -C /usr/ports/mail/exim config
   cd /usr/ports/mail/exim || exit
   make config EXIM_USER=mail EXIM_GROUP=mail
-}
+  make install clean
 
-## Exim Post-Installation Tasks
-exim_post_install() {
+
+  ### Post-Install Tasks
+
   ## Set permissions
   chown -R ${EXIM_USER}:${EXIM_GROUP} /var/spool/exim
 
@@ -1087,7 +1165,7 @@ spamassassin_post_install() {
 
 ################################################################################################################################
 
-## Install Exim BlockCracking
+## Install Exim BlockCracking (BC)
 blockcracking_install() {
 
   ## Check for Exim
@@ -1111,12 +1189,12 @@ blockcracking_install() {
 
     echo "Restarting exim."
 
-    service exim restart
+    /usr/sbin/service exim restart
 
     echo "BlockCracking is now enabled."
 
   else
-    echo "*** Error: Exim is not installed; can't continue (the binary was not found)."
+    echo "*** Error: Exim is not installed. Cannot continue as the binary was not found."
   fi
 
   return;
@@ -1168,11 +1246,11 @@ easyspamfighter_install() {
 
     echo "Restarting Exim."
 
-    service exim restart
+    /usr/sbin/service exim restart
 
     echo "Easy Spam Fighter is now enabled."
   else
-    echo "*** Error: Exim is not installed; can't continue (the binary was not found)."
+    echo "*** Error: Exim is not installed. Cannot continue as the binary was not found."
   fi
 
   return;
@@ -1180,15 +1258,20 @@ easyspamfighter_install() {
 
 ################################################################################################################################
 
-## Dovecot Pre-Installation Tasks
-dovecot_pre_install() {
-  return;
-}
+## Dovecot Installation Tasks
+dovecot_install() {
 
-## Dovecot Post-Installation Tasks
-dovecot_post_install() {
+  # make -C /usr/ports/mail/dovecot2 config
+
+  cd /usr/ports/mail/dovecot2 || exit
+  make config
+  make install clean
+
+
+  ## Dovecot Post-Installation Tasks
+
   ## Fetch latest config:
-  wget -O ${DOVECOT_CONF} http://files.directadmin.com/services/custombuild/dovecot.conf.2.0
+  ${WGET} -O ${DOVECOT_CONF} http://files.directadmin.com/services/custombuild/dovecot.conf.2.0
 
   ## Update directadmin.conf:
   echo "add_userdb_quota=1" >> ${DA_CONF}
@@ -1279,10 +1362,10 @@ dovecot_uninstall() {
 
 ## Verify my.cnf (copied from CB2)
 verify_my_cnf() {
-  #1 = path to cnf
-  #2 = user
-  #3 = pass
-  #4 = optional source file to compare with. update 1 if 4 is newer.
+  # $1 = path to cnf
+  # $2 = user
+  # $3 = pass
+  # $4 = optional source file to compare with. update 1 if 4 is newer.
   # host will be on the command line, as that's how DA already does it.
 
   E_MY_CNF=$1
@@ -1362,11 +1445,6 @@ get_sql_settings() {
 ################################################################################################################################
 
 
-sql_pre_install() {
-return
-}
-
-
 ## SQL Post-Installation Tasks
 sql_post_install() {
   ## Secure Installation (replace it with scripted method below)
@@ -1417,17 +1495,23 @@ sql_post_install() {
 
 ## PHP Post-Installation Tasks
 php_post_install() {
+
+  # make -C /usr/ports/lang/php${PHP1_VERSION} config
+  cd "/usr/ports/lang/php${PHP1_VERSION}" || exit
+  make config
+  make install clean
+
   ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
   #cp -f /usr/local/directadmin/custombuild/configure/fpm/conf/php-fpm.conf.56 /usr/local/etc/php-fpm.conf
 
   if [ "${PHP_INI_TYPE}" = "production" ]; then
-    cp /usr/local/etc/php.ini-production /usr/local/etc/php.ini
+    cp -f /usr/local/etc/php.ini-production /usr/local/etc/php.ini
   elif [ "${PHP_INI_TYPE}" = "development" ]; then
-    cp /usr/local/etc/php.ini-development /usr/local/etc/php.ini
+    cp -f /usr/local/etc/php.ini-development /usr/local/etc/php.ini
   fi
 
   ## PHP1_VERSION="56"
-  PHP_PATH=/usr/local/php${PHP1_VERSION}
+  PHP_PATH="/usr/local/php${PHP1_VERSION}"
 
   ## Create directories for DA compat:
   mkdir -p ${PHP_PATH}
@@ -1490,8 +1574,16 @@ php_upgrade() {
 
 ################################################################################################################################
 
-## phpMyAdmin Post-Installation Tasks
-phpmyadmin_post_install() {
+## phpMyAdmin Installation
+phpmyadmin_install() {
+
+  ### Main Installation
+
+  cd /usr/ports/databases/phpMyAdmin || exit
+  make config
+  make install clean
+
+  ### Post-Installation Tasks
 
   ## Reference for virtualhost entry:
   # Alias /phpmyadmin/ "/usr/local/www/phpMyAdmin/"
@@ -1503,17 +1595,17 @@ phpmyadmin_post_install() {
   # </Directory>
 
   ## Custom config from cb2/custom directory (if present):
-  CUSTOM_PMA_CONFIG=${CB_PATH}/custom/phpmyadmin/config.inc.php
-  CUSTOM_PMA_THEMES=${CB_PATH}/custom/phpmyadmin/themes
+  CUSTOM_PMA_CONFIG="${CB_PATH}/custom/phpmyadmin/config.inc.php"
+  CUSTOM_PMA_THEMES="${CB_PATH}/custom/phpmyadmin/themes"
 
   ##REALPATH=${WWWDIR}/phpMyAdmin-${PHPMYADMIN_VER}
   #REALPATH=${WWW_DIR}/phpMyAdmin
-  PMA_ALIAS_PATH=${WWW_DIR}/phpmyadmin
+  PMA_ALIAS_PATH="${WWW_DIR}/phpmyadmin"
 
 
   ## Scripted reference:
 
-  ## If custom config exists
+  ## If custom config exists:
   if [ -e "${CUSTOM_PMA_CONFIG}" ]; then
     echo "Installing custom phpMyAdmin configuration file: ${CUSTOM_PMA_CONFIG}"
     cp -f "${CUSTOM_PMA_CONFIG}" ${PMA_CONFIG}
@@ -1534,9 +1626,9 @@ phpmyadmin_post_install() {
   ${PERL} -pi -e "s#\['auth_type'\] = 'cookie'#\['auth_type'\] = 'http'#" ${PMA_CONFIG}
   ${PERL} -pi -e "s#\['extension'\] = 'mysql'#\['extension'\] = 'mysqli'#" ${PMA_CONFIG}
 
-  # Copy custom themes:
+  # Copy custom themes (not implemented):
   if [ -d "${CUSTOM_PMA_THEMES}" ]; then
-    echo "Installing custom PhpMyAdmin themes: ${PMA_THEMES}"
+    echo "Installing custom phpMyAdmin themes: ${PMA_THEMES}"
     cp -Rf "${CUSTOM_PMA_THEMES}" ${PMA_PATH}
   fi
 
@@ -1554,18 +1646,12 @@ phpmyadmin_post_install() {
   chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_ALIAS_PATH}
   chmod 755 ${PMA_PATH}
 
-
-  ## Set permissions (same as above, remove this):
-  chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_PATH}
-  chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${PMA_PATH}
-  chmod 755 ${PMA_PATH}
-
   ## Symlink:
   ln -s ${PMA_PATH} ${WWW_DIR}/phpmyadmin
   ln -s ${PMA_PATH} ${WWW_DIR}/pma
 
   ## Verify:
-  ## Disable/lockdown scripts directory (path doesn't exist):
+  ## Disable/lockdown scripts directory (this might not even exist):
   if [ -d ${PMA_PATH}/scripts ]; then
     chmod 000 ${PMA_PATH}/scripts
   fi
@@ -1598,8 +1684,16 @@ phpmyadmin_upgrade() {
 
 ################################################################################################################################
 
-## Apache Post-Installation Tasks
-apache_post_install() {
+## Apache Installation
+apache_install() {
+
+  ### Main Installation
+  cd /usr/ports/www/apache24 || exit
+  make config
+  make install clean
+
+  ### Post-Installation Tasks
+
   ## Symlink for backwards compatibility:
   mkdir -p /etc/httpd/conf
   ln -s ${APACHE_DIR} /etc/httpd/conf
@@ -1637,8 +1731,8 @@ apache_post_install() {
   ln -s ${APACHE_DIR}/ssl/server.ca ${APACHE_DIR}/ssl.crt/server.ca
   ln -s ${APACHE_DIR}/ssl/server.key ${APACHE_DIR}/ssl.key/server.key
 
-  ## NOTE: Careful with this, paths are relative
-  /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout ${APACHE_DIR}/ssl/server.key -out ${APACHE_DIR}/ssl/server.crt -days 9999 -nodes -config ./custom/ap2/cert_config.txt
+  ## Also check for /usr/local/bin/openssl (security/openssl port):
+  /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout ${APACHE_DIR}/ssl/server.key -out ${APACHE_DIR}/ssl/server.crt -days 9999 -nodes -config ${CB_PATH}/custom/ap2/cert_config.txt
 
   ## Set permissions:
   chmod 600 ${APACHE_DIR}/ssl/server.crt
@@ -1664,7 +1758,6 @@ apache_post_install() {
   # setVal apachekey /usr/local/etc/apache24/ssl/server.key
   # setVal apacheca /usr/local/etc/apache24/ssl/server.ca
 
-
   ## Rewrite Apache 2.4 configuration files
   ## Perhaps skip this? No need I think -sg
 
@@ -1672,7 +1765,7 @@ apache_post_install() {
   ##./build rewrite_confs
 
   ## Update /boot/loader.conf:
-  setVal accf_httpd_load \"YES\" /boot/loader.conf
+  setVal accf_http_load \"YES\" /boot/loader.conf
   setVal accf_data_load \"YES\" /boot/loader.conf
 
   ## Update /etc/rc.conf
@@ -1682,13 +1775,11 @@ apache_post_install() {
 
 ################################################################################################################################
 
-## Nginx Pre-Installation Tasks
-nginx_pre_install() {
-  return;
-}
+## Nginx Installation
+nginx_install() {
 
-## Nginx Post-Installation Tasks
-nginx_post_install() {
+  ## Nginx Pre-Installation Tasks
+
   ## Update directadmin.conf
   # nginxconf=/usr/local/etc/nginx/directadmin-vhosts.conf
   # nginxlogdir=/var/log/nginx/domains
@@ -1721,7 +1812,7 @@ nginx_uninstall() {
 ################################################################################################################################
 
 ## ClamAV Post-Installation Tasks
-clamav_post_install() {
+clamav_install() {
   setVal clamav_clamd_enable \"YES\" /etc/rc.conf
   setVal clamav_freshclam_enable \"YES\" /etc/rc.conf
 
@@ -1730,13 +1821,12 @@ clamav_post_install() {
 
 ################################################################################################################################
 
-## RoundCube Pre-Installation Tasks
-roundcube_pre_install() {
-  return;
-}
+## RoundCube Installation
+roundcube_install() {
 
-## RoundCube Post-Installation Tasks
-roundcube_post_install() {
+
+
+  ### Post-Installation Tasks
 
   ## Clarifications
   # _CONF = RC's config.inc.php
@@ -1769,7 +1859,7 @@ roundcube_post_install() {
   #     fi
   # fi
 
-  ##link it from a fake path:
+  ## Link it from a fake path:
   #/bin/rm -f ${ALIASPATH}
   #/bin/ln -sf roundcubemail-${ROUNDCUBE_VER} ${ALIASPATH}
 
@@ -1819,12 +1909,12 @@ roundcube_post_install() {
     if [ -e "${ROUNDCUBE_CONF}" ]; then
       COUNT_MYSQL=$(grep -m1 -c 'mysql://' ${ROUNDCUBE_CONF})
       if [ "${COUNT_MYSQL}" -gt 0 ]; then
-          PART1="$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONF} | awk '{print $3}' | cut -d\@ -f1 | cut -d'/' -f3)"
-          ROUNDCUBE_DB_USER="$(echo ${PART1} | cut -d\: -f1)"
-          ROUNDCUBE_DB_PASS="$(echo ${PART1} | cut -d\: -f2)"
-          PART2="$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONF} | awk '{print $3}' | cut -d\@ -f2 | cut -d\' -f1)"
-          MYSQL_ACCESS_HOST="$(echo ${PART2} | cut -d'/' -f1)"
-          ROUNDCUBE_DB="$(echo ${PART2} | cut -d'/' -f2)"
+          PART1=$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONF} | awk '{print $3}' | cut -d\@ -f1 | cut -d'/' -f3)
+          ROUNDCUBE_DB_USER=$(echo "${PART1}" | cut -d\: -f1)
+          ROUNDCUBE_DB_PASS=$(echo "${PART1}" | cut -d\: -f2)
+          PART2=$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONF} | awk '{print $3}' | cut -d\@ -f2 | cut -d\' -f1)
+          MYSQL_ACCESS_HOST=$(echo "${PART2}" | cut -d'/' -f1)
+          ROUNDCUBE_DB=$(echo "${PART2}" | cut -d'/' -f2)
       fi
     fi
 
@@ -1854,10 +1944,11 @@ roundcube_post_install() {
 
     cd ${ROUNDCUBE_PATH}/config || exit
 
-    if [ -e "${ROUNDCUBE_CONF_CUSTOM}" ]; then
-      echo "Installing custom RoundCube Config: ${ROUNDCUBE_CONF_CUSTOM}"
-     cp -f ${ROUNDCUBE_CONF_CUSTOM} ${ROUNDCUBE_CONF}
-    fi
+    ## (not implemented) RoundCube Custom Configuration
+    # if [ -e "${ROUNDCUBE_CONF_CUSTOM}" ]; then
+    #   echo "Installing custom RoundCube Config: ${ROUNDCUBE_CONF_CUSTOM}"
+    #  cp -f "${ROUNDCUBE_CONF_CUSTOM}" ${ROUNDCUBE_CONF}
+    # fi
 
     if [ -e "${ROUNDCUBE_CONFIG_DB}" ]; then
       if [ ! -e ${ROUNDCUBE_CONF} ]; then
@@ -1939,7 +2030,7 @@ roundcube_post_install() {
       fi
 
       if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
-        wget "${WGET_CONNECT_OPTIONS}" -O mime.types http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
+        ${WGET} "${WGET_CONNECT_OPTIONS}" -O mime.types http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
       fi
 
       echo "\$config['mime_types'] = '${ROUNDCUBE_PATH}/config/mime.types';" >> ${ROUNDCUBE_CONF}
@@ -2028,7 +2119,7 @@ roundcube_post_install() {
   ## Update if needed:
   # ${ROUNDCUBE_PATH}/bin/update.sh '--version=?'
 
-  ## Cleanup
+  ## Cleanup:
   rm -rf ${ROUNDCUBE_PATH}/installer
 
   ## Set the permissions:
@@ -2080,11 +2171,14 @@ roundcube_post_install() {
 
 ################################################################################################################################
 
-## Webapps Pre-Installation Tasks
-webapps_pre_install() {
+## Webapps Installation
+webapps_install() {
+
+  ### Pre-Installation Tasks
+
   ## Create user and group:
-  pw groupadd ${WEBAPPS_GROUP}
-  pw useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
+  /usr/sbin/pw groupadd ${WEBAPPS_GROUP}
+  /usr/sbin/pw useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
 
   ## Set permissions on temp directory:
   if [ ${PHP1_MODE} = "FPM" ]; then
@@ -2100,25 +2194,30 @@ webapps_pre_install() {
   chmod -R 770 ${WWW_DIR}/webmail/tmp;
   chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail
   chown -R ${APACHE_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail/tmp;
-  echo "Deny from All" >> ${WWW_DIR}/webmail/temp/.htaccess
-}
+  echo "Deny from All" >> ${WWW_DIR}/webmail/tmp/.htaccess
 
-## Webapps Post-Installation Tasks
-webapps_post_install() {
+  ### Main Installation
+
+
+
+  ### Post-Installation Tasks
+
   ## Increase the timeout from 10 minutes to 24
-  ${PERL} -pi -e 's/idle_timeout = 10/idle_timeout = 24/' "${$WWW_DIR}/webmail/inc/config.security.php"
-
+  ${PERL} -pi -e 's/idle_timeout = 10/idle_timeout = 24/' "${WWW_DIR}/webmail/inc/config.security.php"
   ${PERL} -pi -e 's#\$temporary_directory = "./database/";#\$temporary_directory = "./tmp/";#' "${WWW_DIR}/webmail/inc/config.php"
   ${PERL} -pi -e 's/= "ONE-FOR-EACH";/= "ONE-FOR-ALL";/' "${WWW_DIR}/webmail/inc/config.php"
   ${PERL} -pi -e 's#\$smtp_server = "SMTP.DOMAIN.COM";#\$smtp_server = "localhost";#' "${WWW_DIR}/webmail/inc/config.php"
   # ${PERL} -pi -e 's#\$default_mail_server = "POP3.DOMAIN.COM";#\$default_mail_server = "localhost";#' "${WWW_DIR}/webmail/inc/config.php"
   ${PERL} -pi -e 's/POP3.DOMAIN.COM/localhost/' "${WWW_DIR}/webmail/inc/config.php"
 
+  ## Get rid of installation directory:
   rm -rf "${WWW_DIR}/webmail/install"
 
   ## Copy redirect.php (done):
   cp -f ${DA_PATH}/scripts/redirect.php ${WWW_DIR}/redirect.php
 }
+
+################################################################################################################################
 
 ## Secure php.ini (copied from CB2)
 ## $1 = php.ini file to update
@@ -2144,8 +2243,8 @@ secure_php_ini() {
 
 ## Ensure Webapps php.ini (copied from CB2)
 verify_webapps_php_ini() {
-  # ${PHP_INI_WEBAPPS}
-  # ${WWW_TMP_DIR}
+  # ${PHP_INI_WEBAPPS} = /usr/local/etc/php/50-webapps.ini
+  # ${WWW_TMP_DIR} = /usr/local/www/tmp
 
   # if [ "${PHP1_MODE_OPT}" = "mod_php" ]; then
   #     WEBAPPS_INI=/usr/local/lib/php.conf.d/50-webapps.ini
@@ -2155,7 +2254,7 @@ verify_webapps_php_ini() {
   #     mkdir -p /usr/local/php${PHP1_SHORTRELEASE}/lib/php.conf.d
   # fi
 
-  ## Copy custom/ file
+  ## Copy custom/ file (not implemented)
   if [ -e "${PHP_CUSTOM_PHP_CONF_D_INI_PATH}/50-webapps.ini" ]; then
     echo "Using custom ${PHP_CUSTOM_PHP_CONF_D_INI_PATH}/50-webapps.ini for ${PHP_INI_WEBAPPS}"
     cp -f "${PHP_CUSTOM_PHP_CONF_D_INI_PATH}/50-webapps.ini" ${PHP_INI_WEBAPPS}
@@ -2171,7 +2270,7 @@ verify_webapps_php_ini() {
 
 ################################################################################################################################
 
-## Ensure Webapps tmp (copied from CB2)
+## Verify Webapps Temp Directory (copied from CB2)
 verify_webapps_tmp() {
   if [ ! -d "{$WWW_TMP_DIR}" ]; then
     mkdir -p ${WWW_TMP_DIR}
@@ -2229,6 +2328,8 @@ rewrite_apache_conf() {
       echo "      suPHP_UserGroup ${WEBAPPS_USER} ${WEBAPPS_GROUP}";
       echo "  </IfModule>";
     } >> ${APACHE_HOST_CONF}
+
+    ## Unsupported:
     # echo '    <IfModule mod_ruid2.c>'                 >> ${APACHE_HOST_CONF}
     # echo '        RUidGid webapps webapps'            >> ${APACHE_HOST_CONF}
     # echo '    </IfModule>'                            >> ${APACHE_HOST_CONF}
@@ -2236,13 +2337,13 @@ rewrite_apache_conf() {
     # echo '        lsapi_user_group webapps webapps'   >> ${APACHE_HOST_CONF}
     # echo '    </IfModule>'                            >> ${APACHE_HOST_CONF}
 
-    ensure_webapps_tmp
+    verify_webapps_tmp
 
     # WEBAPPS_FCGID_DIR=/var/www/fcgid
     SUEXEC_PER_DIR="0"
 
     if [ -s /usr/local/sbin/suexec ]; then
-      SUEXEC_PER_DIR="$(/usr/local/sbin/suexec -V 2>&1 | grep -c 'AP_PER_DIR')"
+      SUEXEC_PER_DIR=$(/usr/local/sbin/suexec -V 2>&1 | grep -c 'AP_PER_DIR')
     fi
 
     # if [ "${PHP1_MODE_OPT}" = "fastcgi" ]; then
@@ -2279,15 +2380,10 @@ rewrite_apache_conf() {
 
 ## Setup Brute-Force Monitor
 bfm_setup() {
-  ## Defaults:
-  # brute_force_roundcube_log=/var/www/html/roundcube/logs/errors
-  # brute_force_squirrelmail_log=/var/www/html/squirrelmail/data/squirrelmail_access_log
-  # brute_force_pma_log=/var/www/html/phpMyAdmin/log/auth.log
-
-  ## Update directadmin.conf
-  brute_force_roundcube_log=${WWW_DIR}/roundcube/logs/errors
-  #brute_force_squirrelmail_log=${WWW_DIR}/squirrelmail/data/squirrelmail_access_log
-  brute_force_pma_log=${WWW_DIR}/phpMyAdmin/log/auth.log
+  ## Update directadmin.conf:
+  # brute_force_roundcube_log=${WWW_DIR}/roundcube/logs/errors
+  # brute_force_squirrelmail_log=${WWW_DIR}/squirrelmail/data/squirrelmail_access_log
+  # brute_force_pma_log=${WWW_DIR}/phpMyAdmin/log/auth.log
 
   setVal brute_force_roundcube_log ${WWW_DIR}/roundcube/logs/errors ${DA_CONF}
   setVal brute_force_pma_log ${WWW_DIR}/phpMyAdmin/log/auth.log ${DA_CONF}
@@ -2318,14 +2414,15 @@ install_app() {
 
   case "$1" in
     "directadmin")
-      directadmin_pre_install
-      directadmin_post_install
+      directadmin_install
       ;;
     "apache")
-      portmaster -d ${PORT_APACHE24}
+      apache_install
+      # portmaster -d ${PORT_APACHE24}
       ;;
     "nginx")
-      portmaster -d ${PORT_NGINX}
+      nginx_install
+      #portmaster -d ${PORT_NGINX}
       ;;
     "php55")
       cd /usr/ports/lang/php55 && make config && make install
@@ -2335,57 +2432,57 @@ install_app() {
       cd /usr/ports/lang/php56 && make config && make install
       # portmaster -d ${PORT_PHP56}
       ;;
-    # "php70")
-    #   cd /usr/ports/lang/php70 && make config && make install
-    #   ;;
+    "php70")
+      cd /usr/ports/lang/php70 && make config && make install
+      ;;
     "ioncube")
       pkgi ${PORT_IONCUBE}
       ;;
     "roundcube")
-      roundcube_pre_install
+      roundcube_install
       portmaster -d ${PORT_ROUNDCUBE}
-      roundcube_post_install
       ;;
     "spamassassin")
       cd /usr/ports/mail/spamassassin && make config && make install
       # portmaster -d ${PORT_SPAMASSASSIN}
-      spamassassin_post_install
+      spamassassin_install
       ;;
     "libspf2") pkgi ${PORT_LIBSPF2} ;;
     "dkim") pkgi ${PORT_LIBDKIM} ;;
     "blockcracking") blockcracking_install ;;
     "easy_spam_fighter") easyspamfighter_install ;;
     "exim")
-      exim_pre_install
-      cd /usr/ports/mail/exim && make config && make install
-      # portmaster -d ${PORT_EXIM}
-      exim_post_install
+      exim_install
       ;;
     "mariadb55")
       # portmaster -d ${PORT_MARIADB55}
       pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
+      sql_post_install
       ;;
     "mariadb100")
       # portmaster -d ${PORT_MARIADB100}
       pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
+      sql_post_install
       ;;
     "mysql55")
       # portmaster -d ${PORT_MYSQL55}
       pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
+      sql_post_install
       ;;
     "mysql56")
       # portmaster -d ${PORT_MYSQL56}
       pkgi ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
+      sql_post_install
       ;;
     "mysql57")
       # portmaster -d ${PORT_MYSQL56}
       pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
+      sql_post_install
       ;;
     "phpmyadmin")
-      phpmyadmin_pre_install
-      cd /usr/ports/databases/phpMyAdmin && make config && make install
+      #cd /usr/ports/databases/phpMyAdmin && make config && make install
       # portmaster -d ${PORT_PHPMYADMIN}
-      phpmyadmin_post_install
+      phpmyadmin_install
       ;;
     "pureftpd")
       #cd /usr/ports/ftp/pureftpd && make config && make install
