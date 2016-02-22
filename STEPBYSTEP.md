@@ -1,4 +1,4 @@
-# PortsBuild Guide
+# PortsBuild Step-by-Step Guide
 
 Step-by-step guide on how to install DirectAdmin on FreeBSD 10.2 with ports and packages.
 

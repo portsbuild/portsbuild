@@ -8,48 +8,32 @@ Automation and integration is achieved by using simple shell scripts, along with
 
 The source code for this project will be open source. A distribution & copyright license has not been chosen yet at this time.
 
-### Supported Software Stacks (planned)
+### Supported Software Stacks
 
-Support for various software stacks will be added in the following priorities:
-
-Phase 1
-
-Service 		| Status
---------------- | ---------------
-Apache 2.4 | Supported
-php5-fpm 5.5 | 
-php5-fpm 5.6 | Supported
-MariaDB 5.5 | Supported
-MariaDB 10.0 | 
-MySQL 5.5 | 
-MySQL 5.6 | 
-Dovecot 2.2.x | Supported
-Exim 4.8x | Supported
-SpamBlocker 4.3.x | Supported
-phpMyAdmin 4.5.x | Supported
-ClamAV | Supported
-SpamAssassin 3.4 | Supported
-curl | Supported
-RoundCube 1.1.3+ | In progress
-Majordomo (src) | Supported
-ionCube loaders | Supported
-ZendOpCache | Supported (php56-opcache)
-proftpd | Supported
-pure-FTPd | Supported
-sysbk | Installed with DirectAdmin
-
-
-Phase 2
-
-Service 		| Status
---------------- | ---------------
-nginx 1.8+ | untested (www/nginx)
-AwStats | www/awstats
-Webalizer | www/webalizer
-Mailman | mail/mailman
-suhosin | untested (security/php56-suhosin)
-suphp | redundant vs. fpm?
-PigeonHole | untested (mail/pigeonhole)
+Service 		| Versions      | Status
+--------------- | ------------- | -------
+Apache          | 2.4.18+       | Supported
+PHP-FPM         | 5.5/5.6/7.0   | Supported
+MariaDB         | 5.5/10.0      | Supported
+MySQL           | 5.5/5.6       | Supported
+Dovecot         | 2.2.x         | Supported
+Exim            | 4.8x          | Supported
+SpamBlocker     | 4.3.x         | Supported
+ClamAV          | 0.9x          | Supported
+SpamAssassin    | 3.4           | Supported
+RoundCube       | 1.1.3+        | In progress
+phpMyAdmin      | 4.5.x         | Supported
+proftpd         | 1.3.5a        | Supported
+pure-FTPd       | 1.0.42        | Supported
+Majordomo       | 1.94.5        | Supported (via DA source copy)
+nginx           | 1.8.x         | Untested (www/nginx)
+AwStats         |               | Untested (www/awstats)
+Webalizer       |               | Untested (www/webalizer)
+suhosin         |               | Untested (security/php-suhosin)
+suphp           |               | Untested (www/suphp)
+mod_security    |               | Untested (www/mod_security)
+Mailman         |               | Untested (mail/mailman)
+PigeonHole      |               | Untested (mail/pigeonhole)
 
 
 PortsBuild will NOT support:
@@ -61,38 +45,11 @@ PortsBuild will NOT support:
 * FreeBSD 10.2 x64 (primary focus)
 * FreeBSD 9.3 x64 (working)
 
-Untested on upcoming FreeBSD 10.3 branch.
+Untested on upcoming FreeBSD 10.3 branch (waiting for -RELEASE).
 
-### Initial Build Environment Requirements
-* ports-mgmt/pkg
-* ports-mgmt/portmaster
-* ports-mgmt/portconf
-* shells/bash
-* lang/perl5.20
-* ftp/wget
-* devel/autoconf
-* devel/automake
-* devel/libtool
-* lang/pyton27
-* lang/python
-* ftp/curl
-* devel/gettext
-* lang/gcc (lang/gcc48)
-* dns/bind910 (for 10.1/10.2)
-* converters/libiconv
-* graphics/gd
-* graphics/png
-* graphics/jpeg
-* graphic/tiff
-* textproc/libxslt
-* devel/gmake
-* security/cyrus-sasl2
-* textproc/libxml2
-
-
-### Current Known Limitations
+### Currently known issues and limitations
 * BIND (named) does not restart after adding a domain on 9.3 due to startup script location in /etc/rc.d/ instead of /usr/local/etc/rc.d/ (DirectAdmin limitation)
-* PHP-FPM does not restart after adding a user due to startup script being called "php-fpm" instead of "php-fpmXX" (XX= 55, 56, etc.) (DirectAdmin limitation)
+* PHP-FPM does not restart after adding a user due to startup script being called "php-fpm" instead of "php-fpmXX" (XX= 55, 56, 70, etc.) (DirectAdmin limitation)
 * Only one instance of PHP can be installed (afaik). Multiple PHP versions may be possible, but requires testing.
 
 
@@ -109,11 +66,11 @@ Untested on upcoming FreeBSD 10.3 branch.
 * Failover (CARP+HAST) configurations
 * Load-Balancing between multiple servers
 * Best Practices Guide (Infrastructure, Design, Implementation, Maintenance, Security, Updates, Upgrades)
-* Additional solutions and topics to discuss: pfSense, ZFS, FreeNAS, Nas4Free, ESXi, hardware
+* Additional solutions and topics: pfSense, ZFS, ESXi, performance & networking tuning
 
 
 ### Copyrights (more to be added)
 Portions of this file include references from third-party authors and companies not affiliated with the author or the PortsBuild project.
-* DirectAdmin Copyright (C) 2003-2015 JBMC Software, St. Albert, AB, Canada: http://www.directadmin.com
+* DirectAdmin Copyright (C) 2003-2016 JBMC Software, St. Albert, AB, Canada: http://www.directadmin.com
 * CustomBuild is written by DirectAdmin and Martynas Bendorius (smtalk)
 * SpamBlockerTechnology is a Trademark of NoBaloney Internet Services: http://www.nobaloney.net
