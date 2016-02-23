@@ -751,11 +751,13 @@ directadmin_install() {
   DA_LAN=1
   echo "Debugging: ${DA_LAN}"
 
-  ## Get DirectAdmin binary:
-  if [ "${DA_LAN}" -eq 0 ]; then
-    ${wget_with_options} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address="${DA_SERVER_IP}" "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
-  elif [ "${DA_LAN}" -eq 1 ]; then
-    ${wget_with_options} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+  if [ ! -e "${DA_PATH}/update.tar.gz" ]; then
+    ## Get DirectAdmin binary:
+    if [ "${DA_LAN}" -eq 0 ]; then
+      ${wget_with_options} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address="${DA_SERVER_IP}" "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+    elif [ "${DA_LAN}" -eq 1 ]; then
+      ${wget_with_options} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+    fi
   fi
 
   if [ ! -e ${DA_PATH}/update.tar.gz ]; then
@@ -890,7 +892,8 @@ directadmin_install() {
     chmod 710 /etc/ssh
   fi
 
-
+  ## Change this:
+  HTTP="http"
 
   ## Get the DirectAdmin License Key File (untested)
   ${wget_with_options} ${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE} -O ${DA_LICENSE_FILE} ${BIND_ADDRESS}
