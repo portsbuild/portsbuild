@@ -5,8 +5,8 @@
 #  Scripted by -sg/mmx.
 #
 #  Based on the work of CustomBuild 2.x, written by DirectAdmin and Martynas Bendorius (smtalk).
-#  CB2 thread: http://forum.directadmin.com/showthread.php?t=44743
-#  CB2 DA Plugin: http://forum.directadmin.com/showthread.php?t=48989
+#
+#  CustomBuild2 thread: http://forum.directadmin.com/showthread.php?t=44743
 #
 #  DirectAdmin Homepage : http://www.directadmin.com
 #  DirectAdmin Forums   : http://forums.directadmin.com
@@ -33,15 +33,15 @@
 #
 # *************************************************************************************************
 #
-
-### If you want to modify PortsBuild settings, please check out 'conf/options.conf'
-
+#
+# *** If you want to modify PortsBuild settings, please check out 'conf/options.conf' ***
+#
 ################################################################################################################################
 
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160130
+PB_BUILD_DATE=20160222
 
 if [ "$(id -u)" != "0" ]; then
   echo "Must run this script as the root user.";
@@ -49,16 +49,15 @@ if [ "$(id -u)" != "0" ]; then
 fi
 
 OS=$(uname)
-OS_VER=$(uname -r | cut -d- -f1) # 9.3, 10.1, 10.2
+OS_VER=$(uname -r | cut -d- -f1) # 9.3, 10.1, 10.2, 10.3
 OS_B64=$(uname -m | grep -c 64)  # 0, 1
 OS_MAJ=$(uname -r | cut -d. -f1) # 9, 10
-
 OS_HOST=$(hostname);
 OS_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
 
 if [ "${OS}" = "FreeBSD" ]; then
   if [ "${OS_B64}" -eq 1 ]; then
-    if [ "$OS_VER" = "10.1" ] || [ "$OS_VER" = "10.2" ] || [ "$OS_VER" = "9.3" ]; then
+    if [ "$OS_VER" = "10.1" ] || [ "$OS_VER" = "10.2" ] || [ "$OS_VER" = "10.3" ] ||  [ "$OS_VER" = "9.3" ]; then
       # echo "FreeBSD $OS_VER x64 operating system detected."
       echo ""
     else
@@ -120,6 +119,8 @@ getDA_Opt() {
 
   ${DA_BIN} c | grep -m1 "^$1=" | cut -d= -f2
 }
+
+################################################################################################################################
 
 # ## Emulate ${!variable} (copied from CB2)
 # eval_var() {
