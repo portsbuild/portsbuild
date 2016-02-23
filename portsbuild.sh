@@ -379,7 +379,7 @@ global_setup() {
   echo "Please make sure these values are correct and that they match the records in your DirectAdmin Client License Portal."
   echo "If in doubt, visit: https://www.directadmin.com/clients/"
   echo ""
-  echo "About to setup PortsBuild+Directadmin for the first time."
+  echo "About to setup PortsBuild and install DirectAdmin for the first time."
   echo "This will install, setup and configure the following services:"
   ## Todo: Process chosen options
   echo "DirectAdmin, Named, Exim 4.8, Dovecot 2, Apache 2.4, PHP-FPM 5.6, MariaDB 10.0, phpMyAdmin, RoundCube and SpamAssassin"
@@ -526,10 +526,11 @@ global_setup() {
     if [ ! -e "${PB_DIR}/conf/cb-options.conf" ]; then
       ${wget_with_options} -O ${CB_CONF} "${PB_MIRROR}/conf/cb-options.conf"
     else
-      cp
+      cp "${PB_DIR}/conf/cb-options.conf" ${CB_CONF}
     fi
 
     if [ -e "${CB_CONF}" ]; then
+      chown -f diradmin:diradmin ${CB_CONF}
       chmod 755 "${CB_CONF}"
     fi
 
@@ -874,11 +875,11 @@ directadmin_install() {
   chmod 711 /home
 
   ## PB: Create User and Reseller Welcome message (need to download/copy these files):
-  touch ${DA_PATH}/data/users/admin/u_welcome.txt
-  touch ${DA_PATH}/data/admin/r_welcome.txt
+  # touch ${DA_PATH}/data/users/admin/u_welcome.txt
+  # touch ${DA_PATH}/data/admin/r_welcome.txt
 
   ## PB: Create backup.conf (wasn't created? need to verify)
-  chown -f diradmin:diradmin ${DA_PATH}/data/users/admin/backup.conf
+  # chown -f diradmin:diradmin ${DA_PATH}/data/users/admin/backup.conf
 
   SSHROOT=$(grep -c 'AllowUsers root' < /etc/ssh/sshd_config);
   if [ "${SSHROOT}" = 0 ]; then
@@ -896,40 +897,39 @@ directadmin_install() {
   ## Change this:
   HTTP="http"
 
-  ## Get the DirectAdmin License Key File (untested)
-  ${wget_with_options} ${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE} -O ${DA_LICENSE_FILE} ${BIND_ADDRESS}
-
-  if [ $? -ne 0 ]; then
-    echo "*** Error: Unable to download the license file.";
-    da_myip;
-    echo "Trying license relay server...";
-
-    ${wget_with_options} ${HTTP}://license.directadmin.com/licenseupdate.php?lid=${2}\&uid=${1}${EXTRA_VALUE} -O $DA_LICENSE_FILE ${BIND_ADDRESS}
+  if [ ! -e ${DA_LICENSE_FILE} ]; then
+    ## Get the DirectAdmin License Key File (untested)
+    ${wget_with_options} ${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE} -O ${DA_LICENSE_FILE} ${BIND_ADDRESS}
 
     if [ $? -ne 0 ]; then
-      echo "*** Error: Unable to download the license file from relay server as well.";
-      myip;
-      exit 2;
+      echo "*** Error: Unable to download the license file.";
+      da_myip;
+      echo "Trying license relay server...";
+
+      ${wget_with_options} ${HTTP}://license.directadmin.com/licenseupdate.php?lid=${2}\&uid=${1}${EXTRA_VALUE} -O $DA_LICENSE_FILE ${BIND_ADDRESS}
+
+      if [ $? -ne 0 ]; then
+        echo "*** Error: Unable to download the license file from relay server as well.";
+        myip;
+        exit 2;
+      fi
     fi
-  fi
 
-
-  COUNT=$(grep -c "* You are not allowed to run this program *" ${DA_LICENSE_FILE});
-  if [ "${COUNT}" -ne 0 ]; then
-    echo "*** Error: You are not authorized to download the license with that Client ID and License ID (and/or IP address). Please email sales@directadmin.com";
-    echo "";
-    echo "If you are having connection issues, please see this guide:";
-    echo "    http://help.directadmin.com/item.php?id=30";
-    echo "";
-    da_myip;
-    exit 3;
+    COUNT=$(grep -c "* You are not allowed to run this program *" ${DA_LICENSE_FILE});
+    if [ "${COUNT}" -ne 0 ]; then
+      echo "*** Error: You are not authorized to download the license with that Client ID and License ID (and/or IP address). Please email sales@directadmin.com";
+      echo "";
+      echo "If you are having connection issues, please see this guide:";
+      echo "    http://help.directadmin.com/item.php?id=30";
+      echo "";
+      da_myip;
+      exit 3;
+    fi
   fi
 
   ## Set permissions on license.key:
   chmod 600 $DA_LICENSE_FILE
   chown diradmin:diradmin $DA_LICENSE_FILE
-
-
 
 
   ## DirectAdmin Post-Installation Tasks
@@ -941,7 +941,7 @@ directadmin_install() {
 
 ## Copied from DA/scripts/getLicense.sh
 da_myip() {
-  IP=$($WGET_PATH $WGET_OPTION ${BIND_ADDRESS} -qO - ${HTTP}://myip.directadmin.com)
+  IP=$(${wget_with_options} ${BIND_ADDRESS} -qO - ${HTTP}://myip.directadmin.com)
 
   if [ "${IP}" = "" ]; then
     echo "*** Error: Cannot determine the server's IP address via myip.directadmin.com";
@@ -2403,6 +2403,13 @@ bfm_setup() {
 
 ## IPFW Setup
 ipfw_setup() {
+  return;
+}
+
+################################################################################################################################
+
+## Validate Options
+validate_options() {
   return;
 }
 

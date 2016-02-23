@@ -17,13 +17,6 @@ fi
 ## PB: Restart services after adding a user
 ## (DA can't do these for us right now due to control script filename differences)
 
-# Note to self:
-# killall -USR1 dataskq
-# tail -n 10 /var/log/directadmin/errortaskq.log
-# ln -s /etc/rc.d/named /usr/local/etc/rc.d/named
-# ln -s /etc/rc.d/sshd /usr/local/etc/rc.d/sshd
-# ln -s /usr/local/etc/rc.d/php-fpm /usr/local/etc/rc.d/php-fpm56
-
 ## note to self: perhaps add a "sleep 10" here to give DA enough time to do its thing
 ## also add checks to see if php-fpm/apache24 is actually installed (same for nginx)
 /usr/sbin/service php-fpm reload

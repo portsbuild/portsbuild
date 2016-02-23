@@ -55,3 +55,10 @@
 * devel/gmake
 * security/cyrus-sasl2
 * textproc/libxml2
+
+
+    killall -USR1 dataskq
+    tail -n 10 /var/log/directadmin/errortaskq.log
+    ln -s /etc/rc.d/named /usr/local/etc/rc.d/named
+    ln -s /etc/rc.d/sshd /usr/local/etc/rc.d/sshd
+    ln -s /usr/local/etc/rc.d/php-fpm /usr/local/etc/rc.d/php-fpm56

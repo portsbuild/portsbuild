@@ -24,7 +24,7 @@ Subdomains:	|nsubdomains|
 
 Number of IPs:	|ips|
 
-You must use these dns servers for your domain. They can be changed through your domain registrar.
+You must use these DNS servers for your domain. They can be changed through your domain registrar.
 
 NS1:	|ns1|
 NS1 IP:	|ns1ip|
