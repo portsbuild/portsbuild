@@ -25,7 +25,7 @@ FOUND_NAMED_CONF=0
 FOUND_PHP_INI=0
 
 ## Verify if /usr/ports exists:
-if [ ! -d ${PORTS_BASE}/ ]; then
+if [ ! -d "${PORTS_BASE}/" ]; then
   #  echo "*** Warning: FreeBSD ports directory (/usr/ports) not initialized."
     FOUND_PORTS=0
 else
@@ -88,31 +88,6 @@ fi
 # echo "IPV6_ENABLED: ${IPV6_ENABLED}"
 
 ################################################################################################################################
-
-## Have PHP System (from CB2)
-## Needed?
-have_php_system() {
-  ## Checks to see if we can use system() based on the disable_functions
-  if [ ! -s "${PHP_INI}" ]; then
-    echo 1
-    return
-  fi
-
-  C=$(grep -m1 -c ^disable_functions "${PHP_INI}")
-  if [ "${C}" -eq 0 ]; then
-    echo 1
-    return
-  fi
-
-  C=$(grep -m1 ^disable_functions "${PHP_INI}" | grep -m1 -c system)
-  if [ "${C}" -eq 1 ]; then
-    echo 0
-    return
-  fi
-
-  echo 1
-  return
-}
 
 
 ## Parse Defaults and User Options, then pass computed values to PB

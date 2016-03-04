@@ -43,6 +43,8 @@
 PB_VER="0.1.0"
 PB_BUILD_DATE=20160222
 
+IFS="$(printf '\n\t')"
+
 if [ "$(id -u)" != "0" ]; then
   echo "Must run this script as the root user.";
   exit 1;
@@ -106,13 +108,13 @@ getDA_Opt() {
   ## $2 is default value
 
   ## Make sure directadmin.conf exists and is greater than zero bytes.
-  if [ ! -s ${DA_CONF} ]; then
+  if [ ! -s "${DA_CONF}" ]; then
     echo "$2"
     return
   fi
 
   ## Check for value in ./directadmin c
-  if ! ${DA_BIN} c | grep -m1 -q -e "^$1="; then
+  if ! "${DA_BIN}" c | grep -m1 -q -e "^$1="; then
     echo "$2"
     return
   fi
@@ -151,34 +153,39 @@ getOpt() {
 }
 
 ## Set Option (copied from CB2)
-## Used to manipulate CB/PB options.conf
+## Used to manipulate CB options.conf
 setOpt() {
   ## $1 = option name
   ## $2 = value
 
-    VAR=$(echo "$1" | tr "'a-z'" "'A-Z'")
-    if [ -z "$(eval_var ${VAR}_DEF)" ]; then
-      echo "${1} is not a valid option."
-      #EXIT_CODE=50
-      return
+## PB Note: no eval_var
+
+  ## Option Validation
+  VAR=$(echo "$1" | tr "'a-z'" "'A-Z'")
+  if [ -z "$(eval_var ${VAR}_DEF)" ]; then
+    echo "${1} is not a valid option."
+    #EXIT_CODE=50
+    return
+  fi
+
+  VALID="no"
+  ## Revalidate by asking user
+  for i in $(eval_var "${VAR}_SET"); do
+    if [ "${i}" = "${2}" ] || [ "${i}" = "userinput" ]; then
+      VALID="yes"
+      break
     fi
+  done
 
-    VALID="no"
-    for i in $(eval_var "${VAR}_SET"); do
-      if [ "${i}" = "${2}" ] || [ "${i}" = "userinput" ]; then
-        VALID="yes"
-        break
-      fi
-    done
+  ## Invalid option
+  if [ "${VALID}" = "no" ]; then
+    echo "${2} is not a valid setting for ${1} option."
+    #EXIT_CODE=51
+    return
+  fi
 
-    if [ "${VALID}" = "no" ]; then
-      echo "${2} is not a valid setting for ${1} option."
-      #EXIT_CODE=51
-      return
-    fi
-
-    OPT_VALUE=$(grep -m1 "^$1=" "${OPTIONS_CONF}" | cut -d= -f2)
-    ${PERL} -pi -e "s#$1=${OPT_VALUE}#$1=$2#" ${PB_CONF}
+  OPT_VALUE=$(grep -m1 "^$1=" "${OPTIONS_CONF}" | cut -d= -f2)
+  ${PERL} -pi -e "s#$1=${OPT_VALUE}#$1=$2#" ${PB_CONF}
 }
 
 ################################################################################################################################
@@ -248,6 +255,20 @@ getVal() {
 #     fi
 # }
 
+
+
+################################################################################################################################
+
+## Convert string to lowercase
+lc() {
+  echo "${1}" | tr "[:upper:]" "[:lower:]"
+}
+
+## Convert string to uppercase
+uc() {
+  echo "${1}" | tr "[:lower:]" "[:upper:]"
+}
+
 ################################################################################################################################
 
 ## Ask User a Question
@@ -269,7 +290,7 @@ ask_user() {
     case $RESPONSE in
       [Yy]* ) return 1; break ;;
       [Nn]* ) return 0; break ;;
-      * ) echo "Please answer with yes or no." ;;
+      * ) echo "Please answer with Yes or No." ;;
     esac
   done
 }
@@ -306,6 +327,14 @@ ports_update() {
   ${PORTSNAP} fetch update
 }
 
+## Rinse & Repeat
+make_install_clean() {
+  CHOSEN_PORT=$1
+  make -C "${CHOSEN_PORT}" rmconfig
+  make -C "${PORT_EXIM}" config OPTIONS_SET="${EXIM_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${EXIM_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_EXIM}" install clean
+}
+
 ## Clean stale ports (deprecate soon)
 clean_stale_ports() {
   echo "Cleaning stale ports"
@@ -329,6 +358,26 @@ update_hosts() {
     echo "Updating /etc/hosts"
     printf "127.0.0.1\t\tlocalhost" >> /etc/hosts
   fi
+}
+
+## Backup a file before performing an operation.
+backup_file() {
+  return
+}
+################################################################################################################################
+
+## Get System Timezone (copied from CB2)
+getTimezone() {
+  if [ -d /usr/share/zoneinfo ] && [ -e /etc/localtime ]; then
+    MD5_LOCALTIME=$(md5 /etc/localtime | awk '{print $4}')
+    # we don't use 'grep -m1' here to fix: "xargs: md5: terminated with signal 13; aborting"
+    DATETIMEZONE=$(find /usr/share/zoneinfo -type f -print0 | xargs -0 md5 | grep "${MD5_LOCALTIME}" | awk '{print $2}' | cut -d\( -f2 | cut -d\) -f1 | perl -p0 -e 's#/usr/share/zoneinfo/##')
+  fi
+
+  if [ "${DATETIMEZONE}" = "" ]; then
+    DATETIMEZONE="America/Toronto"
+  fi
+  echo ${DATETIMEZONE}
 }
 
 ################################################################################################################################
@@ -580,6 +629,8 @@ update_rc() {
   if [ "${APACHE_ENABLE}" = "YES" ]; then
     setVal apache24_enable \"YES\" /etc/rc.conf
     setVal apache24_http_accept_enable \"YES\" /etc/rc.conf
+    setVal accf_httpd_load \"YES\" /boot/loader.conf
+    setVal accf_data_load \"YES\" /boot/loader.conf
   fi
 
   if [ "${MYSQL_ENABLE}" = "YES" ] || [ "${MARIADB_ENABLE}" = "YES" ]; then
@@ -606,8 +657,8 @@ update_rc() {
   fi
 
   if [ "${PUREFTPD_ENABLE}" = "YES" ]; then
-    setVal pureftpd_enable \"YES\" /etc/rc.conf
     setVal ftpd_enable \"NO\" /etc/rc.conf
+    setVal pureftpd_enable \"YES\" /etc/rc.conf
   fi
 
   if [ "${PROFTPD_ENABLE}" = "YES" ]; then
@@ -775,11 +826,11 @@ directadmin_install() {
   fi
 
   ## Extract update.tar.gz into /usr/local/directadmin:
-  cd ${DA_PATH} || exit
+  cd "${DA_PATH}" || exit
   tar zxvf update.tar.gz
 
   ## See if the binary exists:
-  if [ ! -e ${DA_PATH}/directadmin ]; then
+  if [ ! -e "${DA_PATH}/directadmin" ]; then
     echo "*** Error: Cannot find the DirectAdmin binary. Extraction failed.";
     exit 5;
   fi
@@ -790,7 +841,7 @@ directadmin_install() {
   #HOME_YES=`cat /etc/fstab | grep -c /home`;
   HOME_YES=$(grep -c /home < /etc/fstab)
   if [ "$HOME_YES" -lt "1" ]; then
-    echo 'quota_partition=/' >> ${DA_CONF_TEMPLATE};
+    echo "quota_partition=/" >> ${DA_CONF_TEMPLATE};
   fi
 
   ## Detect the ethernet interfaces that are available on the system (or use the one supplied by the user)
@@ -820,9 +871,9 @@ directadmin_install() {
     echo "uid=${DA_USER_ID}";
     echo "lid=${DA_LICENSE_ID}";
     echo "services=${DA_FREEBSD_SERVICES}";
-  } > ${SETUP_TXT};
+  } > "${SETUP_TXT}";
 
-  chmod 600 ${SETUP_TXT};
+  chmod 600 "${SETUP_TXT}";
 
   ## Add the DirectAdmin user & group:
   /usr/sbin/pw groupadd diradmin 2>&1
@@ -849,10 +900,10 @@ directadmin_install() {
   ## Create directories and set permissions:
   mkdir -p /var/log/directadmin
   mkdir -p ${DA_PATH}/conf
-  chown -f diradmin:diradmin ${DA_PATH}/*;
-  chown -f diradmin:diradmin /var/log/directadmin;
-  chmod -f 700 ${DA_PATH}/conf;
-  chmod -f 700 /var/log/directadmin;
+  chown -f diradmin:diradmin ${DA_PATH}/*
+  chown -f diradmin:diradmin /var/log/directadmin
+  chmod -f 700 ${DA_PATH}/conf
+  chmod -f 700 /var/log/directadmin
 
   #mkdir -p ${DA_PATH}/scripts/packages
   mkdir -p ${DA_PATH}/data/admin
@@ -862,8 +913,8 @@ directadmin_install() {
   chown -R diradmin:diradmin ${DA_PATH}/data/
 
   ## No conf files in a fresh install:
-  chown -f diradmin:diradmin ${DA_PATH}/conf/* 2> /dev/null > /dev/null;
-  chmod -f 600 ${DA_PATH}/conf/* 2> /dev/null > /dev/null;
+  chown -f diradmin:diradmin ${DA_PATH}/conf/* 2> /dev/null > /dev/null
+  chmod -f 600 ${DA_PATH}/conf/* 2> /dev/null > /dev/null
 
   ## Create logs directory:
   mkdir -p /var/log/httpd/domains
@@ -881,12 +932,12 @@ directadmin_install() {
   ## PB: Create backup.conf (wasn't created? need to verify)
   # chown -f diradmin:diradmin ${DA_PATH}/data/users/admin/backup.conf
 
-  SSHROOT=$(grep -c 'AllowUsers root' < /etc/ssh/sshd_config);
+  SSHROOT=$(grep -c 'AllowUsers root' < /etc/ssh/sshd_config)
   if [ "${SSHROOT}" = 0 ]; then
     {
-      echo "AllowUsers root";
-      echo "AllowUsers ${DA_ADMIN_USERNAME}";
-      echo "AllowUsers $(logname)";
+      echo "AllowUsers root"
+      echo "AllowUsers ${DA_ADMIN_USERNAME}"
+      echo "AllowUsers $(logname)"
       ## echo "AllowUsers YOUR_OTHER_ADMIN_ACCOUNT" >> /etc/ssh/sshd_config
     } >> /etc/ssh/sshd_config
 
@@ -894,34 +945,34 @@ directadmin_install() {
     chmod 710 /etc/ssh
   fi
 
-  ## Change this:
+  ## PB: Change this:
   HTTP="http"
 
-  if [ ! -e ${DA_LICENSE_FILE} ]; then
+  if [ ! -e "${DA_LICENSE_FILE}" ]; then
     ## Get the DirectAdmin License Key File (untested)
-    ${wget_with_options} ${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE} -O ${DA_LICENSE_FILE} ${BIND_ADDRESS}
+    ${wget_with_options} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
     if [ $? -ne 0 ]; then
-      echo "*** Error: Unable to download the license file.";
-      da_myip;
-      echo "Trying license relay server...";
+      echo "*** Error: Unable to download the license file."
+      da_myip
+      echo "Trying license relay server..."
 
-      ${wget_with_options} ${HTTP}://license.directadmin.com/licenseupdate.php?lid=${2}\&uid=${1}${EXTRA_VALUE} -O $DA_LICENSE_FILE ${BIND_ADDRESS}
+      ${wget_with_options} "${HTTP}://license.directadmin.com/licenseupdate.php?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
       if [ $? -ne 0 ]; then
-        echo "*** Error: Unable to download the license file from relay server as well.";
-        myip;
-        exit 2;
+        echo "*** Error: Unable to download the license file from relay server as well."
+        da_myip
+        exit 2
       fi
     fi
 
-    COUNT=$(grep -c "* You are not allowed to run this program *" ${DA_LICENSE_FILE});
+    COUNT=$(grep -c "* You are not allowed to run this program *" ${DA_LICENSE_FILE})
     if [ "${COUNT}" -ne 0 ]; then
-      echo "*** Error: You are not authorized to download the license with that Client ID and License ID (and/or IP address). Please email sales@directadmin.com";
-      echo "";
-      echo "If you are having connection issues, please see this guide:";
-      echo "    http://help.directadmin.com/item.php?id=30";
-      echo "";
+      echo "*** Error: You are not authorized to download the license with that Client ID and License ID (and/or IP address). Please email sales@directadmin.com"
+      echo ""
+      echo "If you are having connection issues, please see this guide:"
+      echo "    http://help.directadmin.com/item.php?id=30"
+      echo ""
       da_myip;
       exit 3;
     fi
@@ -941,20 +992,26 @@ directadmin_install() {
 
 ## Copied from DA/scripts/getLicense.sh
 da_myip() {
-  IP=$(${wget_with_options} ${BIND_ADDRESS} -qO - ${HTTP}://myip.directadmin.com)
+  IP=$(${wget_with_options} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
 
   if [ "${IP}" = "" ]; then
-    echo "*** Error: Cannot determine the server's IP address via myip.directadmin.com";
+    echo "*** Error: Cannot determine the server's IP address via myip.directadmin.com"
     return;
   fi
 
-  echo "IP used to connect out: ${IP}";
+  echo "IP used to connect out: ${IP}"
 }
 
 ## DirectAdmin Upgrade
 directadmin_upgrade() {
   return;
 }
+
+directadmin_restart() {
+  echo "action=directadmin&value=reload" >> "${TASK_QUEUE}"
+  run_dataskq
+}
+
 
 ################################################################################################################################
 
@@ -970,8 +1027,8 @@ install_cron() {
 
   COUNT=$(grep -c dataskq < /etc/crontab)
   if [ "$COUNT" = 0 ]; then
-    if [ -s ${DA_CRON} ]; then
-      cat ${DA_CRON} >> /etc/crontab;
+    if [ -s "${DA_CRON}" ]; then
+      cat "${DA_CRON}" >> /etc/crontab;
     else
       echo "Error: Could not find ${DA_CRON} or it is empty.";
     fi
@@ -1003,7 +1060,7 @@ freebsd_set_newsyslog() {
   NSL_V=$2
   NSL=/usr/local/etc/newsyslog.d/directadmin.conf
 
-  if ! grep -q ${NSL_L} $NSL; then
+  if ! grep -q "${NSL_L}" $NSL; then
     echo "${NSL_L}\t${NSL_V}\t600\t4\t*\t@T00\t-" >> $NSL
   fi
 
@@ -1051,6 +1108,12 @@ verify_webapps_logrotate() {
 ## Exim Installation
 exim_install() {
 
+  ### Main Installation
+  make -C ${PORT_EXIM} rmconfig
+  make -C ${PORT_EXIM} config OPTIONS_SET="${EXIM_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${EXIM_MAKE_OPTIONS_UNSET}"
+  make -C ${PORT_EXIM} install clean
+  #make config EXIM_USER=mail EXIM_GROUP=mail
+
   ### Pre-Installation Tasks
 
   ## From: DA/scripts/install.sh
@@ -1061,12 +1124,12 @@ exim_install() {
   ## replace $(hostname)
   hostname >> ${VIRTUAL_PATH}/domains;
 
-  if [ ! -s ${VIRTUAL_PATH}/limit ]; then
-    echo "${LIMIT_DEFAULT}" > ${VIRTUAL_PATH}/limit
+  if [ ! -s "${VIRTUAL_PATH}/limit" ]; then
+    echo "${LIMIT_DEFAULT}" > "${VIRTUAL_PATH}/limit"
   fi
 
-  if [ ! -s ${VIRTUAL_PATH}/limit_unknown ]; then
-    echo "${LIMIT_UNKNOWN}" > ${VIRTUAL_PATH}/limit_unknown
+  if [ ! -s "${VIRTUAL_PATH}/limit_unknown" ]; then
+    echo "${LIMIT_UNKNOWN}" > "${VIRTUAL_PATH}/limit_unknown"
   fi
 
   chmod 755 ${VIRTUAL_PATH}/*
@@ -1079,15 +1142,6 @@ exim_install() {
   done
 
   chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}/*;
-
-
-  ### Main Installation
-
-  # Alternative: make -C /usr/ports/mail/exim config
-  cd /usr/ports/mail/exim || exit
-  make config EXIM_USER=mail EXIM_GROUP=mail
-  make install clean
-
 
   ### Post-Install Tasks
 
@@ -1265,12 +1319,10 @@ easyspamfighter_install() {
 ## Dovecot Installation Tasks
 dovecot_install() {
 
-  # make -C /usr/ports/mail/dovecot2 config
-
-  cd /usr/ports/mail/dovecot2 || exit
-  make config
-  make install clean
-
+  ### Main Installation
+  make -C "${PORT_DOVECOT2}" rmconfig
+  make -C "${PORT_DOVECOT2}" config OPTIONS_SET="${DOVECOT_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${DOVECOT_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_DOVECOT2}" install clean
 
   ## Dovecot Post-Installation Tasks
 
@@ -1283,7 +1335,9 @@ dovecot_install() {
 
   ## Reference: doRestartDA:
   echo "action=rewrite&value=email_passwd" >> ${DA_TASK_QUEUE}
-  #run_dataskq d
+
+  ## Debug mode:
+  run_dataskq d
 
   ## Add Dovecot quota support to the directadmin.conf template:
   echo "add_userdb_quota=1" >> ${DA_CONF_TEMPLATE}
@@ -1311,7 +1365,7 @@ dovecot_install() {
 
   ## Symlink for compat:
   ln -s ${DOVECOT_CONF} /etc/dovecot/dovecot.conf
-  # Skipped: ln -s /etc/dovecot/dovecot.conf /etc/dovecot.conf
+  # Skipped (no longer needed?): ln -s /etc/dovecot/dovecot.conf /etc/dovecot.conf
 
 
   ## Verify: use conf/ or conf.d/?
@@ -1451,8 +1505,27 @@ get_sql_settings() {
 
 ## SQL Post-Installation Tasks
 sql_post_install() {
+
+  ## Remove /etc/my.cnf if it exists (not compliant with hier)
+  if [ -e /etc/my.cnf ]; then
+    mv /etc/my.cnf /etc/my.cnf.disabled
+  fi
+
   ## Secure Installation (replace it with scripted method below)
-  /usr/local/bin/mysql_secure_installation
+  ## /usr/local/bin/mysql_secure_installation
+  echo "Securing SQL installation"
+  ${MYSQLSECURE_BIN}
+
+  if [ -e "${MYSQLUPGRADE_BIN}" ]; then
+    ${MYSQLUPGRADE_BIN} --defaults-extra-file=${DA_MYSQL_CNF}
+  elif [ -e "${MYSQLFIX_BIN}" ]; then
+    ${MYSQLFIX_BIN} --defaults-extra-file=${DA_MYSQL_CNF}
+  fi
+
+  ## From CB2 (skipped, 5.1 is outdated):
+  # if [ -e /usr/local/mysql/bin/mysqlcheck ] && [ "${MYSQL_OPT}" = "5.1" ] && [ "${MYSQL_INST_OPT}" != "mariadb" ]; then
+  #   /usr/local/mysql/bin/mysqlcheck --defaults-extra-file=${DA_MY_CNF} --fix-db-names --fix-table-names -A
+  # fi
 
   ## Use this:
   # /usr/local/bin/mysqladmin --user=root password YOURSQLPASSWORD 1> /dev/null 2> /dev/null
@@ -1474,26 +1547,39 @@ sql_post_install() {
   ## CLI method (incomplete):
   #   /usr/local/bin/mysql --user=root --password=ROOT_SQL_PASSWORD "GRANT CREATE, DROP ON *.* TO da_admin@localhost IDENTIFIED BY 'DA_ADMIN_SQL_PASSWORD' WITH GRANT OPTION;"
 
-
   ## Add DirectAdmin `da_admin` SQL database credentials to `mysql.conf`:
-  # echo "user=da_admin" > /usr/local/directadmin/conf/mysql.conf
-  # echo "passwd=DA_ADMIN_SQL_PASSWORD" >> /usr/local/directadmin/conf/mysql.conf
-  # chown diradmin:diradmin /usr/local/directadmin/conf/mysql.conf;
-  # chmod 400 /usr/local/directadmin/conf/mysql.conf;
+  echo "user=da_admin" > ${DA_MYSQL_CONF}
+  echo "passwd=${DA_ADMIN_SQL_PASSWORD}" >> ${DA_MYSQL_CONF}
+  chown diradmin:diradmin ${DA_MYSQL_CONF}
+  chmod 400 ${DA_MYSQL_CONF}
 
   ## Create and update `/usr/local/etc/my.cnf`:
+  if [ ! -e /usr/local/etc/my.cnf ]; then
+    if [ "${DEFAULT_MY_CNF}" = "" ]; then
+      touch /usr/local/etc/my.cnf
+      echo "[mysqld]" > /usr/local/etc/my.cnf
+      echo "local-infile=0" >> /usr/local/etc/my.cnf
+      echo "innodb_file_per_table" >> /usr/local/etc/my.cnf
+    fi
+  fi
 
-  # touch /usr/local/etc/my.cnf
-  # echo "[mysqld]" > /usr/local/etc/my.cnf;
-  # echo "local-infile=0" >> /usr/local/etc/my.cnf;
-  # echo "innodb_file_per_table" >> /usr/local/etc/my.cnf;
-
-  ## Symlink the `mysqldump` binary for compat. This is used by DirectAdmin during SQL backup functions (may not be needed since we can set the binary path in directadmin.conf):
+  ## Symlink the MySQL/MariaDB binaries for compat:
+  DA_MYSQL_PATH=/usr/local/mysql/bin
   mkdir -p /usr/local/mysql/bin
-  ln -s /usr/local/bin/mysqldump /usr/local/mysql/bin/mysqldump
-  ln -s /usr/local/bin/mysql /usr/local/mysql/bin/mysql
-
+  ln -s ${MYSQL_BIN} ${DA_MYSQL_PATH}/mysql
+  ln -s ${MYSQLDUMP_BIN} ${DA_MYSQL_PATH}/mysqldump
+  ln -s ${MYSQLD_BIN} ${DA_MYSQL_PATH}/mysqld
+  ln -s ${MYSQLD_SAFE_BIN} ${DA_MYSQL_PATH}/mysqld_safe
+  ln -s ${MYSQLADMIN_BIN} ${DA_MYSQL_PATH}/mysqladmin
+  ln -s ${MYSQLIMPORT_BIN} ${DA_MYSQL_PATH}/mysqlimport
+  ln -s ${MYSQLSHOW_BIN} ${DA_MYSQL_PATH}/mysqlshow
+  ln -s ${MYSQLUPGRADE_BIN} ${DA_MYSQL_PATH}/mysql_upgrade
+  ln -s ${MYSQLCHECK_BIN} ${DA_MYSQL_PATH}/mysqlcheck
+  ln -s ${MYSQLSECURE_BIN} ${DA_MYSQL_PATH}/mysql_secure_installation
 }
+
+
+
 
 ################################################################################################################################
 
@@ -1501,9 +1587,11 @@ sql_post_install() {
 php_post_install() {
 
   # make -C /usr/ports/lang/php${PHP1_VERSION} config
-  cd "/usr/ports/lang/php${PHP1_VERSION}" || exit
-  make config
-  make install clean
+#  cd "/usr/ports/lang/php${PHP1_VERSION}" || exit
+  make -C "${PORT_PHP}" rmconfig
+  make -C "${PORT_PHP}" config OPTIONS_SET="${PHP_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${PHP_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_PHP}" install clean
+
 
   ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
   #cp -f /usr/local/directadmin/custombuild/configure/fpm/conf/php-fpm.conf.56 /usr/local/etc/php-fpm.conf
@@ -1514,38 +1602,39 @@ php_post_install() {
     cp -f /usr/local/etc/php.ini-development /usr/local/etc/php.ini
   fi
 
-  ## PHP1_VERSION="56"
-  PHP_PATH="/usr/local/php${PHP1_VERSION}"
+  ## e.g. PHP1_VER="56"
+  PHP1_PATH="/usr/local/php${PHP1_VERSION}"
 
   ## Create directories for DA compat:
-  mkdir -p ${PHP_PATH}
-  mkdir -p ${PHP_PATH}/bin
-  mkdir -p ${PHP_PATH}/etc
-  mkdir -p ${PHP_PATH}/include
-  mkdir -p ${PHP_PATH}/lib
-  mkdir -p ${PHP_PATH}/php
-  mkdir -p ${PHP_PATH}/sbin
-  mkdir -p ${PHP_PATH}/sockets
-  mkdir -p ${PHP_PATH}/var/log/
-  mkdir -p ${PHP_PATH}/var/run
-  #mkdir -p ${PHP_PATH}/lib/php.conf.d/
-  mkdir -p ${PHP_PATH}/lib/php/
+  mkdir -p ${PHP1_PATH}
+  mkdir -p ${PHP1_PATH}/bin
+  mkdir -p ${PHP1_PATH}/etc
+  mkdir -p ${PHP1_PATH}/include
+  mkdir -p ${PHP1_PATH}/lib
+  mkdir -p ${PHP1_PATH}/php
+  mkdir -p ${PHP1_PATH}/sbin
+  mkdir -p ${PHP1_PATH}/sockets
+  mkdir -p ${PHP1_PATH}/var/log/
+  mkdir -p ${PHP1_PATH}/var/run
+  # mkdir -p ${PHP_PATH}/lib/php.conf.d/
+  mkdir -p ${PHP1_PATH}/lib/php/
 
   ## Symlink for compat
-  ln -s /usr/local/bin/php ${PHP_PATH}/bin/php
-  ln -s /usr/local/bin/php-cgi ${PHP_PATH}/bin/php-cgi
-  ln -s /usr/local/bin/php-config ${PHP_PATH}/bin/php-config
-  ln -s /usr/local/bin/phpize ${PHP_PATH}/bin/phpize
-  ln -s /usr/local/sbin/php-fpm ${PHP_PATH}/sbin/php-fpm
-  ln -s /var/log/php-fpm.log ${PHP_PATH}/var/log/php-fpm.log
-  ln -s /usr/local/include/php ${PHP_PATH}/include
+  ln -s /usr/local/bin/php ${PHP1_PATH}/bin/php
+  ln -s /usr/local/bin/php-cgi ${PHP1_PATH}/bin/php-cgi
+  ln -s /usr/local/bin/php-config ${PHP1_PATH}/bin/php-config
+  ln -s /usr/local/bin/phpize ${PHP1_PATH}/bin/phpize
+  ln -s /usr/local/sbin/php-fpm ${PHP1_PATH}/sbin/php-fpm
+  ln -s /var/log/php-fpm.log ${PHP1_PATH}/var/log/php-fpm.log
+  ln -s /usr/local/include/php ${PHP1_PATH}/include
 
-  ## Scan directory for PHP ini files:
-  ln -s /usr/local/etc/php ${PHP_PATH}/lib/php.conf.d
-  ln -s /usr/local/etc/php.ini ${PHP_PATH}/lib/php.ini
-  ln -s /usr/local/etc/php-fpm.conf ${PHP_PATH}/etc/php-fpm.conf
-  ln -s /usr/local/lib/php/build ${PHP_PATH}/lib/php/build
-  ln -s /usr/local/lib/php/20131226 ${PHP_PATH}/lib/php/extensions
+  ## php.conf.d: directory for additional PHP ini files loaded by FPM:
+  ln -s /usr/local/etc/php ${PHP1_PATH}/lib/php.conf.d
+  ln -s /usr/local/etc/php.ini ${PHP1_PATH}/lib/php.ini
+  ln -s /usr/local/etc/php-fpm.conf ${PHP1_PATH}/etc/php-fpm.conf
+  ln -s /usr/local/lib/php/build ${PHP1_PATH}/lib/php/build
+  ## Note: extensions dir "20131226" might be different across PHP versions
+  ln -s /usr/local/lib/php/20131226 ${PHP1_PATH}/lib/php/extensions
 
   ## Scripted reference (from CB2):
   echo "Making PHP installation compatible with php.ini file"
@@ -1576,16 +1665,43 @@ php_upgrade() {
   #pkg query -i -x "%o %v" '(php)'
 }
 
+
+## Have PHP System (copied from CB2)
+## Needed?
+have_php_system() {
+  ## Checks to see if we can use system() based on the disable_functions
+  if [ ! -s "${PHP_INI}" ]; then
+    echo 1
+    return
+  fi
+
+  C=$(grep -m1 -c ^disable_functions "${PHP_INI}")
+  if [ "${C}" -eq 0 ]; then
+    echo 1
+    return
+  fi
+
+  C=$(grep -m1 ^disable_functions "${PHP_INI}" | grep -m1 -c system)
+  if [ "${C}" -eq 1 ]; then
+    echo 0
+    return
+  fi
+
+  echo 1
+  return
+}
+
+
 ################################################################################################################################
 
 ## phpMyAdmin Installation
 phpmyadmin_install() {
 
   ### Main Installation
+  make -C "${PORT_PHPMYADMIN}" rmconfig
+  make -C "${PORT_PHPMYADMIN}" config OPTIONS_SET="${PMA_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${PMA_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_PHPMYADMIN}" install clean
 
-  cd /usr/ports/databases/phpMyAdmin || exit
-  make config
-  make install clean
 
   ### Post-Installation Tasks
 
@@ -1692,9 +1808,10 @@ phpmyadmin_upgrade() {
 apache_install() {
 
   ### Main Installation
-  cd /usr/ports/www/apache24 || exit
-  make config
-  make install clean
+  make -C "${PORT_APACHE24}" rmconfig
+  make -C "${PORT_APACHE24}" config OPTIONS_SET="${APACHE24_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${APACHE24_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_APACHE24}" install clean
+
 
   ### Post-Installation Tasks
 
@@ -1782,6 +1899,11 @@ apache_install() {
 ## Nginx Installation
 nginx_install() {
 
+  ## Main Installation
+  make -C "${PORT_NGINX}" rmconfig
+  make -C "${PORT_NGINX}" config OPTIONS_SET="${NGINX_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${NGINX_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_NGINX}" install clean
+
   ## Nginx Pre-Installation Tasks
 
   ## Update directadmin.conf
@@ -1815,8 +1937,14 @@ nginx_uninstall() {
 
 ################################################################################################################################
 
-## ClamAV Post-Installation Tasks
+## ClamAV Installation Tasks
 clamav_install() {
+
+  ### Main Installation
+  make -C "${PORT_CLAMAV}" rmconfig
+  make -C "${PORT_CLAMAV}" config OPTIONS_SET="${CLAMAV_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${CLAMAV_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_CLAMAV}" install clean
+
   setVal clamav_clamd_enable \"YES\" /etc/rc.conf
   setVal clamav_freshclam_enable \"YES\" /etc/rc.conf
 
@@ -1828,7 +1956,10 @@ clamav_install() {
 ## RoundCube Installation
 roundcube_install() {
 
-
+  ### Main Installation
+  make -C "${PORT_ROUNDCUBE}" rmconfig
+  make -C "${PORT_ROUNDCUBE}" config OPTIONS_SET="${ROUNDCUBE_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${ROUNDCUBE_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_ROUNDCUBE}" install clean
 
   ### Post-Installation Tasks
 
@@ -2293,90 +2424,651 @@ verify_webapps_tmp() {
 #do_ApacheHostConf() {
 rewrite_apache_conf() {
 
-  APACHE_HOST_CONF=${APACHE_PATH}/extra/httpd-hostname.conf
+  if [ "${OPT_APACHE_ENABLE}" = "YES" ]; then
 
-  ## Set this for now since PB only supports 1 instance of PHP.
-  #PHP1_MODE_OPT="php-fpm"
-  #PHP1_MODE="FPM"
-  PHP1_VERSION="56"
+    APACHE_HOST_CONF=${APACHE_PATH}/extra/httpd-hostname.conf
 
-  ## Copy custom/ file
-  ## APACHE_HOST_CONF_CUSTOM
-  if [ -e "${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf" ]; then
-    cp -pf "${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf" ${APACHE_HOST_CONF}
-  else
-    echo '' > ${APACHE_HOST_CONF}
+    ## Set this for now since PB only supports 1 instance of PHP.
+    #PHP1_MODE_OPT="php-fpm"
+    #PHP1_MODE="FPM"
+    PHP1_VERSION="56"
 
-    # if [ "${HAVE_FPM_CGI}" = "yes" ]; then
-    #   echo 'SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1' >> ${APACHE_HOST_CONF}
-    # fi
+    ## Copy custom/ file
+    ## APACHE_HOST_CONF_CUSTOM
+    if [ -e "${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf" ]; then
+      cp -pf "${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf" ${APACHE_HOST_CONF}
+    else
+      echo '' > ${APACHE_HOST_CONF}
 
-    echo "<Directory ${WWW_DIR}>" >> ${APACHE_HOST_CONF}
+      # if [ "${HAVE_FPM_CGI}" = "yes" ]; then
+      #   echo 'SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1' >> ${APACHE_HOST_CONF}
+      # fi
 
-    if [ "${PHP1_MODE}" = "FPM" ]; then
+      echo "<Directory ${WWW_DIR}>" >> ${APACHE_HOST_CONF}
+
+      if [ "${PHP1_MODE}" = "FPM" ]; then
+        {
+          echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">';
+          echo "AddHandler \"proxy:unix:/usr/local/php${PHP1_VERSION}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${PHP1_VERSION} .phtml";
+          echo "</FilesMatch>";
+        } >> ${APACHE_HOST_CONF}
+      fi
+
       {
-        echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">';
-        echo "AddHandler \"proxy:unix:/usr/local/php${PHP1_VERSION}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${PHP1_VERSION} .phtml";
-        echo "</FilesMatch>";
+        echo "  Options +SymLinksIfOwnerMatch +IncludesNoExec";
+        echo "  AllowOverride AuthConfig FileInfo Indexes Limit Options=Includes,IncludesNOEXEC,Indexes,ExecCGI,MultiViews,SymLinksIfOwnerMatch,None";
+        echo "";
+        echo "  Order Allow,Deny";
+        echo "  Allow from all";
+        echo "  <IfModule mod_suphp.c>";
+        echo "      suPHP_Engine On";
+        echo "      suPHP_UserGroup ${WEBAPPS_USER} ${WEBAPPS_GROUP}";
+        echo "  </IfModule>";
       } >> ${APACHE_HOST_CONF}
+
+      ## Unsupported:
+      # echo '    <IfModule mod_ruid2.c>'                 >> ${APACHE_HOST_CONF}
+      # echo '        RUidGid webapps webapps'            >> ${APACHE_HOST_CONF}
+      # echo '    </IfModule>'                            >> ${APACHE_HOST_CONF}
+      # echo '    <IfModule mod_lsapi.c>'                 >> ${APACHE_HOST_CONF}
+      # echo '        lsapi_user_group webapps webapps'   >> ${APACHE_HOST_CONF}
+      # echo '    </IfModule>'                            >> ${APACHE_HOST_CONF}
+
+      verify_webapps_tmp
+
+      # WEBAPPS_FCGID_DIR=/var/www/fcgid
+      SUEXEC_PER_DIR="0"
+
+      if [ -s /usr/local/sbin/suexec ]; then
+        SUEXEC_PER_DIR=$(/usr/local/sbin/suexec -V 2>&1 | grep -c 'AP_PER_DIR')
+      fi
+
+      # if [ "${PHP1_MODE_OPT}" = "fastcgi" ]; then
+      #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
+      #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP1_VERSION}.sh .php" >> ${APACHE_HOST_CONF}
+      #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
+      #     echo '    SuexecUserGroup webapps webapps' >> ${APACHE_HOST_CONF}
+      #   fi
+      #   echo '      <FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${APACHE_HOST_CONF}
+      #   echo '          Options +ExecCGI' >> ${APACHE_HOST_CONF}
+      #   echo '          AddHandler fcgid-script .php' >> ${APACHE_HOST_CONF}
+      #   echo '      </FilesMatch>' >> ${APACHE_HOST_CONF}
+      #   echo '  </IfModule>' >> ${APACHE_HOST_CONF}
+      # fi
+
+      # if [ "${PHP2_MODE_OPT}" = "fastcgi" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+      #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
+      #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP2_SHORTRELEASE}.sh .php${PHP2_SHORTRELEASE}" >> ${APACHE_HOST_CONF}
+      #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
+      #   echo '      SuexecUserGroup webapps webapps' >> ${APACHE_HOST_CONF}
+      #   fi
+      #   echo "   <FilesMatch \"\.php${PHP2_SHORTRELEASE}\$\">" >> ${APACHE_HOST_CONF}
+      #   echo '          Options +ExecCGI' >> ${APACHE_HOST_CONF}
+      #   echo "          AddHandler fcgid-script .php${PHP2_SHORTRELEASE}" >> ${APACHE_HOST_CONF}
+      #   echo '      </FilesMatch>' >> ${APACHE_HOST_CONF}
+      #   echo '  </IfModule>' >> ${APACHE_HOST_CONF}
+      # fi
+
+      echo "</Directory>" >> ${APACHE_HOST_CONF}
     fi
+  fi
+}
 
-    {
-      echo "  Options +SymLinksIfOwnerMatch +IncludesNoExec";
-      echo "  AllowOverride AuthConfig FileInfo Indexes Limit Options=Includes,IncludesNOEXEC,Indexes,ExecCGI,MultiViews,SymLinksIfOwnerMatch,None";
-      echo "";
-      echo "  Order Allow,Deny";
-      echo "  Allow from all";
-      echo "  <IfModule mod_suphp.c>";
-      echo "      suPHP_Engine On";
-      echo "      suPHP_UserGroup ${WEBAPPS_USER} ${WEBAPPS_GROUP}";
-      echo "  </IfModule>";
-    } >> ${APACHE_HOST_CONF}
+################################################################################################################################
 
-    ## Unsupported:
-    # echo '    <IfModule mod_ruid2.c>'                 >> ${APACHE_HOST_CONF}
-    # echo '        RUidGid webapps webapps'            >> ${APACHE_HOST_CONF}
-    # echo '    </IfModule>'                            >> ${APACHE_HOST_CONF}
-    # echo '    <IfModule mod_lsapi.c>'                 >> ${APACHE_HOST_CONF}
-    # echo '        lsapi_user_group webapps webapps'   >> ${APACHE_HOST_CONF}
-    # echo '    </IfModule>'                            >> ${APACHE_HOST_CONF}
-
-    verify_webapps_tmp
-
-    # WEBAPPS_FCGID_DIR=/var/www/fcgid
-    SUEXEC_PER_DIR="0"
-
-    if [ -s /usr/local/sbin/suexec ]; then
-      SUEXEC_PER_DIR=$(/usr/local/sbin/suexec -V 2>&1 | grep -c 'AP_PER_DIR')
-    fi
-
-    # if [ "${PHP1_MODE_OPT}" = "fastcgi" ]; then
-    #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
-    #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP1_VERSION}.sh .php" >> ${APACHE_HOST_CONF}
-    #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
-    #       echo '    SuexecUserGroup webapps webapps' >> ${APACHE_HOST_CONF}
-    #   fi
-    #   echo '      <FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${APACHE_HOST_CONF}
-    #   echo '          Options +ExecCGI' >> ${APACHE_HOST_CONF}
-    #   echo '          AddHandler fcgid-script .php' >> ${APACHE_HOST_CONF}
-    #   echo '      </FilesMatch>' >> ${APACHE_HOST_CONF}
-    #   echo '  </IfModule>' >> ${APACHE_HOST_CONF}
+## Rewrite Confs (copied from CB2)
+rewrite_confs() {
+  if [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+    # if [ ! -e httpd-${APACHE2_VER}.tar.gz ]; then
+    #   echo "File httpd-${APACHE2_VER}.tar.gz does not exist. Cannot rewrite configs"
+    # else
+    #   tar xzf httpd-${APACHE2_VER}.tar.gz --no-same-owner
     # fi
 
-    # if [ "${PHP2_MODE_OPT}" = "fastcgi" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
-    #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
-    #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP2_SHORTRELEASE}.sh .php${PHP2_SHORTRELEASE}" >> ${APACHE_HOST_CONF}
-    #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
-    #   echo '      SuexecUserGroup webapps webapps' >> ${APACHE_HOST_CONF}
-    #   fi
-    #   echo "   <FilesMatch \"\.php${PHP2_SHORTRELEASE}\$\">" >> ${APACHE_HOST_CONF}
-    #   echo '          Options +ExecCGI' >> ${APACHE_HOST_CONF}
-    #   echo "          AddHandler fcgid-script .php${PHP2_SHORTRELEASE}" >> ${APACHE_HOST_CONF}
-    #   echo '      </FilesMatch>' >> ${APACHE_HOST_CONF}
-    #   echo '  </IfModule>' >> ${APACHE_HOST_CONF}
+    # if [ ! -d httpd-${APACHE2_VER} ]; then
+    #   echo "Directory httpd-${APACHE2_VER} does not exist. Cannot rewrite configs"
     # fi
 
-    echo "</Directory>" >> ${APACHE_HOST_CONF}
+    ## PB:
+    # HTTPDCONF=${}
+    # HTTPDDIR=${}
+
+    # Copy the new configs
+    cp -rf "${APCONFDIR}" "${HTTPDDIR}"
+    cp -f "${APCONFDIR}/httpd.conf" "${HTTPD_CONF}"
+    cp -f "${APCONFDIR}/extra/httpd-mpm.conf" "${HTTPDCONF}/extra/httpd-mpm.conf"
+
+    ${PERL} -pi -e 's/^DefaultType/#DefaultType/' "${HTTPD_CONF}"
+
+    HDC=httpd-directories-old.conf
+
+    ln -sf $HDC "${HTTPDCONF}/extra/httpd-directories.conf"
+
+    doApacheHostConf
+
+    if [ "${APCUSTOMCONFDIR}" != "0" ]; then
+      cp -rf "${APCUSTOMCONFDIR}" "${HTTPDDIR}"
+    fi
+
+    chmod 710 "${HTTPDDIR}/conf"
+
+    #swap the |WEBAPPS_PHP_RELEASE| token.
+    if [ "${PHP1_MODE_OPT}" = "php-fpm" ] || [ "${PHP2_MODE_OPT}" = "php-fpm" ]; then
+      PHPV=""
+      if [ "${PHP1_MODE_OPT}" = "php-fpm" ]; then
+        PHPV=$(${PERL} -e "print ${PHP1_RELEASE_OPT} * 10")
+      elif [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+        PHPV=$(${PERL} -e "print ${PHP2_RELEASE_OPT} * 10")
+      fi
+
+      if [ "${PHPV}" != "" ]; then
+        ${PERL} -pi -e "s/\|WEBAPPS_PHP_RELEASE\|/${PHPV}/" "${HTTPDCONF}/extra/${HDC}"
+      fi
+    fi
+
+    ensure_server_ca
+
+    #ensure we have the correct apache_ver
+    if [ "$(grep -m1 -c apache_ver=2.0 ${DACONF_TEMPLATE_FILE})" -eq "0" ]; then
+      echo "apache_ver=2.0" >> ${DACONF_TEMPLATE_FILE}
+    elif [ "$(grep -m1 -c apache_ver= ${DACONF_TEMPLATE_FILE})" -ne "0" ]; then
+      ${PERL} -pi -e 's/`grep apache_ver= ${DACONF_TEMPLATE_FILE}`/apache_ver=2.0/' ${DACONF_TEMPLATE_FILE}
+    fi
+    if [ "$(grep -m1 -c apache_ver=2.0 ${DACONF_FILE})" -eq "0" ]; then
+      echo "apache_ver=2.0" >> ${DACONF_FILE}
+      echo "action=rewrite&value=httpd" >> "${TASK_QUEUE}"
+    elif [ "$(grep -m1 -c apache_ver= ${DACONF_FILE})" -ne "0" ]; then
+      ${PERL} -pi -e 's/`grep apache_ver= ${DACONF_FILE}`/apache_ver=2.0/' ${DACONF_FILE}
+      echo "action=rewrite&value=httpd" >> "${TASK_QUEUE}"
+    fi
+
+    do_rewrite_httpd_alias
+
+    #rewrite ips.conf
+    echo "action=rewrite&value=ips" >> ${TASK_QUEUE}
+
+    run_dataskq
+
+    #tokenize the IP and ports
+    tokenize_IP
+    tokenize_ports
+
+    #add all the Include lines if they do not exist
+    if [ "$(grep -m1 -c 'Include' "${HTTPDCONF}/extra/directadmin-vhosts.conf")" = "0" ] || [ ! -e "${HTTPDCONF}/extra/directadmin-vhosts.conf" ]; then
+      doVhosts
+      cd "${CWD}/httpd-${APACHE2_VER}" || exit
+    fi
+
+    if [ ! -d /etc/httpd/conf/ssl.key ] || [ ! -d /etc/httpd/conf/ssl.crt ]; then
+      cd "${WORKDIR}" || exit
+      mkdir -p /etc/httpd/conf/ssl.key
+      mkdir -p /etc/httpd/conf/ssl.crt
+      #install the cert/key
+      /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout /etc/httpd/conf/ssl.key/server.key -out /etc/httpd/conf/ssl.crt/server.crt -days 9999 -nodes -config ./${APCERTCONF}
+
+      chmod 600 "${HTTPDCONF}/ssl.crt/server.crt"
+      chmod 600 "${HTTPDCONF}/ssl.key/server.key"
+      cd "${CWD}" || exit
+    fi
+
+    doApacheCheck
+
+    rm -rf "${CWD}/httpd-${APACHE2_VER}"
+
+    cd ${CWD} || exit
+
+    PHPMODULES=${HTTPDCONF}/extra/httpd-phpmodules.conf
+
+    echo -n "" > "${HTTPDCONF}/extra/httpd-nginx.conf"
+
+    echo -n "" > "${PHPMODULES}"
+
+    if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+      ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' "${HTTPD_CONF}"
+      echo "LoadModule  suphp_module    /usr/lib/apache/mod_suphp.so" >> "${PHPMODULES}"
+    fi
+
+    if [ "${MODSECURITY_OPT}" = "yes" ] && [ "${WEBSERVER_OPT}" = "apache" ]; then
+      ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' "${HTTPD_CONF}"
+      echo "Include /etc/httpd/conf/extra/httpd-modsecurity.conf" >> "${PHPMODULES}"
+      cp -pf "${MODSECURITY_APACHE_INCLUDE}" /etc/httpd/conf/extra/httpd-modsecurity.conf
+      doModSecurityRules norestart
+    fi
+
+    if [ "${HTSCANNER_OPT}" = "yes" ]; then
+      if [ "${HAVE_FCGID}" = "yes" ] || [ "${HAVE_FPM_CGI}" = "yes" ] || [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+        ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' "${HTTPD_CONF}"
+        echo "LoadModule  htscanner_module    /usr/lib/apache/mod_htscanner2.so" >> "${PHPMODULES}"
+      fi
+    fi
+
+    if ! grep -m1 -q '/usr/lib/apache/mod_mpm_' "${PHPMODULES}"; then
+      # Use event MPM for php-fpm and prefork for mod_php
+      if [ "${APACHE_MPM_OPT}" = "auto" ]; then
+        if [ "${HAVE_CLI}" = "no" ]; then
+          # Add to httpd-phpmodules.conf
+          echo "LoadModule mpm_event_module /usr/lib/apache/mod_mpm_event.so" >> "${PHPMODULES}"
+        else
+          # Add to httpd-phpmodules.conf
+          echo "LoadModule mpm_prefork_module /usr/lib/apache/mod_mpm_prefork.so" >> "${PHPMODULES}"
+        fi
+      elif [ "${APACHE_MPM_OPT}" = "event" ]; then
+        echo "LoadModule mpm_event_module /usr/lib/apache/mod_mpm_event.so" >> "${PHPMODULES}"
+      elif [ "${APACHE_MPM_OPT}" = "worker" ]; then
+        echo "LoadModule mpm_worker_module /usr/lib/apache/mod_mpm_worker.so" >> "${PHPMODULES}"
+      else
+        echo "LoadModule mpm_prefork_module /usr/lib/apache/mod_mpm_prefork.so" >> "${PHPMODULES}"
+      fi
+    fi
+
+    # ${PERL} -pi -e 's/^LoadModule php4/\#LoadModule php4/' "${HTTPD_CONF}"
+    ${PERL} -pi -e 's/^LoadModule php5/\#LoadModule php5/' "${HTTPD_CONF}"
+    ${PERL} -pi -e 's/^LoadModule php7/\#LoadModule php7/' "${HTTPD_CONF}"
+
+    # Add correct php module to httpd-phpmodules.conf
+    if [ "${PHP1_MODE_OPT}" = "mod_php" ]; then
+      if [ "${PHP1_RELEASE_OPT}" = "7.0" ]; then
+        echo "LoadModule  php7_module   /usr/lib/apache/libphp7.so" >> "${PHPMODULES}"
+      else
+        echo "LoadModule  php5_module   /usr/lib/apache/libphp5.so" >> "${PHPMODULES}"
+      fi
+    fi
+    if [ "${PHP2_MODE_OPT}" = "mod_php" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+      if [ "${PHP2_RELEASE_OPT}" = "7.0" ]; then
+        echo "LoadModule    php7_module             /usr/lib/apache/libphp7.so" >> "${PHPMODULES}"
+      else
+        echo "LoadModule    php5_module             /usr/lib/apache/libphp5.so" >> "${PHPMODULES}"
+      fi
+    fi
+
+    # if [ "${HAVE_FCGID}" = "yes" ]; then
+    #   if [ -e ${PHPMODULES} ]; then
+    #     if ! grep -m1 -c 'fcgid_module' ${PHPMODULES}; then
+    #       ${PERL} -pi -e 's|^LoadModule  fcgid_module|#LoadModule  fcgid_module|' /etc/httpd/conf/httpd.conf
+    #       echo "LoadModule fcgid_module /usr/lib/apache/mod_fcgid.so" >> ${PHPMODULES}
+    #     fi
+    #     if ! grep -m1 -c 'httpd-fcgid.conf' ${PHPMODULES}; then
+    #       echo "Include /etc/httpd/conf/extra/httpd-fcgid.conf" >> ${PHPMODULES}
+    #     fi
+    #   fi
+
+    #   if [ ! -d /usr/local/safe-bin ]; then
+    #     mkdir -p /usr/local/safe-bin
+    #     chmod 511 /usr/local/safe-bin
+    #     chown apache:apache /usr/local/safe-bin
+    #   fi
+
+    #   for php_shortrelease in `echo ${PHP1_SHORTRELEASE_SET}`; do
+    #     EVAL_CHECK_VAR=HAVE_FCGID${php_shortrelease}
+    #     if [ "$(eval_var ${EVAL_CHECK_VAR})" = "yes" ]; then
+    #       cp -f ${CWD}/configure/fastcgi/fcgid${php_shortrelease}.sh /usr/local/safe-bin/fcgid${php_shortrelease}.sh
+    #       if [ -e ${CWD}/custom/fastcgi/fcgid${php_shortrelease}.sh ]; then
+    #         cp -f ${CWD}/custom/fastcgi/fcgid${php_shortrelease}.sh /usr/local/safe-bin/fcgid${php_shortrelease}.sh
+    #       fi
+    #       chown apache:apache /usr/local/safe-bin/fcgid${php_shortrelease}.sh
+    #       chmod 555 /usr/local/safe-bin/fcgid${php_shortrelease}.sh
+    #     fi
+    #   done
+    # fi
+
+    if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+      if [ -e "${PHPMODULES}" ]; then
+        if ! grep -m1 -q 'suphp_module' "${PHPMODULES}"; then
+          echo "LoadModule  suphp_module    /usr/lib/apache/mod_suphp.so" >> "${PHPMODULES}"
+        fi
+      fi
+    fi
+
+    if [ "${NEWCONFIGS}" = "1" ]; then
+      ${PERL} -pi -e 's/^LoadModule mod_php/\#LoadModule mod_php/' "${HTTPD_CONF}"
+      ${PERL} -pi -e 's/^LoadModule php/\#LoadModule php/' "${HTTPD_CONF}"
+      ${PERL} -pi -e 's/^LoadModule suphp/\#LoadModule suphp/' "${HTTPD_CONF}"
+    fi
+
+    WEBMAILLINK=$(get_webmail_link)
+    ${PERL} -pi -e "s#Alias /webmail \"/var/www/html/roundcube/\"#Alias /webmail \"/var/www/html/${WEBMAILLINK}/\"#" /etc/httpd/conf/extra/httpd-alias.conf
+
+    doPhpConf
+    if [ "${CLOUDLINUX_OPT}" = "no" ] || [ "${PHP1_MODE_OPT}" != "lsphp" ]; then
+      doModLsapi 0
+    fi
+
+    # Disable UserDir access if userdir_access=no is set in the options.conf file
+    if [ "${USERDIR_ACCESS_OPT}" = "no" ]; then
+      ${PERL} -pi -e 's#UserDir public_html#UserDir disabled#' /etc/httpd/conf/extra/httpd-vhosts.conf
+    else
+      ${PERL} -pi -e 's#UserDir disabled#UserDir public_html#' /etc/httpd/conf/extra/httpd-vhosts.conf
+    fi
+
+    create_httpd_nginx
+
+    if [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+      echo "Restarting apache."
+      control_service httpd restart
+    elif [ "${WEBSERVER_OPT}" = "litespeed" ]; then
+      echo "Restarting litespeed."
+      control_service litespeed restart
+    fi
+  fi
+
+  if [ "${WEBSERVER_OPT}" = "nginx" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+    #copy the new configs
+    cp -rf ${NGINXCONFDIR}/* "${NGINXCONF}"
+
+    for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
+      ${PERL} -pi -e "s|/usr/local/php${php_shortrelease}/sockets/webapps.sock|/usr/local/php${PHP1_SHORTRELEASE}/sockets/webapps.sock|" ${NGINXCONF}/nginx.conf
+    done
+
+    do_rewrite_nginx_webapps
+    ensure_server_ca
+    ensure_dhparam "${NGINXCONF}/ssl.crt/dhparams.pem"
+
+    if [ "${MODSECURITY_OPT}" = "yes" ]; then
+      doModSecurityRules norestart
+    fi
+
+    #rewrite ips.conf
+    echo "action=rewrite&value=nginx" >> "${TASK_QUEUE}"
+    echo "action=rewrite&value=ips" >> "${TASK_QUEUE}"
+
+    run_dataskq
+
+    #add all the Include lines if they do not exist
+    if [ "$(grep -m1 -c 'Include' "${NGINXCONF}/directadmin-vhosts.conf")" = "0" ] || [ ! -e "${NGINXCONF}/directadmin-vhosts.conf" ]; then
+      doVhosts
+    fi
+
+    if [ ! -e "${NGINXCONF}/directadmin-settings.conf" ]; then
+      touch "${NGINXCONF}/directadmin-settings.conf"
+    fi
+
+    if [ ! -e "${NGINXCONF}/directadmin-ips.conf" ]; then
+      touch "${NGINXCONF}/directadmin-ips.conf"
+    fi
+
+    if [ ! -e "${NGINXCONF}/nginx-includes.conf" ]; then
+      touch "${NGINXCONF}/nginx-includes.conf"
+    fi
+
+    if [ ! -e "${NGINXCONF}/nginx-modsecurity-enable.conf" ]; then
+      touch "${NGINXCONF}/nginx-modsecurity-enable.conf"
+    elif [ "${MODSECURITY_OPT}" = "no" ]; then
+      echo -n '' > "${NGINXCONF}/nginx-modsecurity-enable.conf"
+    fi
+
+    if [ "${NGINXCUSTOMCONFDIR}" != "0" ]; then
+      cp -rf ${NGINXCUSTOMCONFDIR}/* "${NGINXCONF}/"
+    fi
+
+    chmod 710 "${NGINXCONF}"
+
+    if [ "${IPV6}" = "0" ]; then
+      ${PERL} -pi -e 's| listen       \[::1\]:| #listen       \[::1\]:|' "${NGINXCONF}/nginx-vhosts.conf"
+      ${PERL} -pi -e 's| listen       \[::1\]:| #listen       \[::1\]:|' "${NGINXCONF}/nginx.conf"
+    else
+      ${PERL} -pi -e 's| #listen       \[::1\]:| listen       \[::1\]:|' "${NGINXCONF}/nginx-vhosts.conf"
+      ${PERL} -pi -e 's| #listen       \[::1\]:| listen       \[::1\]:|' "${NGINXCONF}/nginx.conf"
+    fi
+
+    ${PERL} -pi -e "s#worker_processes  1;#worker_processes  ${CPU_CORES};#" "${NGINXCONF}/nginx.conf"
+
+    tokenize_IP
+    tokenize_ports
+
+    # Disable UserDir access if userdir_access=no is set in the options.conf file
+    if [ "${USERDIR_ACCESS_OPT}" = "no" ]; then
+      ${PERL} -pi -e 's| include /etc/nginx/nginx-userdir.conf;| #include /etc/nginx/nginx-userdir.conf;|' /etc/nginx/nginx-vhosts.conf
+    else
+      ${PERL} -pi -e 's| #include /etc/nginx/nginx-userdir.conf;| include /etc/nginx/nginx-userdir.conf;|' /etc/nginx/nginx-vhosts.conf
+    fi
+
+    doPhpConf
+
+    echo "Restarting nginx."
+    # /usr/sbin/nginx -s stop >/dev/null 2>&1
+    # control_service nginx start
+    service nginx restart
+  fi
+
+  if [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+    setVal nginx 0 ${DACONF_TEMPLATE_FILE}
+    setVal nginx 0 ${DACONF_FILE}
+    setVal nginx_proxy 1 ${DACONF_TEMPLATE_FILE}
+    setVal nginx_proxy 1 ${DACONF_FILE}
+  fi
+
+  verify_webapps_tmp
+
+  directadmin_restart
+
+
+}
+################################################################################################################################
+
+## Run DirectAdmin Task Query (copied from CB2)
+run_dataskq() {
+  ## $1 = argument (e.g. "d" for debug)
+
+  DATASKQ_OPT=$1
+  if [ -s "${DA_CONF}" ]; then
+    /usr/local/directadmin/dataskq "${DATASKQ_OPT}" --custombuild
+  fi
+}
+
+################################################################################################################################
+
+## Rewrite directadmin-vhosts.conf (copied from CB2: doVhosts)
+rewrite_vhosts() {
+  PATHNAME=${HTTPDCONF}/extra
+
+  if [ "${WEBSERVER_OPT}" = "nginx" ]; then
+    PATHNAME="${NGINXCONF}"
+  fi
+
+  if [ ! -d "${PATHNAME}" ]; then
+    mkdir -p "${PATHNAME}"
+  fi
+
+  echo -n '' > ${PATHNAME}/directadmin-vhosts.conf
+
+  if [ "${WEBSERVER_OPT}" = "nginx" ]; then
+    for i in $(ls /usr/local/directadmin/data/users/*/nginx.conf); do
+      echo "include $i;" >> ${PATHNAME}/directadmin-vhosts.conf
+    done
+  elif [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "litespeed" ]; then
+    for i in $(ls /usr/local/directadmin/data/users/*/httpd.conf); do
+      echo "Include $i" >> ${PATHNAME}/directadmin-vhosts.conf
+    done
+  elif [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+    echo -n '' > ${NGINXCONF}/directadmin-vhosts.conf
+    for i in $(ls /usr/local/directadmin/data/users/*/nginx.conf); do
+      echo "include $i;" >> "${NGINXCONF}/directadmin-vhosts.conf"
+    done
+    for i in $(ls /usr/local/directadmin/data/users/*/httpd.conf); do
+      echo "Include $i" >> "${PATHNAME}/directadmin-vhosts.conf"
+    done
+  fi
+}
+
+################################################################################################################################
+
+## Rewrite PHP Configuration (copied from CB2: doPhpConf)
+rewrite_php_confs() {
+
+  if [ "${HAVE_FPM_CGI}" = "yes" ]; then
+    for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
+      set_service "php-fpm${php_shortrelease}" OFF
+    done
+  else
+    for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
+      set_service "php-fpm${php_shortrelease}" delete
+    done
+  fi
+
+  fpmChecks
+
+  if [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+
+    doApacheHostConf
+
+    # Writing data to httpd-php-handlers.conf
+    echo -n "" > "${PHP_HANDLERS_HTTPD}"
+
+    echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${PHP_HANDLERS_HTTPD}
+
+
+    if [ "${PHP1_MODE_OPT}" = "mod_php" ]; then
+      echo "AddHandler application/x-httpd-php .inc .php .php5 .php${PHP1_SHORTRELEASE} .phtml" >> ${PHP_HANDLERS_HTTPD}
+    fi
+
+    # if [ "${PHP2_MODE_OPT}" = "mod_php" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+    #   echo "AddHandler application/x-httpd-php .php${PHP2_SHORTRELEASE}" >> ${PHP_HANDLERS_HTTPD}
+    # fi
+
+    if [ "${PHP1_MODE_OPT}" = "mod_php" ] || [ "${PHP2_MODE_OPT}" = "mod_php" ]; then
+      echo "AddHandler application/x-httpd-php-source .phps" >> ${PHP_HANDLERS_HTTPD}
+    fi
+
+    echo '</FilesMatch>' >> ${PHP_HANDLERS_HTTPD}
+
+    echo "AddType text/html .php" >> ${PHP_HANDLERS_HTTPD}
+  fi
+
+  for php_shortrelease in `echo ${PHP1_SHORTRELEASE_SET}`; do
+    eval `echo "HAVE_FPM${php_shortrelease}=no"`
+  done
+
+  if [ "${PHP1_MODE_OPT}" = "php-fpm" ]; then
+
+      ${INITDDIR}/php-fpm${PHP1_SHORTRELEASE} restart
+      if [ ${OS} = "FreeBSD" ]; then
+        ${INITDDIR}/php-fpm${PHP1_SHORTRELEASE} restart
+      fi
+
+    set_service php-fpm${PHP1_SHORTRELEASE} ON
+    eval `echo "HAVE_FPM${PHP1_SHORTRELEASE}=yes"`
+  fi
+
+  if [ "${PHP2_MODE_OPT}" = "php-fpm" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+        ${INITDDIR}/php-fpm${PHP2_SHORTRELEASE} restart
+     # set_service php-fpm${PHP2_SHORTRELEASE} ON
+    # eval `echo "HAVE_FPM${PHP2_SHORTRELEASE}=yes"`
+  fi
+
+  for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
+    EVAL_FPM_VAR=HAVE_FPM${php_shortrelease}
+    HAVE_SHORTRELEASE="$(eval_var ${EVAL_FPM_VAR})"
+
+    if [ "${HAVE_SHORTRELEASE}" = "no" ]; then
+
+        if [ -e ${INITDDIR}/php-fpm${php_shortrelease} ]; then
+          if [ -e /sbin/chkconfig ]; then
+            /sbin/chkconfig php-fpm${php_shortrelease} off
+          fi
+          # ${INITDDIR}/php-fpm${php_shortrelease} stop
+          service php-ftp stop
+        fi
+        # set_service php-fpm${php_shortrelease} delete
+        # boot/init script: rm -f ${INITDDIR}/php-fpm${php_shortrelease}
+    fi
+  done
+
+  if [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+    if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+      # Writing data to suphp.conf
+      echo -n "" > ${SUPHP_CONF_FILE}
+      echo "[global]" >> ${SUPHP_CONF_FILE}
+      echo ";Path to logfile" >> ${SUPHP_CONF_FILE}
+      echo "logfile=/var/log/suphp.log" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo ";Loglevel" >> ${SUPHP_CONF_FILE}
+      echo "loglevel=warn" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo ";User Apache is running as" >> ${SUPHP_CONF_FILE}
+      echo "webserver_user=apache" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo ";Path all scripts have to be in" >> ${SUPHP_CONF_FILE}
+      echo "docroot=/" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo "; Security options" >> ${SUPHP_CONF_FILE}
+      echo "allow_file_group_writeable=false" >> ${SUPHP_CONF_FILE}
+      echo "allow_file_others_writeable=false" >> ${SUPHP_CONF_FILE}
+      echo "allow_directory_group_writeable=false" >> ${SUPHP_CONF_FILE}
+      echo "allow_directory_others_writeable=false" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo ";Check wheter script is within DOCUMENT_ROOT" >> ${SUPHP_CONF_FILE}
+      echo "check_vhost_docroot=false" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo ";Send minor error messages to browser" >> ${SUPHP_CONF_FILE}
+      echo "errors_to_browser=true" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo ";PATH environment variable" >> ${SUPHP_CONF_FILE}
+      echo "env_path=\"/bin:/usr/bin\"" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo ";Umask to set, specify in octal notation" >> ${SUPHP_CONF_FILE}
+      echo "umask=0022" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo ";Minimum UID" >> ${SUPHP_CONF_FILE}
+      echo "min_uid=100" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo ";Minimum GID" >> ${SUPHP_CONF_FILE}
+      echo "min_gid=100" >> ${SUPHP_CONF_FILE}
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo "[handlers]" >> ${SUPHP_CONF_FILE}
+      echo ";Handler for php-scripts" >> ${SUPHP_CONF_FILE}
+
+      if [ "${PHP1_MODE_OPT}" = "suphp" ]; then
+        echo "x-httpd-php${PHP1_SHORTRELEASE}=\"php:/usr/local/php${PHP1_SHORTRELEASE}/bin/php-cgi${PHP1_SHORTRELEASE}\"" >> ${SUPHP_CONF_FILE}
+      fi
+
+      if [ "${PHP2_MODE_OPT}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+        echo "x-httpd-php${PHP2_SHORTRELEASE}=\"php:/usr/local/php${PHP2_SHORTRELEASE}/bin/php-cgi${PHP2_SHORTRELEASE}\"" >> ${SUPHP_CONF_FILE}
+      fi
+
+      echo "" >> ${SUPHP_CONF_FILE}
+      echo ";Handler for CGI-scripts" >> ${SUPHP_CONF_FILE}
+      echo "x-suphp-cgi=\"execute:!self\"" >> ${SUPHP_CONF_FILE}
+
+      # Writing data to /etc/httpd/conf/extra/httpd-suphp.conf
+      echo "Writing data to ${SUPHP_HTTPD}"
+      echo -n "" > ${SUPHP_HTTPD}
+
+      echo "<IfModule mod_suphp.c>" >> ${SUPHP_HTTPD}
+      echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${SUPHP_HTTPD}
+
+      if [ "${PHP1_MODE_OPT}" = "suphp" ]; then
+        echo "AddHandler x-httpd-php${PHP1_SHORTRELEASE} .inc .php .php3 .php4 .php5 .php${PHP1_SHORTRELEASE} .phtml" >> ${SUPHP_HTTPD}
+      fi
+
+      # if [ "${PHP2_MODE_OPT}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+      #   echo "AddHandler x-httpd-php${PHP2_SHORTRELEASE} .php${PHP2_SHORTRELEASE}" >> ${SUPHP_HTTPD}
+      # fi
+
+      echo '</FilesMatch>' >> ${SUPHP_HTTPD}
+
+      echo "<Location />" >> ${SUPHP_HTTPD}
+      echo "suPHP_Engine on" >> ${SUPHP_HTTPD}
+
+      if [ -d /usr/local/php${PHP1_SHORTRELEASE}/lib ]; then
+        echo "suPHP_ConfigPath /usr/local/php${PHP1_SHORTRELEASE}/lib/" >> ${SUPHP_HTTPD}
+      elif [ -d /usr/local/php${PHP2_SHORTRELEASE}/lib ]; then
+        echo "suPHP_ConfigPath /usr/local/php${PHP2_SHORTRELEASE}/lib/" >> ${SUPHP_HTTPD}
+      fi
+
+      if [ "${PHP1_MODE_OPT}" = "suphp" ]; then
+        echo "suPHP_AddHandler x-httpd-php${PHP1_SHORTRELEASE}" >> ${SUPHP_HTTPD}
+      fi
+
+      # if [ "${PHP2_MODE_OPT}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+      #   echo "suPHP_AddHandler x-httpd-php${PHP2_SHORTRELEASE}" >> ${SUPHP_HTTPD}
+      # fi
+
+      echo "</Location>" >> ${SUPHP_HTTPD}
+      echo "</IfModule>" >> ${SUPHP_HTTPD}
+      echo "Done."
+    elif [ -e "${SUPHP_HTTPD}" ]; then
+      echo -n "" > ${SUPHP_HTTPD}
+    fi
   fi
 }
 
@@ -2389,9 +3081,8 @@ bfm_setup() {
   # brute_force_squirrelmail_log=${WWW_DIR}/squirrelmail/data/squirrelmail_access_log
   # brute_force_pma_log=${WWW_DIR}/phpMyAdmin/log/auth.log
 
-  setVal brute_force_roundcube_log ${WWW_DIR}/roundcube/logs/errors ${DA_CONF}
-  setVal brute_force_pma_log ${WWW_DIR}/phpMyAdmin/log/auth.log ${DA_CONF}
-
+  setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" ${DA_CONF}
+  setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF}
 
 
   if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
@@ -2413,96 +3104,77 @@ validate_options() {
   return;
 }
 
-
-
 ################################################################################################################################
 
 ## Install Application
 ## $1 = name of service
 ## e.g. install_app exim
 install_app() {
-  ## add func() to update make.conf, or config via CLI
 
-  case "$1" in
-    "directadmin")
+  case $1 in
+    directadmin)
       directadmin_install
       ;;
-    "apache")
+    apache)
       apache_install
-      # portmaster -d ${PORT_APACHE24}
       ;;
-    "nginx")
+    nginx)
       nginx_install
-      #portmaster -d ${PORT_NGINX}
       ;;
-    "php55")
-      cd /usr/ports/lang/php55 && make config && make install
-      # portmaster -d ${PORT_PHP55}
+    php55|php56|php70)
+      php_install
       ;;
-    "php56")
-      cd /usr/ports/lang/php56 && make config && make install
-      # portmaster -d ${PORT_PHP56}
-      ;;
-    "php70")
-      cd /usr/ports/lang/php70 && make config && make install
-      ;;
-    "ioncube")
+    ioncube)
       pkgi ${PORT_IONCUBE}
       ;;
-    "roundcube")
+    roundcube)
       roundcube_install
-      portmaster -d ${PORT_ROUNDCUBE}
       ;;
-    "spamassassin")
-      cd /usr/ports/mail/spamassassin && make config && make install
-      # portmaster -d ${PORT_SPAMASSASSIN}
+    spamassassin)
       spamassassin_install
       ;;
-    "libspf2") pkgi ${PORT_LIBSPF2} ;;
-    "dkim") pkgi ${PORT_LIBDKIM} ;;
-    "blockcracking") blockcracking_install ;;
-    "easy_spam_fighter") easyspamfighter_install ;;
-    "exim")
+    libspf2) pkgi ${PORT_LIBSPF2} ;;
+    dkim) pkgi ${PORT_LIBDKIM} ;;
+    blockcracking) blockcracking_install ;;
+    easy_spam_fighter) easyspamfighter_install ;;
+    exim)
       exim_install
       ;;
-    "mariadb55")
+    mariadb55)
       # portmaster -d ${PORT_MARIADB55}
       pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
       sql_post_install
       ;;
-    "mariadb100")
+    mariadb100)
       # portmaster -d ${PORT_MARIADB100}
       pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
       sql_post_install
       ;;
-    "mysql55")
+    mysql55)
       # portmaster -d ${PORT_MYSQL55}
       pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
       sql_post_install
       ;;
-    "mysql56")
+    mysql56)
       # portmaster -d ${PORT_MYSQL56}
       pkgi ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
       sql_post_install
       ;;
-    "mysql57")
+    mysql57)
       # portmaster -d ${PORT_MYSQL56}
       pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
       sql_post_install
       ;;
-    "phpmyadmin")
-      #cd /usr/ports/databases/phpMyAdmin && make config && make install
-      # portmaster -d ${PORT_PHPMYADMIN}
+    phpmyadmin)
       phpmyadmin_install
       ;;
-    "pureftpd")
-      #cd /usr/ports/ftp/pureftpd && make config && make install
-      portmaster -d ${PORT_PUREFTPD}
+    proftpd)
+      proftpd_install
       ;;
-    "proftpd")
-      portmaster -d ${PORT_PROFTPD}
+    pureftpd)
+      pureftpd_install
       ;;
-    "bfm")
+    bfm)
       bfm_setup
       ;;
       *) echo "Script error"; return;
@@ -2533,49 +3205,67 @@ update() {
   fi
 }
 
+## Copied from CB2:
+doUpdateScript() {
+  cd ${CWD} || exit
+
+  cp -f options.conf ..
+
+  cd ..
+
+  fetch -o ./${NAME}.tar.gz ${WEBPATH}/${CUSTOMBUILD_OPT}/${NAME}.tar.gz
+
+  if [ -s "${NAME}.tar.gz" ]; then
+    echo "Extracting ${NAME}.tar.gz..."
+
+    tar xvzf "${NAME}.tar.gz" --no-same-owner
+    mv -f options.conf ${WORKDIR}
+    cd ${CWD} || exit
+
+    #downloadVersionsTxt
+
+    chmod 700 portsbuild.sh
+  else
+    echo "Unable to extract ${NAME}.tar.gz."
+  fi
+}
+
+
 ################################################################################################################################
 
 ## Upgrade
 upgrade() {
-    case "$2" in
+    case $2 in
     "") show_menu_upgrade ;;
     esac
 }
 
 ## Upgrade an application or service
 upgrade_app() {
-  case "$2" in
+  case $2 in
     "") show_menu_upgrade ;;
-    "php") php_upgrade ;;
-    "suhosin") suhosin_upgrade ;;
-    "ioncube") ioncube_upgrade ;;
-    "modsecurity") modsecurity_upgrade ;;
-    "awstats") awstats_upgrade ;;
-    "webalizer") webalizer_upgrade ;;
-
-    "apache") apache_upgrade ;;
-    "nginx") nginx_upgrade ;;
-
-    "mysql") mysql_upgrade ;;
-    "mariadb") mariadb_upgrade ;;
-
-    "phpmyadmin") phpmyadmin_upgrade ;;
-
-    "exim") exim_upgrade ;;
-    "dovecot") dovecot_upgrade ;;
-    "roundcube") roundcube_upgrade ;;
-    "pigeonhole") pigeonhole_upgrade ;;
-
-    "spamassassin") spamassassin_upgrade ;;
-    "blockcracking") blockcracking_upgrade ;;
-    "easyspamfighter") easyspamfighter_upgrade ;;
-
-    "pureftpd") pureftpd_upgrade ;;
-    "proftpd") proftpd_upgrade ;;
-
-    "directadmin") directadmin_upgrade ;;
-    "portsbuild") portsbuild_upgrade ;;
-
+    php) php_upgrade ;;
+    suhosin) suhosin_upgrade ;;
+    ioncube) ioncube_upgrade ;;
+    modsecurity) modsecurity_upgrade ;;
+    awstats) awstats_upgrade ;;
+    webalizer) webalizer_upgrade ;;
+    apache) apache_upgrade ;;
+    nginx) nginx_upgrade ;;
+    mysql) mysql_upgrade ;;
+    mariadb) mariadb_upgrade ;;
+    phpmyadmin) phpmyadmin_upgrade ;;
+    exim) exim_upgrade ;;
+    dovecot) dovecot_upgrade ;;
+    roundcube) roundcube_upgrade ;;
+    pigeonhole) pigeonhole_upgrade ;;
+    spamassassin) spamassassin_upgrade ;;
+    blockcracking) blockcracking_upgrade ;;
+    easyspamfighter) easyspamfighter_upgrade ;;
+    pureftpd) pureftpd_upgrade ;;
+    proftpd) proftpd_upgrade ;;
+    directadmin) directadmin_upgrade ;;
+    portsbuild) portsbuild_upgrade ;;
     *) show_menu_upgrade ;;
   esac
 }

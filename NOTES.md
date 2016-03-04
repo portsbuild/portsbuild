@@ -18,6 +18,29 @@
 * Create test units via shunit2
 * Test on FreeBSD 10.3
 * Test Perl 5.22
+* Bash completion script
+
+### Menu Overview:
+
+    config
+    
+    help <command>
+    
+    install
+    
+    options
+    
+    outdated
+    
+    rewrite
+    
+    setup
+    
+    update
+    
+    upgrade
+    
+    version
 
 
 ### Research:
@@ -62,3 +85,6 @@
     ln -s /etc/rc.d/named /usr/local/etc/rc.d/named
     ln -s /etc/rc.d/sshd /usr/local/etc/rc.d/sshd
     ln -s /usr/local/etc/rc.d/php-fpm /usr/local/etc/rc.d/php-fpm56
+
+
+UPPERCASE_SECTION=`echo $1 | tr "[a-z]" "[A-Z]"`
