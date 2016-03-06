@@ -1,0 +1,78 @@
+## Dovecot 2.0 configuration file
+
+#IPv4
+listen = *
+
+#IPv4 and IPv6:
+#listen = *, ::
+
+protocols = imap pop3 lmtp
+
+auth_username_chars = abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890.-_@&
+auth_verbose = yes
+disable_plaintext_auth = no
+login_greeting = Dovecot DA ready.
+mail_access_groups = mail
+default_login_user = dovecot
+mail_location = maildir:~/Maildir
+
+default_process_limit=512
+default_client_limit=2048
+
+passdb {
+  driver = shadow
+}
+passdb {
+  args = username_format=%n /etc/virtual/%d/passwd
+  driver = passwd-file
+}
+protocols = imap pop3
+service auth {
+  user = root
+}
+service imap-login {
+  process_min_avail = 16
+  user = dovecot
+}
+service pop3-login {
+  process_min_avail = 16
+  user = dovecot
+}
+ssl_cert = </usr/local/etc/exim/exim.cert
+ssl_protocols = !SSLv2 !SSLv3
+ssl_cipher_list = ALL:!ADH:RC4+RSA:+HIGH:+MEDIUM:-LOW:-SSLv2:-EXP
+ssl_key = </usr/local/etc/exim/exim.key
+userdb {
+  driver = passwd
+}
+userdb {
+  args = username_format=%n /etc/virtual/%d/passwd
+  driver = passwd-file
+}
+verbose_proctitle = yes
+protocol pop3 {
+  pop3_uidl_format = %08Xu%08Xv
+  pop3_logout_format = top=%t/%p, retr=%r/%b, del=%d/%m, size=%s, bytes=%i/%o
+}
+
+mail_max_userip_connections = 15
+remote 127.0.0.1 {
+  mail_max_userip_connections = 40
+}
+
+# LMTP socket for local delivery from exim
+service lmtp {
+  executable = lmtp -L
+  process_min_avail = 16
+  unix_listener lmtp-client {
+    user = mail
+    group = mail
+    mode = 0660
+  }
+}
+
+protocol lmtp {
+  log_path = /var/log/dovecot-lmtp-errors.log
+  info_log_path = /var/log/dovecot-lmtp.log
+  postmaster_address = postmaster@HOSTNAME
+}

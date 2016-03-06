@@ -41,7 +41,7 @@
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160222
+PB_BUILD_DATE=20160304
 
 IFS="$(printf '\n\t')"
 
@@ -79,26 +79,20 @@ else
   exit 1;
 fi
 
-if [ ! -f conf/defaults.conf ] || [ ! -f conf/ports.conf ] || [ ! -f conf/options.conf ]; then
+# || [ ! -f options.conf ]
+
+if [ ! -f conf/defaults.conf ] || [ ! -f conf/ports.conf ]; then
  echo "Missing files in conf/"
- exit;
+# recreate them # exit;
 fi
+
 
 ## Source (include) additional files into the script:
 . conf/defaults.conf
 . conf/ports.conf
-. conf/options.conf
-. conf/validate.sh
+. options.conf
 #. conf/make.conf
 #. lang/en.txt ## strings files for multilingual support (planned)
-
-# Script is incomplete. :)
-if [ "$(hostname)" != "pb.fallout.local" ]; then
-  echo "PortsBuild is incomplete. If you want to play with it anyway, comment out line 97's exit;"
-  exit;
-
-  DA_LAN=1
-fi
 
 ################################################################################################################################
 
@@ -125,15 +119,15 @@ getDA_Opt() {
 ################################################################################################################################
 
 # ## Emulate ${!variable} (copied from CB2)
-# eval_var() {
-#   var=${1}
-#   if [ -z "${var}" ]; then
-#     echo ""
-#   else
-#     eval newval="\$${var}"
-#     echo "${newval}"
-#   fi
-# }
+eval_var() {
+  var=${1}
+  if [ -z "${var}" ]; then
+    echo ""
+  else
+    eval newval="\$${var}"
+    echo "${newval}"
+  fi
+}
 
 ################################################################################################################################
 
@@ -255,18 +249,27 @@ getVal() {
 #     fi
 # }
 
-
-
 ################################################################################################################################
 
 ## Convert string to lowercase
 lc() {
-  echo "${1}" | tr "[:upper:]" "[:lower:]"
+  local char="$*"
+  out=$(echo $char | tr [:upper:] [:lower:])
+  local retval=$?
+  echo "$out"
+  unset out
+  unset char
+  return $retval
 }
 
 ## Convert string to uppercase
 uc() {
-  echo "${1}" | tr "[:lower:]" "[:upper:]"
+  local char="$*"
+  out=$(echo $char | tr [:lower:] [:upper:])
+  local retval=$?
+  echo "$out"
+  unset out char
+  return $retval
 }
 
 ################################################################################################################################
@@ -329,10 +332,23 @@ ports_update() {
 
 ## Rinse & Repeat
 make_install_clean() {
+
+  ## Origin: category/portname
   CHOSEN_PORT=$1
-  make -C "${CHOSEN_PORT}" rmconfig
-  make -C "${PORT_EXIM}" config OPTIONS_SET="${EXIM_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${EXIM_MAKE_OPTIONS_UNSET}"
-  make -C "${PORT_EXIM}" install clean
+
+  # if [ options_set blank] && [ options_unset blank ]; then
+  # # install via pkg
+  # pkg install -y ${CHOSEN_PORT}
+  # elif
+  # # install via ports:
+
+  ## /usr/bin/make
+  make -C "${PORTS_BASE}/${CHOSEN_PORT}" rmconfig
+  make -C "${PORTS_BASE}/${CHOSEN_PORT}" config OPTIONS_SET="${_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${_MAKE_OPTIONS_UNSET}"
+  make -C "${PORTS_BASE}/${CHOSEN_PORT}" reinstall clean
+
+  # fi
+
 }
 
 ## Clean stale ports (deprecate soon)
@@ -348,7 +364,7 @@ reinstall_all_ports() {
   ${PORTMASTER} -a -f -d
 
   ## Synth command
-
+  # synth upgrade-system
 }
 
 ## Update /etc/hosts
@@ -377,7 +393,23 @@ getTimezone() {
   if [ "${DATETIMEZONE}" = "" ]; then
     DATETIMEZONE="America/Toronto"
   fi
+
   echo ${DATETIMEZONE}
+}
+
+################################################################################################################################
+
+## Add User to Group (copied from CB2)
+addUserGroup() {
+  ## $1 = user
+  ## $2 = group
+
+  if ! /usr/bin/grep -q "^${2}:" < /etc/group; then
+    /usr/sbin/pw groupadd "${2}"
+  fi
+  if ! /usr/bin/id "${1}" > /dev/null; then
+    /usr/sbin/pw useradd -g "${2}" -n "${1}" -s /sbin/nologin
+  fi
 }
 
 ################################################################################################################################
@@ -406,6 +438,10 @@ global_setup() {
   ## $5 = eth_dev
   ## $6 = ip_address
   ## Note to self: 'shift'
+
+  if [ "${DA_ADMIN_EMAIL}" = "" ]; then
+    DA_ADMIN_EMAIL="${DA_ADMIN_USERNAME}@${SERVER_DOMAIN}"
+  fi
 
   ## Make sure all inputs are entered (get rid of IP?)
   if [ "${1}" = "" ] || [ "${2}" = "" ] || [ "${3}" = "" ] || [ "${4}" = "" ] || [ "${5}" = "" ] || [ "${6}" = "" ]; then
@@ -502,11 +538,11 @@ global_setup() {
     ##  synth prepare-system
 
     echo "Installing ports-mgmt/synth"
-    pkgi lang/gcc6-aux devel/ncurses
+    /usr/sbin/pkg install -y lang/gcc6-aux devel/ncurses
 
     ## Eventually replace with binary when it's ready
     if [ ! -e /usr/local/bin/synth ]; then
-      cd /usr/ports/ports-mgmt/synth && make install
+      cd /usr/ports/ports-mgmt/synth && make install clean
     fi
 
     ## Todo: Configure synth (copy Live system profile?)
@@ -594,7 +630,7 @@ global_setup() {
 
     #${SERVICE} directadmin start
 
-    #global_post_install;
+    global_post_install;
 
   else
     printf "PortsBuild installation canceled\n\n"
@@ -618,6 +654,7 @@ update_rc() {
   ## Perhaps rename this function to verify_rc?
 
   ## Todo: refactor with "${SERVICE_NAME}_ENABLE"
+  ## Todo: check for "${SERVICE_NAME}_INSTALL" as well
 
   if [ "${NAMED_ENABLE}" = "YES" ]; then
     setVal named_enable \"YES\" /etc/rc.conf
@@ -629,18 +666,20 @@ update_rc() {
   if [ "${APACHE_ENABLE}" = "YES" ]; then
     setVal apache24_enable \"YES\" /etc/rc.conf
     setVal apache24_http_accept_enable \"YES\" /etc/rc.conf
-    setVal accf_httpd_load \"YES\" /boot/loader.conf
+    setVal accf_http_load \"YES\" /boot/loader.conf
     setVal accf_data_load \"YES\" /boot/loader.conf
-  fi
-
-  if [ "${MYSQL_ENABLE}" = "YES" ] || [ "${MARIADB_ENABLE}" = "YES" ]; then
-    setVal mysql_enable \"YES\" /etc/rc.conf
-    setval mysql_dbdir \"/var/db/mysql\" /etc/rc.conf
-    setVal mysql_optfile \"/usr/local/etc/my.cnf\" /etc/rc.conf
   fi
 
   if [ "${NGINX_ENABLE}" = "YES" ]; then
     setVal nginx_enable \"YES\" /etc/rc.conf
+  # else
+  #   setVal nginx_enable \"NO\" /etc/rc.conf
+  fi
+
+  if [ "${SQL_DB_ENABLE}" = "YES" ]; then
+    setVal mysql_enable \"YES\" /etc/rc.conf
+    setval mysql_dbdir \"/var/db/mysql\" /etc/rc.conf
+    setVal mysql_optfile \"/usr/local/etc/my.cnf\" /etc/rc.conf
   fi
 
   if [ "${PHP_ENABLE}" = "YES" ]; then
@@ -671,6 +710,18 @@ update_rc() {
     setVal spamd_flags \"-c -m 15\" /etc/rc.conf
   fi
 
+  if [ "${SAUTILS_ENABLE}" = "YES" ]; then
+    # Alternative: /etc/periodic.conf.local
+    setVal daily_sa_enable \"YES\" /etc/periodic.conf
+    setVal daily_sa_quiet \"NO\" /etc/periodic.conf
+    # -D --nogpg
+    # daily_sa_update_flags=""
+    # daily_sa_compile_flags=""
+    setVal daily_sa_compile_nice \"YES\" /etc/periodic.conf
+    # daily_sa_compile_nice_flags=""
+    setVal daily_sa_restart_spamd \"YES\" /etc/periodic.conf
+  fi
+
   if [ "${CLAMAV_ENABLE}" = "YES" ]; then
     setVal clamav_clamd_enable \"YES\" /etc/rc.conf
     setVal clamav_freshclam_enable \"YES\" /etc/rc.conf
@@ -687,14 +738,14 @@ update_rc() {
 ################################################################################################################################
 
 ## Update /etc/make.conf
-update_make() {
-  if [ ! -e /etc/make.conf ]; then
-    echo "Creating /etc/make.conf"
-    touch /etc/make.conf
-  fi
+# update_make() {
+#   if [ ! -e /etc/make.conf ]; then
+#     echo "Creating /etc/make.conf"
+#     touch /etc/make.conf
+#   fi
 
-  ## magic goes here
-}
+#   ## magic goes here
+# }
 
 ## Set PORT options, either in /etc/make.conf
 ## or /var/db/ports/$portcode/options
@@ -716,32 +767,42 @@ bind_setup() {
   if [ "${OS_MAJ}" -eq 10 ]; then
     if [ ! -e /usr/local/sbin/named ]; then
       echo "*** Error: Cannot find the named binary.";
-      return;
+      return
     fi
 
     if [ ! -e /usr/local/etc/namedb/named.conf ]; then
-      echo "*** Warning: Cannot find /usr/local/etc/namedb/named.conf.";
-      ${WGET} -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.100.conf
+      echo "*** Warning: Cannot find /usr/local/etc/namedb/named.conf."
+
+      if [ -e "${PB_PATH}/configure/named/named.100.conf" ]; then
+        cp "${PB_PATH}/configure/named/named.100.conf" /etc/namedb/named.conf
+      else
+        ${WGET} -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.100.conf
+      fi
     fi
 
     if [ ! -e /usr/local/etc/namedb/rndc.key ]; then
       echo "Generating rndc.key for the first time"
-     rndc-confgen -a -s "${DA_SERVER_IP}"
+      /usr/local/sbin/rndc-confgen -a -s "${DA_SERVER_IP}"
     fi
   elif [ "$OS_MAJ" -eq 9 ]; then
     if [ ! -e /usr/sbin/named ]; then
-      echo "*** Error: Cannot find the named binary.";
-      return;
-
+      echo "*** Error: Cannot find the named binary."
+      return
     fi
+
     if [ ! -e /var/named/etc/namedb/named.conf ]; then
-      echo "*** Warning: Cannot find /var/named/etc/namedb/named.conf.";
-      ${WGET} -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
+      echo "*** Warning: Cannot find /var/named/etc/namedb/named.conf."
+
+      if [ -e "${PB_PATH}/configure/named/named.93.conf" ]; then
+        cp "${PB_PATH}/configure/named/named.93.conf" /etc/namedb/named.conf
+      else
+        ${WGET} -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
+      fi
     fi
 
     if [ ! -e /etc/namedb/rndc.key ]; then
       echo "Generating rndc.key for the first time"
-      rndc-confgen -a -s "${DA_SERVER_IP}"
+      /usr/sbin/rndc-confgen -a -s "${DA_SERVER_IP}"
     fi
   fi
 
@@ -769,7 +830,7 @@ bind_setup() {
   echo "Starting named"
   ${SERVICE} named start
 
-  return;
+  return
 }
 
 ################################################################################################################################
@@ -982,7 +1043,6 @@ directadmin_install() {
   chmod 600 $DA_LICENSE_FILE
   chown diradmin:diradmin $DA_LICENSE_FILE
 
-
   ## DirectAdmin Post-Installation Tasks
   mkdir -p ${DA_PATH}/data/users/admin/packages
   chown diradmin:diradmin ${DA_PATH}/data/users/admin/packages
@@ -1008,7 +1068,7 @@ directadmin_upgrade() {
 }
 
 directadmin_restart() {
-  echo "action=directadmin&value=reload" >> "${TASK_QUEUE}"
+  echo "action=directadmin&value=reload" >> "${DA_TASK_QUEUE}"
   run_dataskq
 }
 
@@ -1058,10 +1118,13 @@ setup_newsyslog() {
 freebsd_set_newsyslog() {
   NSL_L=$1
   NSL_V=$2
-  NSL=/usr/local/etc/newsyslog.d/directadmin.conf
 
-  if ! grep -q "${NSL_L}" $NSL; then
-    echo "${NSL_L}\t${NSL_V}\t600\t4\t*\t@T00\t-" >> $NSL
+  if [ ! ${NEWSYSLOG_DAYS} -gt 0 ]; then
+    NEWSYSLOG_DAYS=10
+  fi
+
+  if ! grep -q "${NSL_L}" "${NEWSYSLOG_FILE}"; then
+    printf "%s\t$%s\t600\t%d\t*\t@T00\t-" "${NSL_L}" "${NSL_V}" "${NEWSYSLOG_DAYS}" >> "${NEWSYSLOG_FILE}"
   fi
 
   #replace whatever we may have with whatever we need, eg:
@@ -1069,9 +1132,9 @@ freebsd_set_newsyslog() {
   #/var/www/html/roundcube/logs/errors  apache:apache 600     4       *       @T00    -
   #/var/www/html/roundcube/logs/errors      600     4       *       @T00    -
 
-  ${PERL} -pi -e "s|^${NSL_L}\s+webapps:webapps\s+|${NSL_L}\t${NSL_V}\t|" ${NSL}
-  ${PERL} -pi -e "s|^${NSL_L}\s+apache:apache\s+|${NSL_L}\t${NSL_V}\t|" ${NSL}
-  ${PERL} -pi -e "s|^${NSL_L}\s+600\s+|${NSL_L}\t${NSL_V}\t600\t|" ${NSL}
+  ${PERL} -pi -e "s|^${NSL_L}\s+webapps:webapps\s+|${NSL_L}\t${NSL_V}\t|" "${NEWSYSLOG_FILE}"
+  ${PERL} -pi -e "s|^${NSL_L}\s+apache:apache\s+|${NSL_L}\t${NSL_V}\t|" "${NEWSYSLOG_FILE}"
+  ${PERL} -pi -e "s|^${NSL_L}\s+600\s+|${NSL_L}\t${NSL_V}\t600\t|" "${NEWSYSLOG_FILE}"
 }
 
 
@@ -1082,11 +1145,11 @@ verify_webapps_logrotate() {
     # Swap it to apache:apache if needed
     # else swap it to webapps:webapps from apache:apache... or do nothing
 
-    NSL_VALUE=webapps:webapps
+    NSL_VALUE=${WEBAPPS_USER}:${WEBAPPS_GROUP}
 
-    # if [ "${PHP1_MODE_OPT}" = "mod_php" ] && [ "${MOD_RUID2_OPT}" = "no" ]; then
-    #   NSL_VALUE=apache:apache
-    # fi
+    if [ "${PHP1_MODE}" = "mod_php" ]; then
+      NSL_VALUE=${APACHE_USER}:${APACHE_GROUP}
+    fi
 
     if [ "${ROUNDCUBE_ENABLE}" = "YES" ]; then
       freebsd_set_newsyslog /usr/local/www/roundcube/logs/errors ${NSL_VALUE}
@@ -1110,19 +1173,18 @@ exim_install() {
 
   ### Main Installation
   make -C ${PORT_EXIM} rmconfig
-  make -C ${PORT_EXIM} config OPTIONS_SET="${EXIM_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${EXIM_MAKE_OPTIONS_UNSET}"
-  make -C ${PORT_EXIM} install clean
-  #make config EXIM_USER=mail EXIM_GROUP=mail
+  make -C ${PORT_EXIM} config EXIM_USER="${EXIM_USER}" EXIM_GROUP="${EXIM_GROUP}" mail_exim_SET="${EXIM_MAKE_OPTIONS_SET}" mail_exim_UNSET="${EXIM_MAKE_OPTIONS_UNSET}" OPTIONS_SET="" OPTIONS_UNSET=""
+  make -C ${PORT_EXIM} reinstall clean
 
   ### Pre-Installation Tasks
 
   ## From: DA/scripts/install.sh
-  mkdir -p ${VIRTUAL_PATH};
-  chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH};
-  chmod 755 ${VIRTUAL_PATH};
+  mkdir -p ${VIRTUAL_PATH}
+  chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}
+  chmod 755 ${VIRTUAL_PATH}
 
   ## replace $(hostname)
-  hostname >> ${VIRTUAL_PATH}/domains;
+  hostname >> ${VIRTUAL_PATH}/domains
 
   if [ ! -s "${VIRTUAL_PATH}/limit" ]; then
     echo "${LIMIT_DEFAULT}" > "${VIRTUAL_PATH}/limit"
@@ -1137,11 +1199,11 @@ exim_install() {
   chmod 750 ${VIRTUAL_PATH}/usage
 
   for i in domains domainowners pophosts blacklist_domains whitelist_from use_rbl_domains bad_sender_hosts bad_sender_hosts_ip blacklist_senders whitelist_domains whitelist_hosts whitelist_hosts_ip whitelist_senders skip_av_domains skip_rbl_domains; do
-    touch ${VIRTUAL_PATH}/$i;
-    chmod 600 ${VIRTUAL_PATH}/$i;
+    touch ${VIRTUAL_PATH}/$i
+    chmod 600 ${VIRTUAL_PATH}/$i
   done
 
-  chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}/*;
+  chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}/*
 
   ### Post-Install Tasks
 
@@ -1153,19 +1215,19 @@ exim_install() {
 
   ## Generate Self-Signed SSL Certificates
   ## See: http://help.directadmin.com/item.php?id=245
-  /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout /usr/local/etc/exim/exim.key -out /usr/local/etc/exim/exim.cert -days 9000 -nodes
+  /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout ${EXIM_SSL_KEY} -out ${EXIM_SSL_CRT} -days 9000 -nodes
 
   ## Symlink for DA compat
-  ln -s /usr/local/etc/exim/exim.key /etc/exim.key
-  ln -s /usr/local/etc/exim/exim.cert /etc/exim.cert
+  ln -s ${EXIM_SSL_KEY} /etc/exim.key
+  ln -s ${EXIM_SSL_CRT} /etc/exim.cert
 
   ## Set permissions:
-  chown ${EXIM_USER}:${EXIM_GROUP} /usr/local/etc/exim/exim.key
-  chmod 644 /usr/local/etc/exim/exim.key
-  chmod 644 /usr/local/etc/exim/exim.cert
+  chown ${EXIM_USER}:${EXIM_GROUP} ${EXIM_SSL_KEY}
+  chmod 644 ${EXIM_SSL_KEY}
+  chmod 644 ${EXIM_SSL_CRT}
 
   ## Reference: Verify Exim config:
-  exim -C ${EXIM_CONF} -bV
+  /usr/local/sbin/exim -C ${EXIM_CONF} -bV
 
   ## Update /etc/rc.conf
   echo "Enabling Exim startup (updating /etc/rc.conf)"
@@ -1182,26 +1244,31 @@ exim_install() {
   ## If I recall correctly, there's another way to do this via mail/exim and typing "make something"
   if [ ! -e /etc/mail/mailer.conf ]; then
     echo "Creating /etc/mail/mailer.conf"
-    touch /etc/mail/mailer.conf
-  fi
+    #touch /etc/mail/mailer.conf
 
-  ## Update /etc/mail/mailer.conf:
-  ## Change to:
-  # sendmail /usr/local/sbin/exim
-  # send-mail /usr/local/sbin/exim
-  # mailq /usr/local/sbin/exim -bp
-  # newaliases /usr/bin/true
-  # #hoststat /usr/libexec/sendmail/sendmail
-  # #purgestat /usr/libexec/sendmail/sendmail
-  # rmail /usr/local/sbin/exim -i -oee
+    cp ${PB_PATH}/configure/etc/mailer.93.conf /etc/mail/mailer.conf
+    cp ${PB_PATH}/configure/etc/mailer.100.conf /etc/mail/mailer.conf
+
+  # else
+    ## Update /etc/mail/mailer.conf:
+    #sendmail       /usr/libexec/sendmail/sendmail
+    #send-mail      /usr/libexec/sendmail/sendmail
+    #mailq          /usr/libexec/sendmail/sendmail
+    #newaliases     /usr/libexec/sendmail/sendmail
+    #hoststat       /usr/libexec/sendmail/sendmail
+    #purgestat      /usr/libexec/sendmail/sendmail
+
+    ## Change to:
+    # sendmail        /usr/local/sbin/exim
+    # send-mail       /usr/local/sbin/exim
+    # mailq           /usr/local/sbin/exim -bp
+    # newaliases      /usr/bin/true
+    # rmail           /usr/local/sbin/exim -i -oee
+  fi
 
   if [ ! -e /etc/periodic.conf ]; then
     touch /etc/periodic.conf
   fi
-
-  ## Replace with setVal
-  # echo "daily_status_include_submit_mailq=\"NO\"" >> /etc/periodic.conf
-  # echo "daily_clean_hoststat_enable=\"NO\"" >> /etc/periodic.conf
 
   setVal daily_status_include_submit_mailq \"NO\" /etc/periodic.conf
   setVal daily_clean_hoststat_enable \"NO\" /etc/periodic.conf
@@ -1209,13 +1276,15 @@ exim_install() {
 
 ################################################################################################################################
 
-## SpamAssassin Pre-Installation Tasks
-spamassassin_pre_install() {
-  return;
-}
+## SpamAssassin Installation Tasks
+spamassassin_install() {
 
-## SpamAssassin Post-Installation Tasks
-spamassassin_post_install() {
+  ### Main Installation
+  make -C ${PORT_SPAMASSASSIN} rmconfig
+  make -C ${PORT_SPAMASSASSIN} config mail_spamassassin_SET="${mail_spamassassin_SET}" mail_spamassassin_UNSET="${mail_spamassassin_UNSET}" OPTIONS_SET="" OPTIONS_UNSET=""
+  make -C ${PORT_SPAMASSASSIN} reinstall clean
+
+  ## SpamAssassin Post-Installation Tasks
   setVal spamd_enable \"YES\" /etc/rc.conf
   setVal spamd_flags \"-c -m 15\" /etc/rc.conf
 }
@@ -1231,7 +1300,7 @@ blockcracking_install() {
 
   if [ -x ${EXIM_BIN} ]; then
 
-    wget_with_options -O ${PB_MIRROR}/exim/exim.blockcracking.tar.gz
+    ${wget_with_options} -O ${PB_MIRROR}/exim/exim.blockcracking.tar.gz
 
     mkdir -p ${EXIM_PATH}/exim.blockcracking
 
@@ -1239,10 +1308,12 @@ blockcracking_install() {
     tar xzf exim.blockcracking-${BLOCKCRACKING_VER}.tar.gz -C ${EXIM_PATH}/exim.blockcracking
 
     BC_DP_SRC=${EXIM_PATH}/exim.blockcracking/script.denied_paths.default.txt
+
     if [ -e ${EXIM_PATH}/exim.blockcracking/script.denied_paths.custom.txt ]; then
       echo "Using custom BlockCracking script.denied_paths.custom.txt"
       BC_DP_SRC=${EXIM_PATH}/exim.blockcracking/script.denied_paths.custom.txt
     fi
+
     cp -fp ${BC_DP_SRC} ${EXIM_PATH}/exim.blockcracking/script.denied_paths.txt
 
     echo "Restarting exim."
@@ -1270,14 +1341,14 @@ easyspamfighter_install() {
     EXIM_SRS_SUPPORT="$(/usr/local/sbin/exim --version | grep -m1 -c SRS)"
 
     if [ "${EXIM_SPF_SUPPORT}" = "0" ]; then
-      echo "Your version of Exim does not support SPF. This is needed for Easy Spam Fighter."
-      echo "Please rebuild Exim with SPF support."
+      echo "*** Error: Your version of Exim does not support SPF. This is needed for Easy Spam Fighter."
+      echo "Please reinstall Exim with SPF support."
       exit 1;
     fi
 
     if [ "${EXIM_SRS_SUPPORT}" = "0" ]; then
-      echo "Your version of Exim does not support SRS. This is needed for Easy Spam Fighter."
-      echo "Please rebuild Exim with SRS support."
+      echo "*** Error: Your version of Exim does not support SRS. This is needed for Easy Spam Fighter."
+      echo "Please reinstall Exim with SRS support."
       exit 1;
     fi
 
@@ -1316,75 +1387,92 @@ easyspamfighter_install() {
 
 ################################################################################################################################
 
-## Dovecot Installation Tasks
+## Dovecot2 Installation Tasks
 dovecot_install() {
 
   ### Main Installation
   make -C "${PORT_DOVECOT2}" rmconfig
-  make -C "${PORT_DOVECOT2}" config OPTIONS_SET="${DOVECOT_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${DOVECOT_MAKE_OPTIONS_UNSET}"
-  make -C "${PORT_DOVECOT2}" install clean
+  make -C "${PORT_DOVECOT2}" config mail_dovecot2_SET="${mail_dovecot2_SET}" mail_dovecot2_UNSET="${mail_dovecot2_UNSET}" OPTIONS_SET="" OPTIONS_UNSET=""
+  make -C "${PORT_DOVECOT2}" reinstall clean
 
-  ## Dovecot Post-Installation Tasks
-
-  ## Fetch latest config:
-  ${WGET} -O ${DOVECOT_CONF} http://files.directadmin.com/services/custombuild/dovecot.conf.2.0
+  ### Post-Installation Tasks
 
   ## Update directadmin.conf:
-  echo "add_userdb_quota=1" >> ${DA_CONF}
-  echo "dovecot=1" >> ${DA_CONF}
+  COUNT=0
+  if [ -e ${DA_CONF} ]; then
+    COUNT="$(grep -m1 -c -e '^add_userdb_quota=1' ${DA_CONF})"
 
-  ## Reference: doRestartDA:
-  echo "action=rewrite&value=email_passwd" >> ${DA_TASK_QUEUE}
+    if [ "${COUNT}" = "0" ]; then
+      # echo "Adding add_userdb_quota=1 to the ${DA_CONF} file to enable Dovecot quota support"
+      echo "add_userdb_quota=1" >> ${DA_CONF}
+      directadmin_restart
+      echo "action=rewrite&value=email_passwd" >> ${DA_TASK_QUEUE}
+      run_dataskq d
+    fi
+  fi
 
-  ## Debug mode:
-  run_dataskq d
-
-  ## Add Dovecot quota support to the directadmin.conf template:
-  echo "add_userdb_quota=1" >> ${DA_CONF_TEMPLATE}
-
-  ## Todo/verify:
-  ## Update dovecot.conf (and conf/ssl.conf?) for SSL support
-  if [ "${OPT_PREFER_APACHE_SSL_CERTS}" = "YES" ]; then
-    ## using existing Apache certs:
-    ssl_cert = <${APACHE_DIR}/ssl/server.crt
-    ssl_key = <${APACHE_DIR}/ssl/server.key
-  elif [ "${OPT_PREFER_EXIM_SSL_CERTS}" = "YES" ]; then
-    ## or using existing Exim certs:
-    ssl_cert = <${EXIM_PATH}/exim.crt
-    ssl_key = <${EXIM_PATH}/exim.key
-  elif [ "${OPT_PREFER_CUSTOM_SSL_CERTS}" = "YES" ]; then
-    ## or using your own custom certs:
-    ssl_cert = </usr/local/etc/ssl/server.crt
-    ssl_key = </usr/local/etc/ssl/server.key
+  ## Update directadmin.conf (template):
+  COUNT_TEMPLATE="$(grep -m1 -c -e '^add_userdb_quota=1' ${DA_CONF_TEMPLATE})"
+  if [ "${COUNT_TEMPLATE}" = "0" ] && [ -e ${DA_CONF_TEMPLATE} ]; then
+    # echo "Adding add_userdb_quota=1 to the ${DA_CONF_TEMPLATE} (template) file"
+    echo "add_userdb_quota=1" >> ${DA_CONF_TEMPLATE}
   fi
 
   ## Prepare Dovecot directories:
-  mkdir -p /etc/dovecot/
-  mkdir -p ${DOVECOT_PATH}
-  mkdir -p /usr/local/etc/dovecot/conf.d
+  if [ ! -d "${DOVECOT_PATH}" ]; then
+    mkdir -p ${DOVECOT_PATH}
+  fi
+
+  if [ ! -d "${DOVECOT_PATH}/conf" ]; then
+    mkdir -p ${DOVECOT_PATH}/conf
+  fi
+
+  if [ ! -d "${DOVECOT_PATH}/conf.d" ]; then
+    mkdir -p ${DOVECOT_PATH}/conf.d
+  fi
+
+  ## Copy default configuration files:
+  cp -rf ${PB_PATH}/configure/dovecot/conf ${DOVECOT_PATH}/conf
+  cp -rf ${PB_PATH}/configure/dovecot/conf.d ${DOVECOT_PATH}/conf.d
+
+  ## Setup config:
+  if [ -e "${PB_PATH}/configure/dovecot/dovecot.conf" ]; then
+    cp "${PB_PATH}/configure/dovecot/dovecot.conf" ${DOVECOT_CONF}
+  # else
+   # ${WGET} -O ${DOVECOT_CONF} http://files.directadmin.com/services/custombuild/dovecot.conf.2.0
+  fi
 
   ## Symlink for compat:
-  ln -s ${DOVECOT_CONF} /etc/dovecot/dovecot.conf
-  # Skipped (no longer needed?): ln -s /etc/dovecot/dovecot.conf /etc/dovecot.conf
+  mkdir -p /etc/dovecot/
+  ln -s ${DOVECOT_CONF} ${DOVECOT_PATH}/dovecot.conf
+  ## Skipped: ln -s /etc/dovecot/dovecot.conf /etc/dovecot.conf
 
+  #cp -f ${PB_PATH}/configure/dovecot/conf.d/90-quote.conf ${DOVECOT_PATH}/conf.d/90-quota.conf
 
-  ## Verify: use conf/ or conf.d/?
+  ## PigeonHole (not done yet):
+  if [ "${PIGEONHOLE_OPT}" = "YES" ]; then
 
-  ## Verify
-  cp -rf ${DA_PATH}/custombuild/configure/dovecot/conf ${DOVECOT_PATH}
+    # pigeonhole_install
+    ${PERL} -pi -e 's#transport = virtual_localdelivery#transport = dovecot_lmtp_udp#' ${EXIM_CONF}
 
-  echo "mail_plugins = \$mail_plugins quota" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
+    cp -f "${DOVECOT_CONF_SIEVE}" ${DOVECOT_PATH}/conf.d/90-sieve.conf
+    echo "protocols = imap pop3 lmtp sieve" > ${DOVECOT_PATH}/conf/protocols.conf
+    echo "mail_plugins = \$mail_plugins quota sieve" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
 
-  ## Todo: Replace `hostname` with $(hostname)
-  ${PERL} -pi -e "s|HOSTNAME|`hostname`|" ${DOVECOT_PATH}/conf/lmtp.conf
+  else
+    rm -f "${DOVECOT_PATH}/conf.d/90-sieve.conf"
+    echo "mail_plugins = \$mail_plugins quota" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
+  fi
 
-  ## ltmp log files (not done):
+  if [ -e ${DOVECOT_PATH}/conf/lmtp.conf ]; then
+    ${PERL} -pi -e "s|HOSTNAME|$(hostname)|" ${DOVECOT_PATH}/conf/lmtp.conf
+  fi
+
   touch /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
   chown root:wheel /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
   chmod 600 /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
 
-  ## Modifications (done):
-  ${PERL} -pi -e 's#transport = dovecot_lmtp_udp#transport = virtual_localdelivery#' ${EXIM_CONF}
+  #${PERL} -pi -e 's#transport = dovecot_lmtp_udp#transport = virtual_localdelivery#' ${EXIM_CONF}
   ${PERL} -pi -e 's/driver = shadow/driver = passwd/' ${DOVECOT_CONF}
   ${PERL} -pi -e 's/passdb shadow/passdb passwd/' ${DOVECOT_CONF}
 
@@ -1393,27 +1481,100 @@ dovecot_install() {
 
   ## Check for IPV6 compatibility:
   if [ "${IPV6_ENABLED}" = "1" ]; then
-    ${PERL} -pi -e 's|^listen = \*$|#listen = \*|' ${DOVECOT_PATH}/dovecot.conf
-    ${PERL} -pi -e 's|^#listen = \*, ::$|listen = \*, ::|' ${DOVECOT_PATH}/dovecot.conf
+    ${PERL} -pi -e 's|^listen = \*$|#listen = \*|' ${DOVECOT_PATH}/conf/ip.conf
+    ${PERL} -pi -e 's|^#listen = \*, ::$|listen = \*, ::|' ${DOVECOT_PATH}/conf/ip.conf
   else
-    ${PERL} -pi -e 's|^#listen = \*$|listen = \*|' ${DOVECOT_PATH}/dovecot.conf
-    ${PERL} -pi -e 's|^listen = \*, ::$|#listen = \*, ::|' ${DOVECOT_PATH}/dovecot.conf
+    ${PERL} -pi -e 's|^#listen = \*$|listen = \*|' ${DOVECOT_PATH}/conf/ip.conf
+    ${PERL} -pi -e 's|^listen = \*, ::$|#listen = \*, ::|' ${DOVECOT_PATH}/conf/ip.conf
   fi
 
-  echo "listen = *, ::" > /usr/local/etc/dovecot/conf/ip.conf
+  #echo "listen = *, ::" > ${DOVECOT_PATH}/conf/ip.conf
+
+  ##
+  ## Todo: Add custom configuration file handling here
+  ##
+
+  ## Update conf/ssl.conf with appropriate SSL certificates:
+  if [ "${OPT_PREFER_APACHE_SSL_CERTS}" = "YES" ]; then
+    ## using existing Apache certs:
+    echo "ssl_cert = <${APACHE_SSL_CRT}" > "${DOVECOT_PATH}/conf/ssl.conf"
+    echo "ssl_key = <${APACHE_SSL_KEY}" >> "${DOVECOT_PATH}/conf/ssl.conf"
+  elif [ "${OPT_PREFER_EXIM_SSL_CERTS}" = "YES" ]; then
+    ## or using existing Exim certs:
+    echo "ssl_cert = <${EXIM_SSL_CRT}" > "${DOVECOT_PATH}/conf/ssl.conf"
+    echo "ssl_key = <${EXIM_SSL_KEY}" >> "${DOVECOT_PATH}/conf/ssl.conf"
+  elif [ "${OPT_PREFER_CUSTOM_SSL_CERTS}" = "YES" ]; then
+    ## or using your own custom certs:
+    echo "ssl_cert = <${SSL_CUSTOM_CRT}" > "${DOVECOT_PATH}/conf/ssl.conf"
+    echo "ssl_key = <${SSL_CUSTOM_KEY}" >> "${DOVECOT_PATH}/conf/ssl.conf"
+  else
+    ## (not done) Create self-signed certs just for Dovecot:
+    echo "ssl_cert = <${DOVECOT_SSL_CRT}" > "${DOVECOT_PATH}/conf/ssl.conf"
+    echo "ssl_key = <${DOVECOT_SSL_KEY}" >> "${DOVECOT_PATH}/conf/ssl.conf"
+  fi
+
+  echo "ssl_protocols = !SSLv2 !SSLv3" >> "${DOVECOT_PATH}/conf/ssl.conf"
+  echo "ssl_cipher_list = ALL:!ADH:RC4+RSA:+HIGH:+MEDIUM:-LOW:-SSLv2:-EXP" >> "${DOVECOT_PATH}/conf/ssl.conf"
+
+  ## verify_dovecot_logrotate
+  freebsd_set_newsyslog /var/log/dovecot-lmtp-errors.log root:wheel
+  freebsd_set_newsyslog /var/log/dovecot-lmtp.log root:wheel
 
   echo "Enabling Dovecot startup (upating /etc/rc.conf)"
   setVal dovecot_enable \"YES\" /etc/rc.conf
+
+  ${SERVICE} dovecot restart
 }
 
+## Dovecot Configuration
+dovecot_config() {
+  return;
+}
 ## Dovecot Upgrade
 dovecot_upgrade() {
+
   return;
 }
 
 ## Dovecot Uninstall
 dovecot_uninstall() {
   return;
+}
+
+################################################################################################################################
+
+## Webalizer Installation (incomplete)
+webalizer_install() {
+  if [ "${AWSTATS_OPT}" = "no" ]; then
+    setVal awstats 0 ${DA_CONF_TEMPLATE}
+    setVal awstats 0 ${DA_CONF}
+  else
+    setVal awstats 1 ${DA_CONF_TEMPLATE}
+    setVal awstats 1 ${DA_CONF}
+  fi
+
+  doRestartDA
+
+  if [ -e /etc/webalizer.conf ]; then
+    mv -f /etc/webalizer.conf /etc/webalizer.conf.moved 2> /dev/null > /dev/null
+  fi
+}
+
+## AwStats Installation (incomplete)
+awstats_install() {
+
+  #setup the directadmin.conf
+  setVal awstats 1 ${DA_CONF_TEMPLATE}
+  setVal awstats 1 ${DA_CONF}
+  if [ "${WEBALIZER_OPT}" = "no" ]; then
+    setVal webalizer 0 ${DA_CONF_TEMPLATE}
+    setVal webalizer 0 ${DA_CONF}
+  else
+    setVal webalizer 1 ${DA_CONF_TEMPLATE}
+    setVal webalizer 1 ${DA_CONF}
+  fi
+
+  doRestartDA
 }
 
 ################################################################################################################################
@@ -1502,13 +1663,16 @@ get_sql_settings() {
 
 ################################################################################################################################
 
-
 ## SQL Post-Installation Tasks
 sql_post_install() {
 
   ## Remove /etc/my.cnf if it exists (not compliant with hier)
   if [ -e /etc/my.cnf ]; then
-    mv /etc/my.cnf /etc/my.cnf.disabled
+    # if [ ! -e ${MYSQL_CNF} ]
+    #   mv /etc/my.cnf ${MYSQL_CNF}
+    # else
+      mv /etc/my.cnf /etc/my.cnf.disabled
+    # fi
   fi
 
   ## Secure Installation (replace it with scripted method below)
@@ -1553,14 +1717,20 @@ sql_post_install() {
   chown diradmin:diradmin ${DA_MYSQL_CONF}
   chmod 400 ${DA_MYSQL_CONF}
 
-  ## Create and update `/usr/local/etc/my.cnf`:
-  if [ ! -e /usr/local/etc/my.cnf ]; then
-    if [ "${DEFAULT_MY_CNF}" = "" ]; then
-      touch /usr/local/etc/my.cnf
-      echo "[mysqld]" > /usr/local/etc/my.cnf
-      echo "local-infile=0" >> /usr/local/etc/my.cnf
-      echo "innodb_file_per_table" >> /usr/local/etc/my.cnf
-    fi
+  ## Defaults: /usr/local/share/mysql/*.cnf
+  if [ ! -e "${MYSQL_CNF}" ]; then
+    case ${DEFAULT_MY_CNF} in
+      my-huge.cnf|my-medium.cnf|my-innodb-heavy-4G.cnf|my-small.cnf|my-large.cnf) cp /usr/local/share/mysql/${DEFAULT_MY_CNF} "${MYSQL_CNF}" ;;
+      my-huge|my-medium|my-innodb-heavy-4G|my-small|my-large) cp /usr/local/share/mysql/${DEFAULT_MY_CNF}.cnf "${MYSQL_CNF}" ;;
+      custom) cp -f ${CUSTOM_MYSQL_CNF} "${MYSQL_CNF}" ;;
+      *)
+        touch ${MYSQL_CNF}
+        echo "[mysqld]" > ${MYSQL_CNF}
+        echo "local-infile=0" >> ${MYSQL_CNF}
+        echo "innodb_file_per_table" >> ${MYSQL_CNF}
+        ;;
+    esac
+    chown root:wheel ${MYSQL_CNF}
   fi
 
   ## Symlink the MySQL/MariaDB binaries for compat:
@@ -1579,22 +1749,44 @@ sql_post_install() {
 }
 
 
-
-
 ################################################################################################################################
 
-## PHP Post-Installation Tasks
-php_post_install() {
+## PHP Installation Tasks
+php_install() {
 
-  # make -C /usr/ports/lang/php${PHP1_VERSION} config
-#  cd "/usr/ports/lang/php${PHP1_VERSION}" || exit
+  case ${PHP1_VERSION} in
+    55) PORT_PHP="${PORT_PHP55}"
+        PORT_PHP_EXT="${PORT_PHP55_EXT}"
+        PHP_MAKE_OPTIONS_SET="${PHP55_MAKE_OPTIONS_SET}"
+        PHP_MAKE_OPTIONS_UNSET="${PHP55_MAKE_OPTIONS_UNSET}"
+        PHP_EXT_MAKE_OPTIONS_SET="${PHP55_EXT_MAKE_OPTIONS_SET}"
+        PHP_EXT_MAKE_OPTIONS_UNSET="${PHP55_EXT_MAKE_OPTIONS_UNSET}"
+        ;;
+    56) PORT_PHP="${PORT_PHP55}"
+        PORT_PHP_EXT="${PORT_PHP56_EXT}"
+        PHP_MAKE_OPTIONS_SET="${PHP56_MAKE_OPTIONS_SET}"
+        PHP_MAKE_OPTIONS_UNSET="${PHP56_MAKE_OPTIONS_SET}"
+        PHP_EXT_MAKE_OPTIONS_SET="${PHP56_EXT_MAKE_OPTIONS_SET}"
+        PHP_EXT_MAKE_OPTIONS_UNSET="${PHP56_EXT_MAKE_OPTIONS_UNSET}"
+        ;;
+    70) PORT_PHP="${PORT_PHP55}"
+        PORT_PHP_EXT="${PORT_PHP70_EXT}"
+        PHP_MAKE_OPTIONS_SET="${PHP70_MAKE_OPTIONS_SET}"
+        PHP_MAKE_OPTIONS_UNSET="${PHP70_MAKE_OPTIONS_SET}"
+        PHP_EXT_MAKE_OPTIONS_SET="${PHP70_EXT_MAKE_OPTIONS_SET}"
+        PHP_EXT_MAKE_OPTIONS_UNSET="${PHP70_EXT_MAKE_OPTIONS_UNSET}"
+        ;;
+    *) ;;
+  esac
+
   make -C "${PORT_PHP}" rmconfig
-  make -C "${PORT_PHP}" config OPTIONS_SET="${PHP_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${PHP_MAKE_OPTIONS_UNSET}"
-  make -C "${PORT_PHP}" install clean
-
+  make -C "${PORT_PHP}" config OPTIONS_SET="${PHP_MAKE_OPTIONS_SET} ${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${PHP_MAKE_OPTIONS_UNSET} ${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_PHP_EXT}" config OPTIONS_SET="${PHP_EXT_MAKE_OPTIONS_SET} ${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${PHP_EXT_MAKE_OPTIONS_UNSET} ${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_PHP}" reinstall clean
+  # make -C "${PORT_PHP_EXT}" reinstall clean
 
   ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
-  #cp -f /usr/local/directadmin/custombuild/configure/fpm/conf/php-fpm.conf.56 /usr/local/etc/php-fpm.conf
+  cp -f "${PB_PATH}/configure/fpm/conf/php-fpm.conf.${PHP1_VERSION}" /usr/local/etc/php-fpm.conf
 
   if [ "${PHP_INI_TYPE}" = "production" ]; then
     cp -f /usr/local/etc/php.ini-production /usr/local/etc/php.ini
@@ -1699,9 +1891,8 @@ phpmyadmin_install() {
 
   ### Main Installation
   make -C "${PORT_PHPMYADMIN}" rmconfig
-  make -C "${PORT_PHPMYADMIN}" config OPTIONS_SET="${PMA_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${PMA_MAKE_OPTIONS_UNSET}"
-  make -C "${PORT_PHPMYADMIN}" install clean
-
+  make -C "${PORT_PHPMYADMIN}" config OPTIONS_SET="${PMA_MAKE_OPTIONS_SET} ${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${PMA_MAKE_OPTIONS_UNSET} ${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_PHPMYADMIN}" reinstall clean
 
   ### Post-Installation Tasks
 
@@ -1715,8 +1906,8 @@ phpmyadmin_install() {
   # </Directory>
 
   ## Custom config from cb2/custom directory (if present):
-  CUSTOM_PMA_CONFIG="${CB_PATH}/custom/phpmyadmin/config.inc.php"
-  CUSTOM_PMA_THEMES="${CB_PATH}/custom/phpmyadmin/themes"
+  CUSTOM_PMA_CONFIG="${PB_PATH}/custom/phpmyadmin/config.inc.php"
+  CUSTOM_PMA_THEMES="${PB_PATH}/custom/phpmyadmin/themes"
 
   ##REALPATH=${WWWDIR}/phpMyAdmin-${PHPMYADMIN_VER}
   #REALPATH=${WWW_DIR}/phpMyAdmin
@@ -1784,11 +1975,11 @@ phpmyadmin_install() {
   ## Auth log patch for BFM compat (not done):
   ## Currently outputs to /var/log/auth.log
   if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    ${WGET} "${WGET_CONNECT_OPTIONS}" -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+    ${wget_with_options} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
   fi
 
   if [ -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    echo "Patching phpMyAdmin to log failed authentications for BFM"
+    echo "Patching phpMyAdmin for BFM to log failed authentications"
     cd ${PMA_PATH} || exit
     patch -p0 < "${PB_DIR}/patches/pma_auth_logging.patch"
   fi
@@ -1809,81 +2000,86 @@ apache_install() {
 
   ### Main Installation
   make -C "${PORT_APACHE24}" rmconfig
-  make -C "${PORT_APACHE24}" config OPTIONS_SET="${APACHE24_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${APACHE24_MAKE_OPTIONS_UNSET}"
-  make -C "${PORT_APACHE24}" install clean
-
+  make -C "${PORT_APACHE24}" config OPTIONS_SET="${APACHE24_MAKE_OPTIONS_SET} ${GLOBAL_MAKE_OPTIONS_SET} " OPTIONS_UNSET="${APACHE24_MAKE_OPTIONS_UNSET} ${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_APACHE24}" reinstall clean
+  # USERS=${APACHE_USER} GROUPS=${APACHE_GROUP}
 
   ### Post-Installation Tasks
 
   ## Symlink for backwards compatibility:
+  ## 2016-03-05: no longer needed?
   mkdir -p /etc/httpd/conf
-  ln -s ${APACHE_DIR} /etc/httpd/conf
+  ln -s ${APACHE_PATH} /etc/httpd/conf
 
-  ## CustomBuild2 looking for Apache modules in /usr/lib/apache*
+  ## CustomBuild2 looking for Apache modules in ${APACHE_LIB_PATH}*
   ## Symlink for backcomp (done):
-
-  mkdir -p /usr/lib/apache
-  ln -s /usr/local/libexec/apache24 /usr/lib/apache
+  ## 2016-03-05: no longer needed?
+  # mkdir -p ${APACHE_LIB_PATH}
+  # ln -s /usr/local/libexec/apache24 ${APACHE_LIB_PATH}
 
   ## Since DirectAdmin/CB2 reference /var/www/html often, we'll symlink for compat:
   mkdir -p /var/www
   ln -s ${WWW_DIR} /var/www/html
   chown -h ${WEBAPPS_USER}:${WEBAPPS_GROUP} /var/www/html
 
-  ## CustomBuild2 reference /etc/httpd/conf/ssl
-  ## Create empty files for CB2 to generate
+  mkdir -p ${APACHE_PATH}/ssl
 
-  ## Symlink SSL directories for compat:
-  mkdir -p /etc/httpd/conf/ssl.crt
-  mkdir -p /etc/httpd/conf/ssl.key
-  mkdir -p ${APACHE_DIR}/ssl
+  # touch /etc/httpd/conf/ssl.crt/server.crt
+  # touch /etc/httpd/conf/ssl.key/server.key
 
-  #touch /etc/httpd/conf/ssl.crt/server.crt
-  #touch /etc/httpd/conf/ssl.key/server.key
+  # touch ${APACHE_DIR}/ssl/server.crt
+  # touch ${APACHE_DIR}/ssl/server.key
 
-  touch ${APACHE_DIR}/ssl/server.crt
-  touch ${APACHE_DIR}/ssl/server.key
-
-  ln -s ${APACHE_DIR}/ssl/server.crt /etc/httpd/conf/ssl.crt/server.crt
-  ln -s ${APACHE_DIR}/ssl/server.ca /etc/httpd/conf/ssl.crt/server.ca
-  ln -s ${APACHE_DIR}/ssl/server.key /etc/httpd/conf/ssl.key/server.key
-
-  ln -s ${APACHE_DIR}/ssl/server.crt ${APACHE_DIR}/ssl.crt/server.crt
-  ln -s ${APACHE_DIR}/ssl/server.ca ${APACHE_DIR}/ssl.crt/server.ca
-  ln -s ${APACHE_DIR}/ssl/server.key ${APACHE_DIR}/ssl.key/server.key
-
-  ## Also check for /usr/local/bin/openssl (security/openssl port):
-  /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout ${APACHE_DIR}/ssl/server.key -out ${APACHE_DIR}/ssl/server.crt -days 9999 -nodes -config ${CB_PATH}/custom/ap2/cert_config.txt
+  if [ -x /usr/local/bin/openssl ]; then
+    /usr/local/bin/openssl req -x509 -newkey rsa:2048 -keyout ${APACHE_SSL_KEY} -out ${APACHE_SSL_CRT} -days 9999 -nodes -config ${PB_PATH}/custom/ap2/cert_config.txt
+  else
+    /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout ${APACHE_SSL_KEY} -out ${APACHE_SSL_CRT} -days 9999 -nodes -config ${PB_PATH}/custom/ap2/cert_config.txt
+  fi
 
   ## Set permissions:
-  chmod 600 ${APACHE_DIR}/ssl/server.crt
-  chmod 600 ${APACHE_DIR}/ssl/server.key
+  chmod 600 ${APACHE_PATH}/ssl/server.crt
+  chmod 600 ${APACHE_PATH}/ssl/server.key
+
+  ## Create & symlink SSL directories for CB2 compat
+  ## 2016-03-05: no longer needed?
+  mkdir -p /etc/httpd/conf/ssl.crt
+  mkdir -p /etc/httpd/conf/ssl.key
+
+  ln -s ${APACHE_SSL_CRT} /etc/httpd/conf/ssl.crt/server.crt
+  ln -s ${APACHE_SSL_KEY} /etc/httpd/conf/ssl.key/server.key
+  ln -s ${APACHE_SSL_CA} /etc/httpd/conf/ssl.crt/server.ca
+
+  ln -s ${APACHE_SSL_CRT} ${APACHE_PATH}/ssl.crt/server.crt
+  ln -s ${APACHE_SSL_KEY} ${APACHE_PATH}/ssl.key/server.key
+  ln -s ${APACHE_SSL_CA} ${APACHE_PATH}/ssl.crt/server.ca
+
 
   ## Symlink for DA compat:
   ln -s /usr/local/sbin/httpd /usr/sbin/httpd
 
   ## Copy over modified (custom) CB2 conf files to conf/:
-  cp -rf ${DA_PATH}/custombuild/custom/ap2/conf/ ${APACHE_DIR}/
-  cp -f ${DA_PATH}/custombuild/custom/ap2/conf/httpd.conf ${APACHE_DIR}/
-  cp -f ${DA_PATH}/custombuild/custom/ap2/conf/extra/httpd-mpm.conf ${APACHE_DIR}/extra/httpd-mpm.conf
+  cp -rf ${PB_PATH}/custom/ap2/conf/ ${APACHE_PATH}/
+  cp -f ${PB_PATH}/custom/ap2/conf/httpd.conf ${APACHE_PATH}/
+  cp -f ${PB_PATH}/custom/ap2/conf/extra/httpd-mpm.conf ${APACHE_EXTRA_PATH}/httpd-mpm.conf
 
   ## Already done (default):
-  ${PERL} -pi -e 's/^DefaultType/#DefaultType/' ${APACHE_DIR}/httpd.conf
-  chmod 710 ${APACHE_DIR}
+  ${PERL} -pi -e 's/^DefaultType/#DefaultType/' ${APACHE_PATH}/httpd.conf
 
-  ## Update directadmin.conf with new SSL paths
-  # setVal apacheconf /usr/local/etc/apache24/httpd.conf
-  # setVal apacheips /usr/local/etc/apache24/ips.conf
-  # setVal apachemimetypes /usr/local/etc/apache24/mime.types
-  # setVal apachecert /usr/local/etc/apache24/ssl/server.crt
-  # setVal apachekey /usr/local/etc/apache24/ssl/server.key
-  # setVal apacheca /usr/local/etc/apache24/ssl/server.ca
+  chmod 710 ${APACHE_PATH}
+
+  ## Update directadmin.conf with new paths:
+  setVal apacheconf ${APACHE_PATH}/httpd.conf ${DA_CONF}
+  setVal apacheips ${APACHE_PATH}/ips.conf ${DA_CONF}
+  setVal apachemimetypes ${APACHE_PATH}/mime.types ${DA_CONF}
+  setVal apachecert ${APACHE_SSL_CRT} ${DA_CONF}
+  setVal apachekey ${APACHE_SSL_KEY} ${DA_CONF}
+  setVal apacheca ${APACHE_SSL_CA} ${DA_CONF}
 
   ## Rewrite Apache 2.4 configuration files
-  ## Perhaps skip this? No need I think -sg
+  ## cd /usr/local/directadmin/custombuild
+  ## ./build rewrite_confs
 
-  ##cd /usr/local/directadmin/custombuild
-  ##./build rewrite_confs
+  apache_rewrite_confs
 
   ## Update /boot/loader.conf:
   setVal accf_http_load \"YES\" /boot/loader.conf
@@ -1902,7 +2098,7 @@ nginx_install() {
   ## Main Installation
   make -C "${PORT_NGINX}" rmconfig
   make -C "${PORT_NGINX}" config OPTIONS_SET="${NGINX_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${NGINX_MAKE_OPTIONS_UNSET}"
-  make -C "${PORT_NGINX}" install clean
+  make -C "${PORT_NGINX}" reinstall clean
 
   ## Nginx Pre-Installation Tasks
 
@@ -1942,11 +2138,55 @@ clamav_install() {
 
   ### Main Installation
   make -C "${PORT_CLAMAV}" rmconfig
-  make -C "${PORT_CLAMAV}" config OPTIONS_SET="${CLAMAV_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${CLAMAV_MAKE_OPTIONS_UNSET}"
-  make -C "${PORT_CLAMAV}" install clean
+  make -C "${PORT_CLAMAV}" config OPTIONS_SET="${CLAMAV_MAKE_OPTIONS_SET} ${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${CLAMAV_MAKE_OPTIONS_UNSET} ${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_CLAMAV}" reinstall clean
+
+  ## Verify:
+  if [ "${CLAMAV_EXIM_ENABLE}" = "YES" ]; then
+    wget ${WGET_CONNECT_OPTIONS} -O /usr/local/etc/exim.clamav.load.conf ${PB_MIRROR}/exim/exim.clamav.load.conf
+    wget ${WGET_CONNECT_OPTIONS} -O /usr/local/etc/exim.clamav.conf ${PB_MIRROR}/exim/exim.clamav.conf
+  fi
+
+  if [ "${CLAMD_CONF}" -eq 0 ]; then
+    if [ ! -s "${CLAMD_CONF}" ] && [ -s /usr/local/etc/clamd.conf.sample ]; then
+      cp -f /usr/local/etc/clamd.conf.sample "${CLAMD_CONF}"
+    fi
+
+    perl -pi -e 's|Example|#Example|' "${CLAMD_CONF}"
+    perl -pi -e 's|#PidFile /var/run/clamd.pid|PidFile /var/run/clamd/clamd.pid|' "${CLAMD_CONF}"
+    perl -pi -e 's|#TCPSocket 3310|TCPSocket 3310|' "${CLAMD_CONF}"
+    perl -pi -e 's|#TCPAddr 127.0.0.1|TCPAddr 127.0.0.1|' "${CLAMD_CONF}"
+    perl -pi -e 's|^LocalSocket|#LocalSocket|' "${CLAMD_CONF}"
+  fi
+
+  if [ "${FRESHCLAM_CONF}" -eq 0 ]; then
+    if [ ! -s "${FRESHCLAM_CONF}" ] && [ -s /usr/local/etc/freshclam.conf.sample ]; then
+      cp -f /usr/local/etc/freshclam.conf.sample "${FRESHCLAM_CONF}"
+    fi
+
+    perl -pi -e 's|Example|#Example|' "${FRESHCLAM_CONF}"
+    perl -pi -e 's|#LogSyslog yes|LogSyslog yes|' "${FRESHCLAM_CONF}"
+    perl -pi -e 's|#PidFile /var/run/freshclam.pid|PidFile /var/run/clamd/freshclam.pid|' "${FRESHCLAM_CONF}"
+    perl -pi -e 's|#Checks 24|#Checks 24|' "${FRESHCLAM_CONF}"
+    perl -pi -e 's|#NotifyClamd /path/to/clamd.conf|#NotifyClamd /etc/clamd.conf|' "${FRESHCLAM_CONF}"
+  fi
+
+  ## Verify:
+  if [ "${CLAMAV_EXIM_ENABLE}" = "YES" ]; then
+    perl -pi -e 's|#.include_if_exists /usr/local/etc/exim.clamav.load.conf|.include_if_exists /etc/exim.clamav.load.conf|' "${EXIM_CONF}"
+    perl -pi -e 's|#.include_if_exists /usr/local/etc/exim.clamav.conf|.include_if_exists /etc/exim.clamav.conf|' "${EXIM_CONF}"
+  fi
 
   setVal clamav_clamd_enable \"YES\" /etc/rc.conf
   setVal clamav_freshclam_enable \"YES\" /etc/rc.conf
+
+  ${SERVICE} clamav-clamd start
+  ${SERVICE} clamav-freshclam start
+
+  if [ "${CLAMAV_EXIM_ENABLE}" = "YES" ]; then
+    echo "Restarting Exim"
+    ${SERVICE} exim restart
+  fi
 
   return;
 }
@@ -1958,8 +2198,8 @@ roundcube_install() {
 
   ### Main Installation
   make -C "${PORT_ROUNDCUBE}" rmconfig
-  make -C "${PORT_ROUNDCUBE}" config OPTIONS_SET="${ROUNDCUBE_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${ROUNDCUBE_MAKE_OPTIONS_UNSET}"
-  make -C "${PORT_ROUNDCUBE}" install clean
+  make -C "${PORT_ROUNDCUBE}" config OPTIONS_SET="${ROUNDCUBE_MAKE_OPTIONS_SET} ${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${ROUNDCUBE_MAKE_OPTIONS_UNSET} ${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORT_ROUNDCUBE}" reinstall clean
 
   ### Post-Installation Tasks
 
@@ -2155,7 +2395,7 @@ roundcube_install() {
 
       ## mime.types
       if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
-        #if [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "litespeed" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+        #if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "litespeed" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
           if [ -s ${APACHE_MIME_TYPES} ]; then
             if grep -m1 -q 'application/java-archive' ${APACHE_MIME_TYPES}; then
               cp -f ${APACHE_MIME_TYPES} ${ROUNDCUBE_PATH}/config/mime.types
@@ -2240,7 +2480,7 @@ roundcube_install() {
   fi
 
   #systems with "system()" in disable_functions need to use no php.ini:
-  if [ "`have_php_system`" = "0" ]; then
+  if [ "$(have_php_system)" = "0" ]; then
     ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' "${ROUNDCUBE_PATH}/bin/update.sh"
   fi
 
@@ -2422,21 +2662,21 @@ verify_webapps_tmp() {
 
 ## Apache Host Configuration (copied from CB2)
 #do_ApacheHostConf() {
-rewrite_apache_conf() {
+apache_rewrite_confs() {
 
-  if [ "${OPT_APACHE_ENABLE}" = "YES" ]; then
+  if [ "${WEBSERVER}" = "apache" ]; then
 
-    APACHE_HOST_CONF=${APACHE_PATH}/extra/httpd-hostname.conf
+    APACHE_HOST_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
 
     ## Set this for now since PB only supports 1 instance of PHP.
     #PHP1_MODE_OPT="php-fpm"
     #PHP1_MODE="FPM"
-    PHP1_VERSION="56"
+    #PHP1_VERSION="56"
 
     ## Copy custom/ file
     ## APACHE_HOST_CONF_CUSTOM
-    if [ -e "${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf" ]; then
-      cp -pf "${WORKDIR}/custom/ap2/conf/extra/httpd-hostname.conf" ${APACHE_HOST_CONF}
+    if [ -e "${PB_PATH}/custom/ap2/conf/extra/httpd-hostname.conf" ]; then
+      cp -pf "${PB_PATH}/custom/ap2/conf/extra/httpd-hostname.conf" ${APACHE_HOST_CONF}
     else
       echo '' > ${APACHE_HOST_CONF}
 
@@ -2483,7 +2723,7 @@ rewrite_apache_conf() {
         SUEXEC_PER_DIR=$(/usr/local/sbin/suexec -V 2>&1 | grep -c 'AP_PER_DIR')
       fi
 
-      # if [ "${PHP1_MODE_OPT}" = "fastcgi" ]; then
+      # if [ "${PHP1_MODE}" = "fastcgi" ]; then
       #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
       #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP1_VERSION}.sh .php" >> ${APACHE_HOST_CONF}
       #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
@@ -2496,7 +2736,7 @@ rewrite_apache_conf() {
       #   echo '  </IfModule>' >> ${APACHE_HOST_CONF}
       # fi
 
-      # if [ "${PHP2_MODE_OPT}" = "fastcgi" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+      # if [ "${PHP2_MODE}" = "fastcgi" ] && [ "${PHP2_RELEASE}" != "no" ]; then
       #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
       #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP2_SHORTRELEASE}.sh .php${PHP2_SHORTRELEASE}" >> ${APACHE_HOST_CONF}
       #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
@@ -2518,166 +2758,164 @@ rewrite_apache_conf() {
 
 ## Rewrite Confs (copied from CB2)
 rewrite_confs() {
-  if [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
-    # if [ ! -e httpd-${APACHE2_VER}.tar.gz ]; then
-    #   echo "File httpd-${APACHE2_VER}.tar.gz does not exist. Cannot rewrite configs"
-    # else
-    #   tar xzf httpd-${APACHE2_VER}.tar.gz --no-same-owner
-    # fi
 
-    # if [ ! -d httpd-${APACHE2_VER} ]; then
-    #   echo "Directory httpd-${APACHE2_VER} does not exist. Cannot rewrite configs"
-    # fi
-
-    ## PB:
-    # HTTPDCONF=${}
-    # HTTPDDIR=${}
+  if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
 
     # Copy the new configs
-    cp -rf "${APCONFDIR}" "${HTTPDDIR}"
-    cp -f "${APCONFDIR}/httpd.conf" "${HTTPD_CONF}"
-    cp -f "${APCONFDIR}/extra/httpd-mpm.conf" "${HTTPDCONF}/extra/httpd-mpm.conf"
+    cp -rf "${PB_PATH}/configure/ap2/" "${APACHE_PATH}"
+    cp -f "${PB_PATH}/configure/ap2/httpd.conf" "${APACHE_CONF}"
+    cp -f "${PB_PATH}/configure/ap2/extra/httpd-mpm.conf" "${APACHE_EXTRA_PATH}/httpd-mpm.conf"
 
-    ${PERL} -pi -e 's/^DefaultType/#DefaultType/' "${HTTPD_CONF}"
+    ${PERL} -pi -e 's/^DefaultType/#DefaultType/' "${APACHE_CONF}"
 
-    HDC=httpd-directories-old.conf
+    HDC=${APACHE_EXTRA_PATH}/httpd-directories-old.conf
 
-    ln -sf $HDC "${HTTPDCONF}/extra/httpd-directories.conf"
+    ln -sf $HDC "${APACHE_EXTRA_PATH}/httpd-directories.conf"
 
-    doApacheHostConf
+    apache_rewrite_confs
 
+    ## Custom configurations
     if [ "${APCUSTOMCONFDIR}" != "0" ]; then
-      cp -rf "${APCUSTOMCONFDIR}" "${HTTPDDIR}"
+      cp -rf "${APCUSTOMCONFDIR}" "${APACHE_PATH}"
     fi
 
-    chmod 710 "${HTTPDDIR}/conf"
+    chmod 710 "${APACHE_EXTRA_PATH}"
 
-    #swap the |WEBAPPS_PHP_RELEASE| token.
-    if [ "${PHP1_MODE_OPT}" = "php-fpm" ] || [ "${PHP2_MODE_OPT}" = "php-fpm" ]; then
+    ## Swap the |WEBAPPS_PHP_RELEASE| token.
+    if [ "${PHP1_MODE}" = "FPM" ] || [ "${PHP2_MODE}" = "FPM" ]; then
       PHPV=""
-      if [ "${PHP1_MODE_OPT}" = "php-fpm" ]; then
-        PHPV=$(${PERL} -e "print ${PHP1_RELEASE_OPT} * 10")
-      elif [ "${PHP2_RELEASE_OPT}" != "no" ]; then
-        PHPV=$(${PERL} -e "print ${PHP2_RELEASE_OPT} * 10")
+
+      if [ "${PHP1_MODE}" = "FPM" ]; then
+        PHPV=$(${PERL} -e "print ${PHP1_VERSION}")
+      elif [ "${PHP2_VERSION}" != "" ]; then
+        PHPV=$(${PERL} -e "print ${PHP2_VERSION}")
       fi
 
       if [ "${PHPV}" != "" ]; then
-        ${PERL} -pi -e "s/\|WEBAPPS_PHP_RELEASE\|/${PHPV}/" "${HTTPDCONF}/extra/${HDC}"
+        ${PERL} -pi -e "s/\|WEBAPPS_PHP_RELEASE\|/${PHPV}/" "${APACHE_EXTRA_PATH}/${HDC}"
       fi
     fi
 
-    ensure_server_ca
+    ## Todo:
+    verify_server_ca
 
-    #ensure we have the correct apache_ver
-    if [ "$(grep -m1 -c apache_ver=2.0 ${DACONF_TEMPLATE_FILE})" -eq "0" ]; then
-      echo "apache_ver=2.0" >> ${DACONF_TEMPLATE_FILE}
-    elif [ "$(grep -m1 -c apache_ver= ${DACONF_TEMPLATE_FILE})" -ne "0" ]; then
-      ${PERL} -pi -e 's/`grep apache_ver= ${DACONF_TEMPLATE_FILE}`/apache_ver=2.0/' ${DACONF_TEMPLATE_FILE}
-    fi
-    if [ "$(grep -m1 -c apache_ver=2.0 ${DACONF_FILE})" -eq "0" ]; then
-      echo "apache_ver=2.0" >> ${DACONF_FILE}
-      echo "action=rewrite&value=httpd" >> "${TASK_QUEUE}"
-    elif [ "$(grep -m1 -c apache_ver= ${DACONF_FILE})" -ne "0" ]; then
-      ${PERL} -pi -e 's/`grep apache_ver= ${DACONF_FILE}`/apache_ver=2.0/' ${DACONF_FILE}
-      echo "action=rewrite&value=httpd" >> "${TASK_QUEUE}"
+    # Verify we have the correct apache_ver
+    if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE})" -eq "0" ]; then
+      echo "apache_ver=2.0" >> ${DA_CONF_TEMPLATE}
+    elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_TEMPLATE})" -ne "0" ]; then
+      ${PERL} -pi -e 's/`grep apache_ver= ${DA_CONF_TEMPLATE}`/apache_ver=2.0/' ${DA_CONF_TEMPLATE}
     fi
 
+    if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF})" -eq "0" ]; then
+      echo "apache_ver=2.0" >> ${DA_CONF}
+      echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
+    elif [ "$(grep -m1 -c apache_ver= ${DA_CONF})" -ne "0" ]; then
+      ${PERL} -pi -e 's/`grep apache_ver= ${DA_CONF}`/apache_ver=2.0/' ${DA_CONF}
+      echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
+    fi
+
+    ## Todo:
     do_rewrite_httpd_alias
 
-    #rewrite ips.conf
-    echo "action=rewrite&value=ips" >> ${TASK_QUEUE}
+    ## Rewrite ips.conf
+    echo "action=rewrite&value=ips" >> "${DA_TASK_QUEUE}"
 
     run_dataskq
 
-    #tokenize the IP and ports
+    # CB2: Tokenize the IP and ports
     tokenize_IP
     tokenize_ports
 
-    #add all the Include lines if they do not exist
-    if [ "$(grep -m1 -c 'Include' "${HTTPDCONF}/extra/directadmin-vhosts.conf")" = "0" ] || [ ! -e "${HTTPDCONF}/extra/directadmin-vhosts.conf" ]; then
+    ## Add all the Include lines if they do not exist
+    if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf")" = "0" ] || [ ! -e "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf" ]; then
       doVhosts
       cd "${CWD}/httpd-${APACHE2_VER}" || exit
     fi
 
-    if [ ! -d /etc/httpd/conf/ssl.key ] || [ ! -d /etc/httpd/conf/ssl.crt ]; then
-      cd "${WORKDIR}" || exit
-      mkdir -p /etc/httpd/conf/ssl.key
-      mkdir -p /etc/httpd/conf/ssl.crt
-      #install the cert/key
-      /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout /etc/httpd/conf/ssl.key/server.key -out /etc/httpd/conf/ssl.crt/server.crt -days 9999 -nodes -config ./${APCERTCONF}
 
-      chmod 600 "${HTTPDCONF}/ssl.crt/server.crt"
-      chmod 600 "${HTTPDCONF}/ssl.key/server.key"
-      cd "${CWD}" || exit
+    if [ ! -e "${APACHE_SSL_KEY}" ] || [ ! -e "${APACHE_SSL_CRT}" ]; then
+      ## Generate the SSL certificate and key:
+      if [ -x /usr/local/bin/openssl ]; then
+        /usr/local/bin/openssl req -x509 -newkey rsa:2048 -keyout ${APACHE_SSL_KEY} -out ${APACHE_SSL_CRT} -days 9999 -nodes -config ${PB_PATH}/configure/ap2/cert_config.txt
+      else
+        /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout ${APACHE_SSL_KEY} -out ${APACHE_SSL_CRT} -days 9999 -nodes -config ${PB_PATH}/configure/ap2/cert_config.txt
+      fi
+
+      ## /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout "${APACHE_SSL_KEY}" -out "${APACHE_SSL_CRT}" -days 9999 -nodes -config ./${APCERTCONF}
+
+      chmod 600 "${APACHE_SSL_CRT}"
+      chmod 600 "${APACHE_SSL_KEY}"
     fi
 
+    ## Todo:
     doApacheCheck
 
-    rm -rf "${CWD}/httpd-${APACHE2_VER}"
+    PHPMODULES=${APACHE_EXTRA_PATH}/httpd-phpmodules.conf
 
-    cd ${CWD} || exit
-
-    PHPMODULES=${HTTPDCONF}/extra/httpd-phpmodules.conf
-
-    echo -n "" > "${HTTPDCONF}/extra/httpd-nginx.conf"
+    echo -n "" > "${APACHE_EXTRA_PATH}/httpd-nginx.conf"
 
     echo -n "" > "${PHPMODULES}"
 
     if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
-      ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' "${HTTPD_CONF}"
-      echo "LoadModule  suphp_module    /usr/lib/apache/mod_suphp.so" >> "${PHPMODULES}"
+      ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' "${APACHE_CONF}"
+      echo "LoadModule  suphp_module    ${APACHE_LIB_PATH}/mod_suphp.so" >> "${PHPMODULES}"
     fi
 
-    if [ "${MODSECURITY_OPT}" = "yes" ] && [ "${WEBSERVER_OPT}" = "apache" ]; then
-      ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' "${HTTPD_CONF}"
-      echo "Include /etc/httpd/conf/extra/httpd-modsecurity.conf" >> "${PHPMODULES}"
-      cp -pf "${MODSECURITY_APACHE_INCLUDE}" /etc/httpd/conf/extra/httpd-modsecurity.conf
+    ## mod_security (not done):
+    if [ "${MODSECURITY_ENABLE}" = "yes" ] && [ "${WEBSERVER}" = "apache" ]; then
+      ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' "${APACHE_CONF}"
+      echo "Include ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf" >> "${PHPMODULES}"
+      cp -pf "${MODSECURITY_APACHE_INCLUDE}" ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf
       doModSecurityRules norestart
     fi
 
+    ## HTScanner (not done):
     if [ "${HTSCANNER_OPT}" = "yes" ]; then
       if [ "${HAVE_FCGID}" = "yes" ] || [ "${HAVE_FPM_CGI}" = "yes" ] || [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
-        ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' "${HTTPD_CONF}"
-        echo "LoadModule  htscanner_module    /usr/lib/apache/mod_htscanner2.so" >> "${PHPMODULES}"
+        ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' "${APACHE_CONF}"
+        echo "LoadModule  htscanner_module    ${APACHE_LIB_PATH}/mod_htscanner2.so" >> "${PHPMODULES}"
       fi
     fi
 
-    if ! grep -m1 -q '/usr/lib/apache/mod_mpm_' "${PHPMODULES}"; then
+    ## Example: /usr/local/libexec/apache24/mod_mpm_event.so
+
+    ## Verfiy:
+    if ! grep -m1 -q "${APACHE_LIB_PATH}/mod_mpm_" "${PHPMODULES}"; then
       # Use event MPM for php-fpm and prefork for mod_php
-      if [ "${APACHE_MPM_OPT}" = "auto" ]; then
+      if [ "${APACHE_MPM}" = "AUTO" ]; then
         if [ "${HAVE_CLI}" = "no" ]; then
           # Add to httpd-phpmodules.conf
-          echo "LoadModule mpm_event_module /usr/lib/apache/mod_mpm_event.so" >> "${PHPMODULES}"
+          echo "LoadModule mpm_event_module ${APACHE_LIB_PATH}/mod_mpm_event.so" >> "${PHPMODULES}"
         else
           # Add to httpd-phpmodules.conf
-          echo "LoadModule mpm_prefork_module /usr/lib/apache/mod_mpm_prefork.so" >> "${PHPMODULES}"
+          echo "LoadModule mpm_prefork_module ${APACHE_LIB_PATH}/mod_mpm_prefork.so" >> "${PHPMODULES}"
         fi
-      elif [ "${APACHE_MPM_OPT}" = "event" ]; then
-        echo "LoadModule mpm_event_module /usr/lib/apache/mod_mpm_event.so" >> "${PHPMODULES}"
-      elif [ "${APACHE_MPM_OPT}" = "worker" ]; then
-        echo "LoadModule mpm_worker_module /usr/lib/apache/mod_mpm_worker.so" >> "${PHPMODULES}"
+      elif [ "${APACHE_MPM}" = "EVENT" ]; then
+        echo "LoadModule mpm_event_module ${APACHE_LIB_PATH}/mod_mpm_event.so" >> "${PHPMODULES}"
+      elif [ "${APACHE_MPM}" = "WORKER" ]; then
+        echo "LoadModule mpm_worker_module ${APACHE_LIB_PATH}/mod_mpm_worker.so" >> "${PHPMODULES}"
       else
-        echo "LoadModule mpm_prefork_module /usr/lib/apache/mod_mpm_prefork.so" >> "${PHPMODULES}"
+        echo "LoadModule mpm_prefork_module ${APACHE_LIB_PATH}/mod_mpm_prefork.so" >> "${PHPMODULES}"
       fi
     fi
 
-    # ${PERL} -pi -e 's/^LoadModule php4/\#LoadModule php4/' "${HTTPD_CONF}"
-    ${PERL} -pi -e 's/^LoadModule php5/\#LoadModule php5/' "${HTTPD_CONF}"
-    ${PERL} -pi -e 's/^LoadModule php7/\#LoadModule php7/' "${HTTPD_CONF}"
+    # ${PERL} -pi -e 's/^LoadModule php4/\#LoadModule php4/' "${APACHE_CONF}"
+    ${PERL} -pi -e 's/^LoadModule php5/\#LoadModule php5/' "${APACHE_CONF}"
+    ${PERL} -pi -e 's/^LoadModule php7/\#LoadModule php7/' "${APACHE_CONF}"
 
     # Add correct php module to httpd-phpmodules.conf
-    if [ "${PHP1_MODE_OPT}" = "mod_php" ]; then
-      if [ "${PHP1_RELEASE_OPT}" = "7.0" ]; then
-        echo "LoadModule  php7_module   /usr/lib/apache/libphp7.so" >> "${PHPMODULES}"
+    if [ "${PHP1_MODE}" = "MODPHP" ]; then
+      if [ "${PHP1_VERSION}" = "70" ]; then
+        echo "LoadModule  php7_module   ${APACHE_LIB_PATH}/libphp7.so" >> "${PHPMODULES}"
       else
-        echo "LoadModule  php5_module   /usr/lib/apache/libphp5.so" >> "${PHPMODULES}"
+        echo "LoadModule  php5_module   ${APACHE_LIB_PATH}/libphp5.so" >> "${PHPMODULES}"
       fi
     fi
-    if [ "${PHP2_MODE_OPT}" = "mod_php" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
-      if [ "${PHP2_RELEASE_OPT}" = "7.0" ]; then
-        echo "LoadModule    php7_module             /usr/lib/apache/libphp7.so" >> "${PHPMODULES}"
+    if [ "${PHP2_MODE}" = "mod_php" ] && [ "${PHP2_VERSION}" != "" ]; then
+      if [ "${PHP2_VERSION}" = "70" ]; then
+        echo "LoadModule    php7_module             ${APACHE_LIB_PATH}/libphp7.so" >> "${PHPMODULES}"
       else
-        echo "LoadModule    php5_module             /usr/lib/apache/libphp5.so" >> "${PHPMODULES}"
+        echo "LoadModule    php5_module             ${APACHE_LIB_PATH}/libphp5.so" >> "${PHPMODULES}"
       fi
     fi
 
@@ -2685,10 +2923,10 @@ rewrite_confs() {
     #   if [ -e ${PHPMODULES} ]; then
     #     if ! grep -m1 -c 'fcgid_module' ${PHPMODULES}; then
     #       ${PERL} -pi -e 's|^LoadModule  fcgid_module|#LoadModule  fcgid_module|' /etc/httpd/conf/httpd.conf
-    #       echo "LoadModule fcgid_module /usr/lib/apache/mod_fcgid.so" >> ${PHPMODULES}
+    #       echo "LoadModule fcgid_module ${APACHE_LIB_PATH}/mod_fcgid.so" >> ${PHPMODULES}
     #     fi
     #     if ! grep -m1 -c 'httpd-fcgid.conf' ${PHPMODULES}; then
-    #       echo "Include /etc/httpd/conf/extra/httpd-fcgid.conf" >> ${PHPMODULES}
+    #       echo "Include ${APACHE_EXTRA_PATH}/httpd-fcgid.conf" >> ${PHPMODULES}
     #     fi
     #   fi
 
@@ -2714,54 +2952,54 @@ rewrite_confs() {
     if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
       if [ -e "${PHPMODULES}" ]; then
         if ! grep -m1 -q 'suphp_module' "${PHPMODULES}"; then
-          echo "LoadModule  suphp_module    /usr/lib/apache/mod_suphp.so" >> "${PHPMODULES}"
+          echo "LoadModule  suphp_module    ${APACHE_LIB_PATH}/mod_suphp.so" >> "${PHPMODULES}"
         fi
       fi
     fi
 
     if [ "${NEWCONFIGS}" = "1" ]; then
-      ${PERL} -pi -e 's/^LoadModule mod_php/\#LoadModule mod_php/' "${HTTPD_CONF}"
-      ${PERL} -pi -e 's/^LoadModule php/\#LoadModule php/' "${HTTPD_CONF}"
-      ${PERL} -pi -e 's/^LoadModule suphp/\#LoadModule suphp/' "${HTTPD_CONF}"
+      ${PERL} -pi -e 's/^LoadModule mod_php/\#LoadModule mod_php/' "${APACHE_CONF}"
+      ${PERL} -pi -e 's/^LoadModule php/\#LoadModule php/' "${APACHE_CONF}"
+      ${PERL} -pi -e 's/^LoadModule suphp/\#LoadModule suphp/' "${APACHE_CONF}"
     fi
 
     WEBMAILLINK=$(get_webmail_link)
-    ${PERL} -pi -e "s#Alias /webmail \"/var/www/html/roundcube/\"#Alias /webmail \"/var/www/html/${WEBMAILLINK}/\"#" /etc/httpd/conf/extra/httpd-alias.conf
+    ${PERL} -pi -e "s#Alias /webmail \"/usr/local/www/roundcube/\"#Alias /webmail \"/usr/local/www/${WEBMAILLINK}/\"#" ${APACHE_EXTRA_PATH}/httpd-alias.conf
 
     doPhpConf
-    if [ "${CLOUDLINUX_OPT}" = "no" ] || [ "${PHP1_MODE_OPT}" != "lsphp" ]; then
+    # if [ "${CLOUDLINUX_OPT}" = "no" ] || [ "${PHP1_MODE_OPT}" != "lsphp" ]; then
       doModLsapi 0
-    fi
+    # fi
 
-    # Disable UserDir access if userdir_access=no is set in the options.conf file
+    ## Disable UserDir access if userdir_access=no is set in the options.conf file
     if [ "${USERDIR_ACCESS_OPT}" = "no" ]; then
-      ${PERL} -pi -e 's#UserDir public_html#UserDir disabled#' /etc/httpd/conf/extra/httpd-vhosts.conf
+      ${PERL} -pi -e 's#UserDir public_html#UserDir disabled#' ${APACHE_EXTRA_PATH}/httpd-vhosts.conf
     else
-      ${PERL} -pi -e 's#UserDir disabled#UserDir public_html#' /etc/httpd/conf/extra/httpd-vhosts.conf
+      ${PERL} -pi -e 's#UserDir disabled#UserDir public_html#' ${APACHE_EXTRA_PATH}/httpd-vhosts.conf
     fi
 
+    ## Todo:
     create_httpd_nginx
 
-    if [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
-      echo "Restarting apache."
-      control_service httpd restart
-    elif [ "${WEBSERVER_OPT}" = "litespeed" ]; then
-      echo "Restarting litespeed."
-      control_service litespeed restart
+    if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+      echo "Restarting Apache"
+      ${SERVICE} apachectl restart
     fi
   fi
 
-  if [ "${WEBSERVER_OPT}" = "nginx" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+  ## Nginx:
+
+  if [ "${WEBSERVER}" = "nginx" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
     #copy the new configs
-    cp -rf ${NGINXCONFDIR}/* "${NGINXCONF}"
+    cp -rf ${NGINXCONFDIR}/* "${NGINX_CONF}"
 
     for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
       ${PERL} -pi -e "s|/usr/local/php${php_shortrelease}/sockets/webapps.sock|/usr/local/php${PHP1_SHORTRELEASE}/sockets/webapps.sock|" ${NGINXCONF}/nginx.conf
     done
 
     do_rewrite_nginx_webapps
-    ensure_server_ca
-    ensure_dhparam "${NGINXCONF}/ssl.crt/dhparams.pem"
+    verify _server_ca
+    ensure_dhparam "${NGINX_CONF}/ssl.crt/dhparams.pem"
 
     if [ "${MODSECURITY_OPT}" = "yes" ]; then
       doModSecurityRules norestart
@@ -2830,7 +3068,7 @@ rewrite_confs() {
     service nginx restart
   fi
 
-  if [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+  if [ "${WEBSERVER}" = "nginx_apache" ]; then
     setVal nginx 0 ${DACONF_TEMPLATE_FILE}
     setVal nginx 0 ${DACONF_FILE}
     setVal nginx_proxy 1 ${DACONF_TEMPLATE_FILE}
@@ -2859,9 +3097,9 @@ run_dataskq() {
 
 ## Rewrite directadmin-vhosts.conf (copied from CB2: doVhosts)
 rewrite_vhosts() {
-  PATHNAME=${HTTPDCONF}/extra
+  PATHNAME=${APACHE_EXTRA_PATH}
 
-  if [ "${WEBSERVER_OPT}" = "nginx" ]; then
+  if [ "${WEBSERVER}" = "nginx" ]; then
     PATHNAME="${NGINXCONF}"
   fi
 
@@ -2869,24 +3107,264 @@ rewrite_vhosts() {
     mkdir -p "${PATHNAME}"
   fi
 
-  echo -n '' > ${PATHNAME}/directadmin-vhosts.conf
+  echo -n '' > ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf
 
-  if [ "${WEBSERVER_OPT}" = "nginx" ]; then
+  if [ "${WEBSERVER}" = "nginx" ]; then
     for i in $(ls /usr/local/directadmin/data/users/*/nginx.conf); do
-      echo "include $i;" >> ${PATHNAME}/directadmin-vhosts.conf
+      echo "include $i;" >> ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf
     done
-  elif [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "litespeed" ]; then
+  elif [ "${WEBSERVER}" = "apache" ]; then
     for i in $(ls /usr/local/directadmin/data/users/*/httpd.conf); do
-      echo "Include $i" >> ${PATHNAME}/directadmin-vhosts.conf
+      echo "Include $i" >> ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf
     done
-  elif [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+  elif [ "${WEBSERVER}" = "nginx_apache" ]; then
     echo -n '' > ${NGINXCONF}/directadmin-vhosts.conf
     for i in $(ls /usr/local/directadmin/data/users/*/nginx.conf); do
       echo "include $i;" >> "${NGINXCONF}/directadmin-vhosts.conf"
     done
     for i in $(ls /usr/local/directadmin/data/users/*/httpd.conf); do
-      echo "Include $i" >> "${PATHNAME}/directadmin-vhosts.conf"
+      echo "Include $i" >> "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf"
     done
+  fi
+}
+
+
+################################################################################################################################
+
+## Suhosin Installation
+suhosin_install() {
+  pkgi "${PORT_SUHOSIN}"
+
+  if [ ${PHP_SUHOSIN_UPLOADSCAN} = "YES" ] && [ ! -e /usr/local/bin/clamdscan ]; then
+    if [ "${CLAMAV_OPT}" = "no" ]; then
+      echo "Cannot install suhosin with PHP upload scan using ClamAV, because /usr/local/bin/clamdscan does not exist on the system and clamav=no is set in the options.conf file."
+      exit
+    fi
+
+    clamav_install
+  fi
+}
+
+################################################################################################################################
+
+## Tokenize the IP (copied from CB2)
+tokenize_IP() {
+  TOKENFILE_APACHE=${APACHE_EXTRA_PATH}/httpd-vhosts.conf
+
+  TOKENFILE_NGINX=${NGINXCONF}/nginx.conf
+  if [ -e ${TOKENFILE_NGINX} ]; then
+    if grep -q -m1 'nginx-vhosts\.conf' ${TOKENFILE_NGINX}; then
+      TOKENFILE_NGINX=${NGINXCONF}/nginx-vhosts.conf
+    fi
+  fi
+
+  TOKENFILE_NGINX_USERDIR=${NGINXCONF}/nginx-userdir.conf
+
+  HOSTNAME=$(hostname)
+  IP="$(grep -r -l -m1 '^status=server$' /usr/local/directadmin/data/admin/ips | cut -d/ -f8)"
+  if [ "${IP}" = "" ]; then
+    IP="$(grep -m1 ${HOSTNAME} /etc/hosts | awk '{print $1}')"
+    if [ "${IP}" = "" ]; then
+      echo "Unable to detect your server IP in /etc/hosts. Please enter it: "
+      read IP
+    fi
+  fi
+  if [ "${IP}" = "" ]; then
+    echo "Unable to detect your server IP. Exiting..."
+    do_exit 0
+  fi
+
+  if [ "$(echo ${IP} | grep -m1 -c ':')" -gt 0 ]; then
+    IP="[${IP}]"
+  fi
+
+  echo "Using $IP for your server IP"
+
+  LAN_IP=$(getDA_Opt lan_ip "")
+
+  if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "litespeed" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+    if [ -e ${TOKENFILE_APACHE} ]; then
+      if [ "$(grep -m1 -c '|IP|' ${TOKENFILE_APACHE})" -gt "0" ]; then
+        STR="perl -pi -e 's/\|IP\|/$IP/' ${TOKENFILE_APACHE}"
+        eval "${STR}"
+      fi
+    fi
+  fi
+
+  if [ "${WEBSERVER}" = "nginx" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+    if [ -e "${TOKENFILE_NGINX}" ]; then
+      if [ "$(grep -m1 -c '|IP|' ${TOKENFILE_NGINX})" -gt "0" ]; then
+        if [ "${LAN_IP}" != "" ]; then
+          echo "Using lan_ip=$LAN_IP as a secondary server IP";
+          STR="perl -pi -e 's/\|IP\|:\|PORT_80\|;/\|IP\|:\|PORT_80\|;\n\tlisten\t\t$LAN_IP:\|PORT_80\|;/' ${TOKENFILE_NGINX}"
+          eval "${STR}"
+
+          STR="perl -pi -e 's/\|IP\|:\|PORT_443\| ssl;/\|IP\|:\|PORT_443\| ssl;\n\tlisten\t\t$LAN_IP:\|PORT_443\| ssl;/' ${TOKENFILE_NGINX}"
+          eval "${STR}"
+        fi
+
+        echo "Using $IP for your server IP"
+        STR="perl -pi -e 's/\|IP\|/$IP/' ${TOKENFILE_NGINX}"
+        eval "${STR}"
+      fi
+    fi
+
+    if [ -e "${TOKENFILE_NGINX_USERDIR}" ]; then
+      if [ "$(grep -m1 -c '|IP|' ${TOKENFILE_NGINX_USERDIR})" -gt "0" ]; then
+        if [ "${LAN_IP}" != "" ]; then
+          STR="perl -pi -e 's/\|IP\|:\|PORT_80\|;/\|IP\|:\|PORT_80\|;\n\tlisten\t\t$LAN_IP:\|PORT_80\|;/' ${TOKENFILE_NGINX_USERDIR}"
+          eval "${STR}"
+
+          STR="perl -pi -e 's/\|IP\|:\|PORT_443\| ssl;/\|IP\|:\|PORT_443\| ssl;\n\tlisten\t\t$LAN_IP:\|PORT_443\| ssl;/' ${TOKENFILE_NGINX_USERDIR}"
+          eval "${STR}"
+        fi
+
+        STR="perl -pi -e 's/\|IP\|/$IP/' ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+    fi
+  fi
+}
+
+################################################################################################################################
+
+## Tokenize Ports (copied from CB2)
+tokenize_ports() {
+  TOKENFILE_APACHE="${APACHE_EXTRA_PATH}/httpd-vhosts.conf"
+
+  TOKENFILE_NGINX=${NGINXCONF}/nginx.conf
+  if [ -e "${TOKENFILE_NGINX}" ]; then
+    if grep -q -m1 'nginx-vhosts\.conf' "${TOKENFILE_NGINX}"; then
+      TOKENFILE_NGINX=${NGINXCONF}/nginx-vhosts.conf
+    fi
+  fi
+  TOKENFILE_NGINX_USERDIR=${NGINXCONF}/nginx-userdir.conf
+
+  if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "litespeed" ]; then
+    if [ -e ${TOKENFILE_APACHE} ]; then
+      if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_APACHE})" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_APACHE}"
+        eval "${STR}"
+      else
+        perl -pi -e "s/:${PORT_8080}\>/:${PORT_80}\>/" ${TOKENFILE_APACHE}
+        perl -pi -e "s/^Listen ${PORT_8080}$/Listen ${PORT_80}/" ${TOKENFILE_APACHE}
+      fi
+      if [ "$(grep -m1 -c '|PORT_443|' ${TOKENFILE_APACHE})" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_APACHE}"
+        eval "${STR}"
+      else
+        perl -pi -e "s/:${PORT_8081}\>/:${PORT_443}\>/" ${TOKENFILE_APACHE}
+        perl -pi -e "s/^Listen ${PORT_8081}$/Listen ${PORT_443}/" ${TOKENFILE_APACHE}
+      fi
+
+      SSLFILE=${APACHE_EXTRA_PATH}/httpd-ssl.conf
+      STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${SSLFILE}"
+      eval "${STR}"
+      perl -pi -e "s/:${PORT_8081}\>/:${PORT_443}\>/" ${SSLFILE}
+      perl -pi -e "s/^Listen ${PORT_8081}$/Listen ${PORT_443}/" ${SSLFILE}
+
+      perl -pi -e "s/:${PORT_8080}\>/:${PORT_80}\>/" ${HTTPD_CONF}
+      perl -pi -e "s/^Listen ${PORT_8080}$/Listen ${PORT_80}/" ${HTTPD_CONF}
+    fi
+  fi
+
+  if [ "${WEBSERVER}" = "nginx" ]; then
+    if [ -e "${TOKENFILE_NGINX}" ]; then
+      if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_NGINX})" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX}"
+        eval "${STR}"
+      fi
+      if [ "$(grep -m1 -c '|PORT_443|' ${TOKENFILE_NGINX})" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX}"
+        eval "${STR}"
+      fi
+    fi
+
+    if [ -e "${TOKENFILE_NGINX_USERDIR}" ]; then
+      if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_NGINX_USERDIR})" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+      if [ "$(grep -m1 -c '|PORT_443|' ${TOKENFILE_NGINX_USERDIR})" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+    fi
+  fi
+
+  if [ "${WEBSERVER}" = "nginx_apache" ]; then
+    if [ -e "${TOKENFILE_NGINX}" ]; then
+      if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_NGINX})" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX}"
+        eval "${STR}"
+      fi
+
+      if [ "$(grep -m1 -c '|PORT_443|' ${TOKENFILE_NGINX})" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX}"
+        eval "${STR}"
+      fi
+
+      if [ "`grep -m1 -c '|PORT_8080|' ${TOKENFILE_NGINX}`" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_8080\|/${PORT_8080}/\" ${TOKENFILE_NGINX}"
+        eval "${STR}"
+      fi
+
+      if [ "`grep -m1 -c '|PORT_8081|' ${TOKENFILE_NGINX}`" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_8081\|/${PORT_8081}/\" ${TOKENFILE_NGINX}"
+        eval "${STR}"
+      fi
+    fi
+
+    if [ -e ${TOKENFILE_NGINX_USERDIR} ]; then
+      if [ "`grep -m1 -c '|PORT_80|' ${TOKENFILE_NGINX_USERDIR}`" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+
+      if [ "`grep -m1 -c '|PORT_443|' ${TOKENFILE_NGINX_USERDIR}`" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+
+      if [ "`grep -m1 -c '|PORT_8080|' ${TOKENFILE_NGINX_USERDIR}`" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_8080\|/${PORT_8080}/\" ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+
+      if [ "`grep -m1 -c '|PORT_8081|' ${TOKENFILE_NGINX_USERDIR}`" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_8081\|/${PORT_8081}/\" ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+    fi
+
+    if [ -e ${TOKENFILE_APACHE} ]; then
+      if [ "`grep -m1 -c '|PORT_80|' ${TOKENFILE_APACHE}`" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_8080}/\" ${TOKENFILE_APACHE}"
+        eval "${STR}"
+      else
+        perl -pi -e "s/:${PORT_80}\>/:${PORT_8080}\>/" ${TOKENFILE_APACHE}
+      fi
+
+      if [ "`grep -m1 -c '|PORT_443|' ${TOKENFILE_APACHE}`" -gt "0" ]; then
+        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_8081}/\" ${TOKENFILE_APACHE}"
+        eval "${STR}"
+      else
+        perl -pi -e "s/:${PORT_443}\>/:${PORT_8081}\>/" ${TOKENFILE_APACHE}
+      fi
+
+      if [ "`grep -m1 -c "^Listen ${PORT_80}$" ${HTTPD_CONF}`" -gt 0 ]; then
+        STR="perl -pi -e \"s/^Listen ${PORT_80}$/Listen ${PORT_8080}/\" ${HTTPD_CONF}"
+        eval "${STR}"
+      else
+        perl -pi -e "s/:${PORT_80}\>/:${PORT_8080}\>/" ${HTTPD_CONF}
+      fi
+
+      SSLFILE=${APACHE_EXTRA_PATH}/httpd-ssl.conf
+      STR="perl -pi -e \"s/\|PORT_443\|/${PORT_8081}/\" ${SSLFILE}"
+      eval "${STR}"
+      perl -pi -e "s/:${PORT_443}\>/:${PORT_8081}\>/" ${SSLFILE}
+      perl -pi -e "s/^Listen ${PORT_443}$/Listen ${PORT_8081}/" ${SSLFILE}
+    fi
   fi
 }
 
@@ -2907,26 +3385,26 @@ rewrite_php_confs() {
 
   fpmChecks
 
-  if [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+  if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
 
     doApacheHostConf
 
     # Writing data to httpd-php-handlers.conf
     echo -n "" > "${PHP_HANDLERS_HTTPD}"
 
-    echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${PHP_HANDLERS_HTTPD}
+    echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> "${PHP_HANDLERS_HTTPD}"
 
 
     if [ "${PHP1_MODE_OPT}" = "mod_php" ]; then
-      echo "AddHandler application/x-httpd-php .inc .php .php5 .php${PHP1_SHORTRELEASE} .phtml" >> ${PHP_HANDLERS_HTTPD}
+      echo "AddHandler application/x-httpd-php .inc .php .php5 .php${PHP1_SHORTRELEASE} .phtml" >> "${PHP_HANDLERS_HTTPD}"
     fi
 
     # if [ "${PHP2_MODE_OPT}" = "mod_php" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
-    #   echo "AddHandler application/x-httpd-php .php${PHP2_SHORTRELEASE}" >> ${PHP_HANDLERS_HTTPD}
+    #   echo "AddHandler application/x-httpd-php .php${PHP2_SHORTRELEASE}" >> "${PHP_HANDLERS_HTTPD}"
     # fi
 
     if [ "${PHP1_MODE_OPT}" = "mod_php" ] || [ "${PHP2_MODE_OPT}" = "mod_php" ]; then
-      echo "AddHandler application/x-httpd-php-source .phps" >> ${PHP_HANDLERS_HTTPD}
+      echo "AddHandler application/x-httpd-php-source .phps" >> "${PHP_HANDLERS_HTTPD}"
     fi
 
     echo '</FilesMatch>' >> ${PHP_HANDLERS_HTTPD}
@@ -2935,15 +3413,12 @@ rewrite_php_confs() {
   fi
 
   for php_shortrelease in `echo ${PHP1_SHORTRELEASE_SET}`; do
-    eval `echo "HAVE_FPM${php_shortrelease}=no"`
+    eval $(echo "HAVE_FPM${php_shortrelease}=no")
   done
 
   if [ "${PHP1_MODE_OPT}" = "php-fpm" ]; then
 
-      ${INITDDIR}/php-fpm${PHP1_SHORTRELEASE} restart
-      if [ ${OS} = "FreeBSD" ]; then
-        ${INITDDIR}/php-fpm${PHP1_SHORTRELEASE} restart
-      fi
+      "${INITDDIR}/php-fpm${PHP1_SHORTRELEASE}" restart
 
     set_service php-fpm${PHP1_SHORTRELEASE} ON
     eval `echo "HAVE_FPM${PHP1_SHORTRELEASE}=yes"`
@@ -2960,99 +3435,98 @@ rewrite_php_confs() {
     HAVE_SHORTRELEASE="$(eval_var ${EVAL_FPM_VAR})"
 
     if [ "${HAVE_SHORTRELEASE}" = "no" ]; then
-
-        if [ -e ${INITDDIR}/php-fpm${php_shortrelease} ]; then
-          if [ -e /sbin/chkconfig ]; then
-            /sbin/chkconfig php-fpm${php_shortrelease} off
-          fi
-          # ${INITDDIR}/php-fpm${php_shortrelease} stop
-          service php-ftp stop
+        if [ -e "${INITDDIR}/php-fpm${php_shortrelease}" ]; then
+          "${INITDDIR}/php-fpm${php_shortrelease}" stop
+        else
+          ${SERVICE} php-fpm stop
         fi
         # set_service php-fpm${php_shortrelease} delete
         # boot/init script: rm -f ${INITDDIR}/php-fpm${php_shortrelease}
     fi
   done
 
-  if [ "${WEBSERVER_OPT}" = "apache" ] || [ "${WEBSERVER_OPT}" = "nginx_apache" ]; then
+  if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
     if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
-      # Writing data to suphp.conf
-      echo -n "" > ${SUPHP_CONF_FILE}
-      echo "[global]" >> ${SUPHP_CONF_FILE}
-      echo ";Path to logfile" >> ${SUPHP_CONF_FILE}
-      echo "logfile=/var/log/suphp.log" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo ";Loglevel" >> ${SUPHP_CONF_FILE}
-      echo "loglevel=warn" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo ";User Apache is running as" >> ${SUPHP_CONF_FILE}
-      echo "webserver_user=apache" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo ";Path all scripts have to be in" >> ${SUPHP_CONF_FILE}
-      echo "docroot=/" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo "; Security options" >> ${SUPHP_CONF_FILE}
-      echo "allow_file_group_writeable=false" >> ${SUPHP_CONF_FILE}
-      echo "allow_file_others_writeable=false" >> ${SUPHP_CONF_FILE}
-      echo "allow_directory_group_writeable=false" >> ${SUPHP_CONF_FILE}
-      echo "allow_directory_others_writeable=false" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo ";Check wheter script is within DOCUMENT_ROOT" >> ${SUPHP_CONF_FILE}
-      echo "check_vhost_docroot=false" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo ";Send minor error messages to browser" >> ${SUPHP_CONF_FILE}
-      echo "errors_to_browser=true" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo ";PATH environment variable" >> ${SUPHP_CONF_FILE}
-      echo "env_path=\"/bin:/usr/bin\"" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo ";Umask to set, specify in octal notation" >> ${SUPHP_CONF_FILE}
-      echo "umask=0022" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo ";Minimum UID" >> ${SUPHP_CONF_FILE}
-      echo "min_uid=100" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo ";Minimum GID" >> ${SUPHP_CONF_FILE}
-      echo "min_gid=100" >> ${SUPHP_CONF_FILE}
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo "[handlers]" >> ${SUPHP_CONF_FILE}
-      echo ";Handler for php-scripts" >> ${SUPHP_CONF_FILE}
+      ## Writing data to suphp.conf:
+      (
+        echo -n ""
+        echo "[global]"
+        echo ";Path to logfile"
+        echo "logfile=/var/log/suphp.log"
+        echo ""
+        echo ";Loglevel"
+        echo "loglevel=warn"
+        echo ""
+        echo ";User Apache is running as"
+        echo "webserver_user=apache"
+        echo ""
+        echo ";Path all scripts have to be in"
+        echo "docroot=/"
+        echo ""
+        echo "; Security options"
+        echo "allow_file_group_writeable=false"
+        echo "allow_file_others_writeable=false"
+        echo "allow_directory_group_writeable=false"
+        echo "allow_directory_others_writeable=false"
+        echo ""
+        echo ";Check wheter script is within DOCUMENT_ROOT"
+        echo "check_vhost_docroot=false"
+        echo ""
+        echo ";Send minor error messages to browser"
+        echo "errors_to_browser=true"
+        echo ""
+        echo ";PATH environment variable"
+        echo "env_path=\"/bin:/usr/bin\""
+        echo ""
+        echo ";Umask to set, specify in octal notation"
+        echo "umask=0022"
+        echo ""
+        echo ";Minimum UID"
+        echo "min_uid=100"
+        echo ""
+        echo ";Minimum GID"
+        echo "min_gid=100"
+        echo ""
+        echo "[handlers]"
+        echo ";Handler for php-scripts"
+      ) > "${SUPHP_CONF_FILE}"
 
       if [ "${PHP1_MODE_OPT}" = "suphp" ]; then
-        echo "x-httpd-php${PHP1_SHORTRELEASE}=\"php:/usr/local/php${PHP1_SHORTRELEASE}/bin/php-cgi${PHP1_SHORTRELEASE}\"" >> ${SUPHP_CONF_FILE}
+        echo "x-httpd-php${PHP1_SHORTRELEASE}=\"php:/usr/local/php${PHP1_SHORTRELEASE}/bin/php-cgi${PHP1_SHORTRELEASE}\"" >> "${SUPHP_CONF_FILE}"
       fi
 
       if [ "${PHP2_MODE_OPT}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
-        echo "x-httpd-php${PHP2_SHORTRELEASE}=\"php:/usr/local/php${PHP2_SHORTRELEASE}/bin/php-cgi${PHP2_SHORTRELEASE}\"" >> ${SUPHP_CONF_FILE}
+        echo "x-httpd-php${PHP2_SHORTRELEASE}=\"php:/usr/local/php${PHP2_SHORTRELEASE}/bin/php-cgi${PHP2_SHORTRELEASE}\"" >> "${SUPHP_CONF_FILE}"
       fi
 
-      echo "" >> ${SUPHP_CONF_FILE}
-      echo ";Handler for CGI-scripts" >> ${SUPHP_CONF_FILE}
-      echo "x-suphp-cgi=\"execute:!self\"" >> ${SUPHP_CONF_FILE}
+      echo "" >> "${SUPHP_CONF_FILE}"
+      echo ";Handler for CGI-scripts" >> "${SUPHP_CONF_FILE}"
+      echo "x-suphp-cgi=\"execute:!self\"" >> "${SUPHP_CONF_FILE}"
 
-      # Writing data to /etc/httpd/conf/extra/httpd-suphp.conf
+      # Writing data to ${APACHE_EXTRA_PATH}/httpd-suphp.conf
       echo "Writing data to ${SUPHP_HTTPD}"
-      echo -n "" > ${SUPHP_HTTPD}
+      echo -n "" > "${SUPHP_HTTPD}"
 
-      echo "<IfModule mod_suphp.c>" >> ${SUPHP_HTTPD}
-      echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${SUPHP_HTTPD}
+      echo "<IfModule mod_suphp.c>" >> "${SUPHP_HTTPD}"
+      echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> "${SUPHP_HTTPD}"
 
       if [ "${PHP1_MODE_OPT}" = "suphp" ]; then
-        echo "AddHandler x-httpd-php${PHP1_SHORTRELEASE} .inc .php .php3 .php4 .php5 .php${PHP1_SHORTRELEASE} .phtml" >> ${SUPHP_HTTPD}
+        echo "AddHandler x-httpd-php${PHP1_SHORTRELEASE} .inc .php .php3 .php4 .php5 .php${PHP1_SHORTRELEASE} .phtml" >> "${SUPHP_HTTPD}"
       fi
 
       # if [ "${PHP2_MODE_OPT}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
       #   echo "AddHandler x-httpd-php${PHP2_SHORTRELEASE} .php${PHP2_SHORTRELEASE}" >> ${SUPHP_HTTPD}
       # fi
 
-      echo '</FilesMatch>' >> ${SUPHP_HTTPD}
+      echo '</FilesMatch>' >> "${SUPHP_HTTPD}"
 
-      echo "<Location />" >> ${SUPHP_HTTPD}
-      echo "suPHP_Engine on" >> ${SUPHP_HTTPD}
+      echo "<Location />" >> "${SUPHP_HTTPD}"
+      echo "suPHP_Engine on" >> "${SUPHP_HTTPD}"
 
-      if [ -d /usr/local/php${PHP1_SHORTRELEASE}/lib ]; then
-        echo "suPHP_ConfigPath /usr/local/php${PHP1_SHORTRELEASE}/lib/" >> ${SUPHP_HTTPD}
-      elif [ -d /usr/local/php${PHP2_SHORTRELEASE}/lib ]; then
-        echo "suPHP_ConfigPath /usr/local/php${PHP2_SHORTRELEASE}/lib/" >> ${SUPHP_HTTPD}
+      if [ -d "/usr/local/php${PHP1_SHORTRELEASE}/lib" ]; then
+        echo "suPHP_ConfigPath /usr/local/php${PHP1_SHORTRELEASE}/lib/" >> "${SUPHP_HTTPD}"
+      elif [ -d "/usr/local/php${PHP2_SHORTRELEASE}/lib" ]; then
+        echo "suPHP_ConfigPath /usr/local/php${PHP2_SHORTRELEASE}/lib/" >> "${SUPHP_HTTPD}"
       fi
 
       if [ "${PHP1_MODE_OPT}" = "suphp" ]; then
@@ -3063,11 +3537,11 @@ rewrite_php_confs() {
       #   echo "suPHP_AddHandler x-httpd-php${PHP2_SHORTRELEASE}" >> ${SUPHP_HTTPD}
       # fi
 
-      echo "</Location>" >> ${SUPHP_HTTPD}
-      echo "</IfModule>" >> ${SUPHP_HTTPD}
+      echo "</Location>" >> "${SUPHP_HTTPD}"
+      echo "</IfModule>" >> "${SUPHP_HTTPD}"
       echo "Done."
     elif [ -e "${SUPHP_HTTPD}" ]; then
-      echo -n "" > ${SUPHP_HTTPD}
+      echo -n "" > "${SUPHP_HTTPD}"
     fi
   fi
 }
@@ -3084,15 +3558,14 @@ bfm_setup() {
   setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" ${DA_CONF}
   setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF}
 
-
   if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    wget_with_options -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+    ${wget_with_options} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
   fi
 
   #pure_pw=/usr/bin/pure-pw
 }
 
-## IPFW Setup
+## IPFW Setup (not done)
 ipfw_setup() {
   return;
 }
@@ -3101,83 +3574,124 @@ ipfw_setup() {
 
 ## Validate Options
 validate_options() {
+
+  ## Verify if PortsBuild directory exists.
+  # if [ ! -d "/usr/local/directadmin/portsbuild" ]; then
+  #   FOUND_PORTSBUILD=0
+  # else
+  #   FOUND_PORTSBUILD=1
+  # fi
+
+  ## Parse Defaults and User Options, then pass computed values to PB
+
+  ## Default SSL Certificates to use
+  OPT_PREFER_APACHE_SSL_CERTS="NO"
+  OPT_PREFER_EXIM_SSL_CERTS="NO"
+  OPT_PREFER_CUSTOM_SSL_CERTS="NO"
+
+  # SERVER_IP=${DA_SERVER_IP}
+  # SERVER_IP_MASK=${DA_SERVER_IP_MASK}
+
+  case ${PHP1_VERSION} in
+    55|56|70) PHP_ENABLE="YES" ;;
+    *) echo "*** Error: Invalid PHP version set in options.conf"; exit ;;
+  esac
+
+  case $(uc ${PHP1_MODE}) in
+    FPM|SUPHP|MODPHP|MOD_PHP) PHP_ENABLE="YES" ;;
+    *) echo "*** Error: Invalid PHP mode set in options.conf"; exit ;;
+  esac
+
+  case $(uc ${WEBSERVER}) in
+    APACHE|APACHE24) APACHE_ENABLE="YES" ;;
+    NGINX) NGINX_ENABLE="YES" ;;
+    *) echo "*** Error: Invalid WEBSERVER set in options.conf"; exit ;;
+  esac
+
+  case $(uc ${APACHE_MPM}) in
+    EVENT|PREFORK|WORKER) APACHE_ENABLE="YES" ;;
+    *) echo "*** Error: Invalid APACHE_MPM set in options.conf"; exit ;;
+  esac
+
+  case $(uc ${SQL_DB_SERVER}) in
+    MYSQL55|MYSQL56|MYSQL57|MARIADB55|MARIADB100) SQL_DB_ENABLE="YES" ;;
+    *) echo "*** Error: Invalid SQL_DB_Server set in options.conf"; exit ;;
+  esac
+
+  case $(lc ${PHP_INI_TYPE}) in
+    production|development) ;;
+    custom) ;;
+    *) echo "*** Error: Invalid PHP.ini type set in options.conf"; exit ;;
+  esac
+
+  if [ "${PB_SYMLINK}" = "" ]; then
+    OPT_PB_SYMLINK="NO"
+  fi
+
+  if [ "${INSTALL_CCACHE}" = "" ]; then
+    OPT_INSTALL_CCACHE="YES"
+  fi
+
+  DA_LAN=0
+  if [ -s /root/.lan ]; then
+    DA_LAN=$(cat /root/.lan)
+  fi
+
+  INSECURE=0
+  if [ -s /root/.insecure_download ]; then
+    INSECURE=$(cat /root/.insecure_download)
+  fi
+
+  # BIND_ADDRESS=--bind-address=$IP
+  # if [ "${DA_LAN}" -eq 1 ]; then
+  #   BIND_ADDRESS="";
+  # fi
+
   return;
 }
 
 ################################################################################################################################
 
 ## Install Application
-## $1 = name of service
+## $2 = name of service
 ## e.g. install_app exim
 install_app() {
 
-  case $1 in
-    directadmin)
-      directadmin_install
-      ;;
-    apache)
-      apache_install
-      ;;
-    nginx)
-      nginx_install
-      ;;
-    php55|php56|php70)
-      php_install
-      ;;
-    ioncube)
-      pkgi ${PORT_IONCUBE}
-      ;;
-    roundcube)
-      roundcube_install
-      ;;
-    spamassassin)
-      spamassassin_install
-      ;;
-    libspf2) pkgi ${PORT_LIBSPF2} ;;
-    dkim) pkgi ${PORT_LIBDKIM} ;;
+  case $2 in
+    apache) apache_install ;;
+    bfm) bfm_setup ;;
     blockcracking) blockcracking_install ;;
+    directadmin) directadmin_install ;;
+    dkim) pkgi ${PORT_LIBDKIM} ;;
     easy_spam_fighter) easyspamfighter_install ;;
-    exim)
-      exim_install
-      ;;
+    exim) exim_install ;;
+    ioncube) pkgi "${PORT_IONCUBE}" ;;
+    ipfw) ipfw_setup ;;
+    libspf2) pkgi ${PORT_LIBSPF2} ;;
     mariadb55)
-      # portmaster -d ${PORT_MARIADB55}
-      pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
-      sql_post_install
-      ;;
+      /usr/sbin/pkg -y ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
+      sql_post_install ;;
     mariadb100)
-      # portmaster -d ${PORT_MARIADB100}
-      pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
-      sql_post_install
-      ;;
+      /usr/sbin/pkg -y ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
+      sql_post_install ;;
     mysql55)
-      # portmaster -d ${PORT_MYSQL55}
-      pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
-      sql_post_install
-      ;;
+      /usr/sbin/pkg -y ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
+      sql_post_install ;;
     mysql56)
-      # portmaster -d ${PORT_MYSQL56}
-      pkgi ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
-      sql_post_install
-      ;;
+      /usr/sbin/pkg -y ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
+      sql_post_install ;;
     mysql57)
-      # portmaster -d ${PORT_MYSQL56}
-      pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
-      sql_post_install
-      ;;
-    phpmyadmin)
-      phpmyadmin_install
-      ;;
-    proftpd)
-      proftpd_install
-      ;;
-    pureftpd)
-      pureftpd_install
-      ;;
-    bfm)
-      bfm_setup
-      ;;
-      *) echo "Script error"; return;
+      /usr/sbin/pkg -y ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
+      sql_post_install ;;
+    nginx) nginx_install ;;
+    php55|php56|php70) php_install ;;
+    phpmyadmin) phpmyadmin_install ;;
+    proftpd) proftpd_install ;;
+    pureftpd) pureftpd_install ;;
+    roundcube) roundcube_install ;;
+    spamassassin) spamassassin_install ;;
+    suhosin) suhosin_install ;;
+    *) echo "Script error"; return;
   esac
 }
 
@@ -3200,36 +3714,26 @@ update() {
   echo "PortsBuild script update"
   # wget -O portsbuild.sh ${PB_MIRROR}/portsbuild.sh
 
+  ## Backup configuration file
+  cp -f options.conf ../portsbuild.conf.backup
+
+  #fetch -o ./${PORTSBUILD_NAME}.tar.gz "${PB_MIRROR}/${PORTSBUILD_NAME}.tar.gz"
+
+  if [ -s "${PORTSBUILD_NAME}.tar.gz" ]; then
+    echo "Extracting ${NAME}.tar.gz..."
+
+    tar xvzf "${PORTSBUILD_NAME}.tar.gz" --no-same-owner
+
+    chmod 700 portsbuild.sh
+  else
+    echo "Unable to extract ${PORTSBUILD_NAME}.tar.gz."
+  fi
+
+  ## Symlink pb->portsbuild.sh
   if [ "${OPT_PB_SYMLINK}" = "YES" ]; then
     ln -s /usr/local/directadmin/portsbuild/portsbuild.sh /usr/local/bin/pb
   fi
 }
-
-## Copied from CB2:
-doUpdateScript() {
-  cd ${CWD} || exit
-
-  cp -f options.conf ..
-
-  cd ..
-
-  fetch -o ./${NAME}.tar.gz ${WEBPATH}/${CUSTOMBUILD_OPT}/${NAME}.tar.gz
-
-  if [ -s "${NAME}.tar.gz" ]; then
-    echo "Extracting ${NAME}.tar.gz..."
-
-    tar xvzf "${NAME}.tar.gz" --no-same-owner
-    mv -f options.conf ${WORKDIR}
-    cd ${CWD} || exit
-
-    #downloadVersionsTxt
-
-    chmod 700 portsbuild.sh
-  else
-    echo "Unable to extract ${NAME}.tar.gz."
-  fi
-}
-
 
 ################################################################################################################################
 
@@ -3244,28 +3748,28 @@ upgrade() {
 upgrade_app() {
   case $2 in
     "") show_menu_upgrade ;;
-    php) php_upgrade ;;
-    suhosin) suhosin_upgrade ;;
-    ioncube) ioncube_upgrade ;;
-    modsecurity) modsecurity_upgrade ;;
-    awstats) awstats_upgrade ;;
-    webalizer) webalizer_upgrade ;;
     apache) apache_upgrade ;;
-    nginx) nginx_upgrade ;;
-    mysql) mysql_upgrade ;;
-    mariadb) mariadb_upgrade ;;
-    phpmyadmin) phpmyadmin_upgrade ;;
-    exim) exim_upgrade ;;
-    dovecot) dovecot_upgrade ;;
-    roundcube) roundcube_upgrade ;;
-    pigeonhole) pigeonhole_upgrade ;;
-    spamassassin) spamassassin_upgrade ;;
+    awstats) awstats_upgrade ;;
     blockcracking) blockcracking_upgrade ;;
-    easyspamfighter) easyspamfighter_upgrade ;;
-    pureftpd) pureftpd_upgrade ;;
-    proftpd) proftpd_upgrade ;;
     directadmin) directadmin_upgrade ;;
+    dovecot) dovecot_upgrade ;;
+    easyspamfighter) easyspamfighter_upgrade ;;
+    exim) exim_upgrade ;;
+    ioncube) ioncube_upgrade ;;
+    mariadb) mariadb_upgrade ;;
+    modsecurity) modsecurity_upgrade ;;
+    mysql) mysql_upgrade ;;
+    nginx) nginx_upgrade ;;
+    php) php_upgrade ;;
+    phpmyadmin) phpmyadmin_upgrade ;;
+    pigeonhole) pigeonhole_upgrade ;;
     portsbuild) portsbuild_upgrade ;;
+    proftpd) proftpd_upgrade ;;
+    pureftpd) pureftpd_upgrade ;;
+    roundcube) roundcube_upgrade ;;
+    spamassassin) spamassassin_upgrade ;;
+    suhosin) suhosin_upgrade ;;
+    webalizer) webalizer_upgrade ;;
     *) show_menu_upgrade ;;
   esac
 }
@@ -3371,6 +3875,8 @@ show_main_menu() {
   show_menu;
 }
 
+
+validate_options;
 
 ## ./portsbuild selection screen
 case "$1" in
