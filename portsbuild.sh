@@ -1,4 +1,5 @@
 #!/bin/sh
+# Fun fact: root's shell is actually /bin/tcsh
 # *************************************************************************************************
 # >>> PortsBuild
 #
@@ -41,26 +42,38 @@
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160306
+PB_BUILD_DATE=20160308
 
 IFS="$(printf '\n\t')"
 LANG=C
 
 if [ "$(id -u)" != "0" ]; then
-  echo "Must run this script as the root user."
+  echo "*** Error: Must run this script as the root user."
   exit 1
 fi
+
+# if (expr) then
+#        echo "test"
+# else if (expr2) then
+#        echo "test"
+# else
+#        echo "test"
+# endif
+
+## $OSTYPE = FreeBSD
+## $VENDOR = amd
+## $MACHTYPE = x86_64
 
 OS=$(uname)
 OS_VER=$(uname -r | cut -d- -f1) # 9.3, 10.1, 10.2, 10.3
 OS_B64=$(uname -m | grep -c 64)  # 0, 1
 OS_MAJ=$(uname -r | cut -d. -f1) # 9, 10
 OS_HOST=$(hostname)
-# OS_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
+OS_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
 
 if [ "${OS}" = "FreeBSD" ]; then
   if [ "${OS_B64}" -eq 1 ]; then
-    if [ "$OS_VER" = "10.1" ] || [ "$OS_VER" = "10.2" ] || [ "$OS_VER" = "10.3" ] || [ "$OS_VER" = "9.3" ]; then
+    if [ "${OS_VER}" = "10.1" ] || [ "${OS_VER}" = "10.2" ] || [ "${OS_VER}" = "10.3" ] || [ "${OS_VER}" = "9.3" ]; then
       # echo "FreeBSD $OS_VER x64 operating system detected."
       echo ""
     else
@@ -86,10 +99,52 @@ fi
 ### defaults.conf
 ###
 
-## _DIR/_PATH = directory or path to application
-## _DEF = default
-## _BIN = binary
-## _FILE = specific file
+## System & User Accounts
+DA_ADMIN_USERNAME=admin
+DA_SQLDB_USERNAME=da_admin
+DA_SRV_USER=diradmin
+DA_SRV_GROUP=diradmin
+APACHE_USER=apache ## www
+APACHE_GROUP=apache ## www
+NGINX_USER=nginx ## www
+NGINX_GROUP=nginx ## www
+WEBAPPS_USER=webapps
+WEBAPPS_GROUP=webapps
+EXIM_USER=mail ## mailnull
+EXIM_GROUP=mail ## mail
+
+## System Binary/Application paths and variables
+CHOWN=/usr/sbin/chown
+CHMOD=/bin/chmod
+BOOT_DIR=/usr/local/etc/rc.d
+FETCH=/usr/bin/fetch
+file_mtime="stat -f %m"
+PERL=/usr/local/bin/perl
+PKG=/usr/sbin/pkg
+# PKGI="${PKG} install -y"
+PORTSNAP=/usr/sbin/portsnap
+PORTMASTER=/usr/local/sbin/portmaster
+SERVICE=/usr/sbin/service
+SYNTH=/usr/local/bin/synth
+SYSCTL=/sbin/sysctl
+WGET=/usr/local/bin/wget
+WGET_CONNECT_OPTIONS="--connect-timeout=5 --read-timeout=10 --tries=3"
+WGET_WITH_OPTIONS="${WGET} ${WGET_CONNECT_OPTIONS}"
+TAR=/usr/bin/tar
+
+## PortsBuild Paths & Files
+PB_PATH=/usr/local/portsbuild
+if [ ! -e ${PB_PATH} ] || [ "$(pwd)" = "${PB_PATH}" ]; then
+  PB_PATH=$(pwd)
+fi
+
+PB_CONF=${PB_PATH}/options.conf
+# PB_FILES_PATH=${PB_PATH}/files
+# PB_WORK_DIR=${PB_PATH}
+
+## PortsBuild Remote File Repository
+PB_MIRROR1="http://s3.amazonaws.com/portsbuild/files"
+PB_MIRROR=${PB_MIRROR1}
 
 ## DirectAdmin Paths & Files
 DA_PATH=/usr/local/directadmin
@@ -122,26 +177,6 @@ DA_FREEBSD_SERVICES="services_freebsd90_64.tar.gz"
 ## CustomBuild Paths & Files
 CB_PATH=${DA_PATH}/custombuild
 CB_CONF=${CB_PATH}/options.conf
-
-## PortsBuild Paths & Files
-PB_PATH=${DA_PATH}/portsbuild
-PB_CONF=${PB_PATH}/options.conf
-# PB_FILES_PATH=${PB_PATH}/files
-# PB_WORK_DIR=${PB_PATH}
-
-## PortsBuild Remote File Repository
-PB_MIRROR1="http://s3.amazonaws.com/portsbuild/files"
-PB_MIRROR=${PB_MIRROR1}
-
-## User Option Defaults:
-# WEBSERVER=apache
-# APACHE_MPM=event
-# SQL_DB_SERVER=mariadb100
-# CLAMAV_ENABLE=YES
-# SPAMASSASSIN_ENABLE=YES
-# SAUTILS_ENABLE=YES
-# PHPMYADMIN_ENABLE=YES
-# ROUNDCUBE_ENABLE=YES
 
 ## Min and Max password lengths when used by random_pass()
 MIN_PASS_LENGTH=12
@@ -189,7 +224,7 @@ NGINX_IPS_CONF=${NGINX_PATH}/directadmin-ips.conf
 #NGINX_PID=/var/run/nginx.pid
 
 ## Global WWW Directory (for webmail scripts)
-WWW_DIR=/usr/local/www
+WWW_DIR=/usr/local/www ## Ports uses "${WWWDIR}"
 WWW_TMP_DIR=${WWW_DIR}/tmp
 
 WEBMAIL_DIR=${WWW_DIR}/webmail
@@ -282,40 +317,19 @@ MYSQLSECURE=${MYSQLSECURE_BIN}
 MYSQLSHOW=${MYSQLSHOW_BIN}
 MYSQLUPGRADE=${MYSQLUPGRADE_BIN}
 
-## User Accounts
-DA_ADMIN_USERNAME=admin
-DA_SQLDB_USERNAME=da_admin
-DA_SRV_USER=diradmin
-DA_SRV_GROUP=diradmin
-APACHE_USER=apache
-APACHE_GROUP=apache
-NGINX_USER=www ## verify
-NGINX_GROUP=www ## verify
-WEBAPPS_USER=webapps
-WEBAPPS_GROUP=webapps
-EXIM_USER=mail
-EXIM_GROUP=mail
-
 NEWSYSLOG_FILE=/usr/local/etc/newsyslog.d/directadmin.conf
 NEWSYSLOG_DAYS=10
 
-## System Binary/Application paths and variables
-CHOWN=/usr/sbin/chown
-CHMOD=/bin/chmod
-BOOT_DIR=/usr/local/etc/rc.d
-file_mtime="stat -f %m"
-PERL=/usr/local/bin/perl
-PKG=/usr/sbin/pkg
-# PKGI="${PKG} install -y"
-PORTSNAP=/usr/sbin/portsnap
-PORTMASTER=/usr/local/sbin/portmaster
-SERVICE=/usr/sbin/service
-SYNTH=/usr/local/bin/synth
-SYSCTL=/sbin/sysctl
-WGET=/usr/local/bin/wget
-WGET_CONNECT_OPTIONS="--connect-timeout=5 --read-timeout=10 --tries=3"
-wget_with_options="${WGET} ${WGET_CONNECT_OPTIONS}"
-TAR=/usr/bin/tar
+## User Option Defaults:
+# WEBSERVER=apache
+# APACHE_MPM=event
+# SQL_DB_SERVER=mariadb100
+# CLAMAV_ENABLE=YES
+# SPAMASSASSIN_ENABLE=YES
+# SAUTILS_ENABLE=YES
+# PHPMYADMIN_ENABLE=YES
+# ROUNDCUBE_ENABLE=YES
+
 
 ################################################################################################################################
 
@@ -361,6 +375,11 @@ PORT_PHP56_EXT=lang/php56-extensions
 PORT_PHP70=lang/php70
 PORT_PHP70_EXT=lang/php70-extensions
 
+PORT_MOD_PHP55=www/mod_php55
+PORT_MOD_PHP56=www/mod_php56
+PORT_MOD_PHP70=www/mod_php70
+
+
 PORT_PHPMYADMIN=databases/phpmyadmin
 PORT_IONCUBE=devel/ioncube
 # PORT_PCRE=devel/pcre
@@ -399,31 +418,48 @@ PORT_MARIADB100_CLIENT=databases/mariadb100-client
 PORT_AWSTATS=www/awstats
 PORT_WEBALIZER=www/webalizer
 
-## Ports: Unsupported/Untested/Deprecated
-# PORT_SQUIRRELMAIL=mail/squirrelmail
-# PORT_ATMAIL=mail/atmail
-# PORT_UEBIMIAU=mail/uebimiau
-# PORT_MEMCACHED=databases/memcached
-# PORT_PECLMEMCACHE=databases/pecl-memcache
-# PORT_PECLMEMCACHED=databases/pecl-memcached
-# PORT_REDIS=databases/redis
-
 
 ################################################################################################################################
-
 
 ###
 ### make.conf
 ###
 
+# PHP_PORT?=      lang/php${PHP_VER}
 
-## Global make.conf options
-## These options are included every time a port is built via make.
+# USE_PHP_BUILD=yes
+
+# .if defined(USE_PHP_BUILD)
+# BUILD_DEPENDS+= ${PHPBASE}/include/php/main/php.h:${PORTSDIR}/${PHP_PORT}
+# .endif
+# RUN_DEPENDS+=   ${PHPBASE}/include/php/main/php.h:${PORTSDIR}/${PHP_PORT}
+# .if defined(WANT_PHP_MOD) || (defined(WANT_PHP_WEB) && defined(PHP_VERSION) && ${PHP_SAPI:Mcgi} == "" && ${PHP_SAPI:Mfpm} == "")
+# USE_APACHE_RUN= 22+
+# .include "${PORTSDIR}/Mk/bsd.apache.mk"
+# RUN_DEPENDS+=   ${PHPBASE}/${APACHEMODDIR}/libphp5.so:${PORTSDIR}/${MOD_PHP_PORT}
+# .endif
+
+
+### Global (default) make options
+
+# DEFAULT_VERSIONS= apache=2.4 php=56
+# APACHE_PORT= www/apache24
+# USE_APACHE=24
+# DEFAULT_PHP_VER=56
+# PHP_VER=56
+
+## These variables are included every time 'make' is called. Default is to source /etc/make.conf.
+GLOBAL_MAKE_VARIABLES="" # e.g. WITH_OPENSSL_PORT=YES BATCH=YES WITH_CCACHE_BUILD=YES
+
+## These options are included every time a Port is built via 'make'.
 GLOBAL_MAKE_OPTIONS_SET=""
 GLOBAL_MAKE_OPTIONS_UNSET="EXAMPLES X11 HTMLDOCS CUPS TESTS" # DOCS NLS
 
 APACHE24_MAKE_OPTIONS_SET="SUEXEC MPM_EVENT"
 APACHE24_MAKE_OPTIONS_UNSET="MPM_PREFORK"
+
+## Todo: Harden symlinks patch?
+# APACHE24_EXTRA_PATCHES=""
 
 NGINX_MAKE_OPTIONS_SET=""
 NGINX_MAKE_OPTIONS_UNSET=""
@@ -443,10 +479,17 @@ PHP70_MAKE_OPTIONS_UNSET=""
 PHP70_EXT_MAKE_OPTIONS_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP GD GETTEXT HASH ICONV IMAP INTL JSON MBSTRING MCRYPT MYSQLI OPCACHE OPENSSL PDF PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
 PHP70_EXT_MAKE_OPTIONS_UNSET=""
 
-# Prefixes for multi-PHP installations:
-# PHP55_PREFIX=/usr/local/php55
-# PHP56_PREFIX=/usr/local/php56
-# PHP70_PREFIX=/usr/local/php70
+## Todo/Untested: Prefixes for multi-PHP installations:
+PHP55_PREFIX=/usr/local/php55
+PHP56_PREFIX=/usr/local/php56
+PHP70_PREFIX=/usr/local/php70
+
+MOD_PHP55_MAKE_OPTIONS_SET="MAILHEAD" # AP2FILTER
+MOD_PHP55_MAKE_OPTIONS_UNSET=""
+MOD_PHP56_MAKE_OPTIONS_SET="MAILHEAD"
+MOD_PHP56_MAKE_OPTIONS_UNSET=""
+MOD_PHP70_MAKE_OPTIONS_SET=""
+MOD_PHP70_MAKE_OPTIONS_UNSET=""
 
 ROUNDCUBE_MAKE_OPTIONS_SET="" # SSL
 ROUNDCUBE_MAKE_OPTIONS_UNSET=""
@@ -466,26 +509,21 @@ SAUTILS_MAKE_OPTIONS_UNSET=""
 DOVECOT2_MAKE_OPTIONS_SET="" #
 DOVECOT2_MAKE_OPTIONS_UNSET=""
 
-## ClamAV
 CLAMAV_MAKE_OPTIONS_SET="" # MILTER
 CLAMAV_MAKE_OPTIONS_UNSET=""
 
-## Databases
-MARIADB55_MAKE_OPTIONS_SET=""
-MARIADB55_MAKE_OPTIONS_UNSET=""
+# MARIADB55_MAKE_OPTIONS_SET=""
+# MARIADB55_MAKE_OPTIONS_UNSET=""
+# MARIADB100_MAKE_OPTIONS_SET=""
+# MARIADB100_MAKE_OPTIONS_UNSET=""
+# MYSQL55_MAKE_OPTIONS_SET=""
+# MYSQL55_MAKE_OPTIONS_UNSET=""
+# MYSQL56_MAKE_OPTIONS_SET=""
+# MYSQL56_MAKE_OPTIONS_UNSET=""
+# MYSQL57_MAKE_OPTIONS_SET=""
+# MYSQL57_MAKE_OPTIONS_UNSET=""
 
-MARIADB100_MAKE_OPTIONS_SET=""
-MARIADB100_MAKE_OPTIONS_UNSET=""
-
-MYSQL55_MAKE_OPTIONS_SET=""
-MYSQL55_MAKE_OPTIONS_UNSET=""
-
-MYSQL56_MAKE_OPTIONS_SET=""
-MYSQL56_MAKE_OPTIONS_UNSET=""
-
-MYSQL57_MAKE_OPTIONS_SET=""
-MYSQL57_MAKE_OPTIONS_UNSET=""
-
+## FTP Daemons
 PROFTPD_MAKE_OPTIONS_SET=""
 PROFTPD_MAKE_OPTIONS_UNSET=""
 
@@ -514,12 +552,16 @@ if [ -e "${DA_BIN}" ]; then
 fi
 
 ## Verify:
-## Use either BASE or PORT OpenSSL
+## OPT_WITH_OPENSSL_PORT=$(sysrc -n -f /etc/make.conf WITH_OPENSSL_PORT)
+
+## Use either BASE or PORT OpenSSL libraries.
 ## The latter only if make.conf contains WITH_OPENSSL_PORT=YES
 if [ -x /usr/local/bin/openssl ] && [ "$(uc "$(getVal WITH_OPENSSL_PORT /etc/make.conf)")" = "YES" ]; then
   OPENSSL_BIN=/usr/local/bin/openssl
+  # GLOBAL_MAKE_VARIABLES="${GLOBAL_MAKE_VARIABLES} WITH_OPENSSL_PORT=YES"
 elif [ -x /usr/bin/openssl ]; then
   OPENSSL_BIN=/usr/bin/openssl
+  # GLOBAL_MAKE_VARIABLES="${GLOBAL_MAKE_VARIABLES} WITH_OPENSSL_BASE=YES"
 fi
 
 ## Verify:
@@ -529,15 +571,12 @@ OPENSSL_EXTRA="-config ${PB_PATH}/custom/ap2/cert_config.txt"
 # -config ${PB_PATH}/custom/ap2/cert_config.txt
 
 ## Source (include) additional files into the script:
-##. conf/defaults.conf
-##. conf/ports.conf
 . options.conf
-#. conf/make.conf
-#. lang/en.txt ## strings files for multilingual support (planned)
 
 ################################################################################################################################
 
 ## Get DirectAdmin Option Values (copied from CB2)
+## Retrieves values from directadmin/conf/options.conf
 getDA_Opt() {
   ## $1 is option name
   ## $2 is default value
@@ -554,12 +593,13 @@ getDA_Opt() {
     return
   fi
 
+  ## Retrieve DirectAdmin's default value:
   ${DA_BIN} c | grep -m1 "^$1=" | cut -d= -f2
 }
 
 ################################################################################################################################
 
-# ## Emulate ${!variable} (copied from CB2)
+## Emulate ${!variable} (copied from CB2)
 eval_var() {
   var=${1}
   if [ -z "${var}" ]; then
@@ -578,7 +618,7 @@ getOpt() {
   ## $1 = option name
   ## $2 = default value
 
-  # CB2: Added "grep -v" to workaround many lines with empty options
+  ## CB2: Added "grep -v" to workaround many lines with empty options
   GET_OPTION=$(grep -v "^$1=$" "${OPTIONS_CONF}" | grep -m1 "^$1=" | cut -d= -f2)
   if [ "${GET_OPTION}" = "" ]; then
     echo "$1=$2" >> "${OPTIONS_CONF}"
@@ -1014,9 +1054,19 @@ global_setup() {
     bind_setup
 
 
-
-
     ## Install & configure services and applications
+
+    exim_install
+    dovecot_install
+    spamassassin_install
+    majordomo_install
+    apache_install
+    php_install
+    install_app mariadb100
+    blockcracking_install
+    easyspamfighter_install
+    clamav_install
+
 
 
 
@@ -1030,10 +1080,10 @@ global_setup() {
     fi
 
     if [ ! -e "${CB_CONF}" ]; then
-      if [ ! -e "${PB_DIR}/custombuild/options.conf" ]; then
-        ${wget_with_options} -O ${CB_CONF} "${PB_MIRROR}/custombuild/options.conf"
+      if [ ! -e "${PB_PATH}/custombuild/options.conf" ]; then
+        ${WGET_WITH_OPTIONS} -O ${CB_CONF} "${PB_MIRROR}/custombuild/options.conf"
       else
-        cp "${PB_DIR}/custombuild/options.conf" ${CB_CONF}
+        cp "${PB_PATH}/custombuild/options.conf" ${CB_CONF}
       fi
     fi
 
@@ -1049,6 +1099,8 @@ global_setup() {
     ./directadmin p
 
     #${SERVICE} directadmin start
+
+    basic_system_security
 
     global_post_install
 
@@ -1283,17 +1335,18 @@ directadmin_install() {
       echo "diradmin: :blackhole:" >> /etc/aliases
     fi
     ## Update aliases database
+    echo "Updating /etc/aliases"
     /usr/bin/newaliases
   fi
 
   mkdir -p ${DA_PATH}
 
+  ## Get DirectAdmin binary:
   if [ ! -e "${DA_PATH}/update.tar.gz" ]; then
-    ## Get DirectAdmin binary:
     if [ "${DA_LAN}" -eq 0 ]; then
-      ${wget_with_options} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address="${DA_SERVER_IP}" "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+      ${WGET_WITH_OPTIONS} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address="${DA_SERVER_IP}" "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
     elif [ "${DA_LAN}" -eq 1 ]; then
-      ${wget_with_options} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+      ${WGET_WITH_OPTIONS} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
     fi
   fi
 
@@ -1433,14 +1486,14 @@ directadmin_install() {
 
   if [ ! -e "${DA_LICENSE_FILE}" ]; then
     ## Get the DirectAdmin License Key File (untested)
-    ${wget_with_options} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
+    ${WGET_WITH_OPTIONS} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
     if [ $? -ne 0 ]; then
       echo "*** Error: Unable to download the DirectAdmin license file."
       da_myip
       echo "Trying license relay server..."
 
-      ${wget_with_options} "${HTTP}://license.directadmin.com/licenseupdate.php?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
+      ${WGET_WITH_OPTIONS} "${HTTP}://license.directadmin.com/licenseupdate.php?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
       if [ $? -ne 0 ]; then
         echo "*** Error: Unable to download the DirectAdmin license file from relay server as well."
@@ -1479,7 +1532,7 @@ directadmin_install() {
 
 ## Copied from DA/scripts/getLicense.sh
 da_myip() {
-  IP=$(${wget_with_options} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
+  IP=$(${WGET_WITH_OPTIONS} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
 
   if [ "${IP}" = "" ]; then
     echo "*** Error: Cannot determine the server's IP address via myip.directadmin.com"
@@ -1502,6 +1555,13 @@ directadmin_restart() {
   run_dataskq
 }
 
+################################################################################################################################
+
+## Basic System Security Tasks
+basic_system_security() {
+  sysrc -f /etc/sysctl.conf security.bsd.see_other_uids=0
+  sysrc -f /etc/sysctl.conf security.bsd.see_other_gids=0
+}
 
 ################################################################################################################################
 
@@ -1633,10 +1693,28 @@ exim_install() {
   mkdir ${VIRTUAL_PATH}/usage
   chmod 750 ${VIRTUAL_PATH}/usage
 
+  virtual_files="\
+    domains \
+    domainowners \
+    pophosts \
+    blacklist_domains \
+    whitelist_from \
+    use_rbl_domains \
+    bad_sender_hosts \
+    bad_sender_hosts_ip \
+    blacklist_senders \
+    whitelist_domains \
+    whitelist_hosts \
+    whitelist_hosts_ip \
+    whitelist_senders \
+    skip_av_domains \
+    skip_rbl_domains \
+  "
+
   ## Verify: IFS= modified
-  for i in domains domainowners pophosts blacklist_domains whitelist_from use_rbl_domains bad_sender_hosts bad_sender_hosts_ip blacklist_senders whitelist_domains whitelist_hosts whitelist_hosts_ip whitelist_senders skip_av_domains skip_rbl_domains; do
-    touch ${VIRTUAL_PATH}/$i
-    chmod 600 ${VIRTUAL_PATH}/$i
+  for file in ${virtual_files}; do
+    touch "${VIRTUAL_PATH}/${file}"
+    chmod 600 "${VIRTUAL_PATH}/${file}"
   done
 
   chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}/*
@@ -1746,7 +1824,7 @@ blockcracking_install() {
 
     echo "Downloading BlockCracking"
 
-    ${wget_with_options} -O ${PB_PATH}/files/exim.blockcracking.tar.gz ${PB_MIRROR}/files/exim.blockcracking.tar.gz
+    ${WGET_WITH_OPTIONS} -O ${PB_PATH}/files/exim.blockcracking.tar.gz ${PB_MIRROR}/files/exim.blockcracking.tar.gz
 
     ## used to include: -${BLOCKCRACKING_VER}
 
@@ -1824,7 +1902,7 @@ easyspamfighter_install() {
     # getFile easy_spam_fighter/exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz easy_spam_figther exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz
 
     ## Todo: grab latest version
-    ${wget_with_options} -O ${PB_PATH}/files/esf.tar.gz ${PB_MIRROR}/files/esf.tar.gz
+    ${WGET_WITH_OPTIONS} -O ${PB_PATH}/files/esf.tar.gz ${PB_MIRROR}/files/esf.tar.gz
 
     if [ -e ${PB_PATH}/files/esf.tar.gz ]; then
 
@@ -2248,6 +2326,8 @@ php_install() {
         PHP_MAKE_OPTIONS_UNSET="${PHP55_MAKE_OPTIONS_UNSET}"
         PHP_EXT_MAKE_OPTIONS_SET="${PHP55_EXT_MAKE_OPTIONS_SET}"
         PHP_EXT_MAKE_OPTIONS_UNSET="${PHP55_EXT_MAKE_OPTIONS_UNSET}"
+        PHP_MOD_MAKE_OPTIONS_SET="${MOD_PHP55_MAKE_OPTIONS_SET}"
+        PHP_MOD_MAKE_OPTIONS_UNSET="${MOD_PHP55_MAKE_OPTIONS_UNSET}"
         ;;
     56) PORT_PHP="${PORT_PHP56}"
         PORT_PHP_EXT="${PORT_PHP56_EXT}"
@@ -2255,6 +2335,8 @@ php_install() {
         PHP_MAKE_OPTIONS_UNSET="${PHP56_MAKE_OPTIONS_SET}"
         PHP_EXT_MAKE_OPTIONS_SET="${PHP56_EXT_MAKE_OPTIONS_SET}"
         PHP_EXT_MAKE_OPTIONS_UNSET="${PHP56_EXT_MAKE_OPTIONS_UNSET}"
+        PHP_MOD_MAKE_OPTIONS_SET="${MOD_PHP56_MAKE_OPTIONS_SET}"
+        PHP_MOD_MAKE_OPTIONS_UNSET="${MOD_PHP56_MAKE_OPTIONS_UNSET}"
         ;;
     70) PORT_PHP="${PORT_PHP70}"
         PORT_PHP_EXT="${PORT_PHP70_EXT}"
@@ -2262,10 +2344,21 @@ php_install() {
         PHP_MAKE_OPTIONS_UNSET="${PHP70_MAKE_OPTIONS_SET}"
         PHP_EXT_MAKE_OPTIONS_SET="${PHP70_EXT_MAKE_OPTIONS_SET}"
         PHP_EXT_MAKE_OPTIONS_UNSET="${PHP70_EXT_MAKE_OPTIONS_UNSET}"
+        PHP_MOD_MAKE_OPTIONS_SET="${MOD_PHP70_MAKE_OPTIONS_SET}"
+        PHP_MOD_MAKE_OPTIONS_UNSET="${MOD_PHP70_MAKE_OPTIONS_UNSET}"
         ;;
     *) ;;
   esac
 
+  ## PORT_MOD_PHP55
+  case ${PHP1_MODE} in
+    fpm) ;;
+    mod_php) ;;
+    fastcgi) ;;
+    suphp) ;;
+  esac
+
+  ### Main Installation
   make -C "${PORTS_BASE}/${PORT_PHP}" rmconfig
   make -C "${PORTS_BASE}/${PORT_PHP}" config OPTIONS_SET="${PHP_MAKE_OPTIONS_SET} ${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${PHP_MAKE_OPTIONS_UNSET} ${GLOBAL_MAKE_OPTIONS_UNSET}"
   make -C "${PORTS_BASE}/${PORT_PHP_EXT}" config OPTIONS_SET="${PHP_EXT_MAKE_OPTIONS_SET} ${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${PHP_EXT_MAKE_OPTIONS_UNSET} ${GLOBAL_MAKE_OPTIONS_UNSET}"
@@ -2475,7 +2568,7 @@ phpmyadmin_install() {
   ## Auth log patch for BFM compat (not done):
   ## Currently outputs to /var/log/auth.log
   if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    ${wget_with_options} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+    ${WGET_WITH_OPTIONS} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
   fi
 
   if [ -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
@@ -2652,6 +2745,7 @@ nginx_install() {
 #   fi
 #}
 
+
 ################################################################
 
 ## Uninstall nginx
@@ -2661,18 +2755,33 @@ nginx_uninstall() {
 
 ################################################################################################################################
 
+## Majordomo Uninstall
+majordomo_install() {
+
+return
+}
+
+################################################################
+
+## Majordomo Uninstall
+majordomo_uninstall() {
+  return
+}
+
+################################################################################################################################
+
 ## ClamAV Installation Tasks
 clamav_install() {
 
   ### Main Installation
-  make -C "${PORT_CLAMAV}" rmconfig
-  make -C "${PORT_CLAMAV}" config OPTIONS_SET="${CLAMAV_MAKE_OPTIONS_SET} ${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${CLAMAV_MAKE_OPTIONS_UNSET} ${GLOBAL_MAKE_OPTIONS_UNSET}"
-  make -C "${PORT_CLAMAV}" reinstall clean
+  make -C "${PORTS_BASE}/${PORT_CLAMAV}" rmconfig
+  make -C "${PORTS_BASE}/${PORT_CLAMAV}" config security_clamav_SET="${CLAMAV_MAKE_OPTIONS_SET}" security_clamav_UNSET="${CLAMAV_MAKE_OPTIONS_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORTS_BASE}/${PORT_CLAMAV}" reinstall clean
 
   ## Verify:
   if [ "${CLAMAV_EXIM_ENABLE}" = "YES" ]; then
-    wget ${WGET_CONNECT_OPTIONS} -O /usr/local/etc/exim.clamav.load.conf ${PB_MIRROR}/exim/exim.clamav.load.conf
-    wget ${WGET_CONNECT_OPTIONS} -O /usr/local/etc/exim.clamav.conf ${PB_MIRROR}/exim/exim.clamav.conf
+    wget ${WGET_CONNECT_OPTIONS} -O /usr/local/etc/exim/exim.clamav.load.conf ${PB_MIRROR}/exim/exim.clamav.load.conf
+    wget ${WGET_CONNECT_OPTIONS} -O /usr/local/etc/exim/exim.clamav.conf ${PB_MIRROR}/exim/exim.clamav.conf
   fi
 
   if [ "${CLAMD_CONF}" -eq 0 ]; then
@@ -4099,7 +4208,7 @@ bfm_setup() {
   setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF_FILE}
 
   if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    ${wget_with_options} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+    ${WGET_WITH_OPTIONS} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
   fi
 
   #pure_pw=/usr/bin/pure-pw
@@ -4134,14 +4243,17 @@ validate_options() {
 
   ## Port/Package Options
   case ${PHP1_VERSION} in
-    55|56|70) PHP_ENABLE="YES" ;;
+    55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION} ;;
     *) echo "*** Error: Invalid PHP version set in options.conf"; exit ;;
   esac
 
   case $(uc ${PHP1_MODE}) in
-    FPM|SUPHP|MODPHP|MOD_PHP) PHP_ENABLE="YES" ;;
+    FPM|SUPHP|MODPHP|MOD_PHP) OPT_PHP1_MODE=${PHP1_MODE} ;;
     *) echo "*** Error: Invalid PHP mode set in options.conf"; exit ;;
   esac
+
+  ## additional checks for PHP, then:
+  ## OPT_PHP_ENABLE="YES"
 
   case $(uc ${WEBSERVER}) in
     APACHE|APACHE24) APACHE_ENABLE="YES" ;;
@@ -4334,7 +4446,7 @@ show_menu_upgrade() {
   echo ""
   echo "Listing possible upgrades"
 
-  return;
+  return
 }
 
 ## Show Setup Menu
@@ -4342,7 +4454,7 @@ show_menu_setup() {
   echo "To setup PortsBuild and DirectAdmin for the first time, run:"
   echo "  ./portsbuild setup <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> <IP_ADDRESS>"
   echo ""
-  return;
+  return
 }
 ################################################################################################################################
 
@@ -4403,7 +4515,7 @@ show_outdated() {
 
 ## About PortsBuild
 about() {
-  show_version;
+  show_version
   echo "visit portsbuild.org"
 }
 
@@ -4443,18 +4555,18 @@ show_menu() {
 # menu_update_update = "update"
 # menu_update_desc = "Update an application or service"
 
-  return;
+  return
 }
 
 ## Show the main menu
 show_main_menu() {
-  show_logo;
-  show_version;
-  show_menu;
+  show_logo
+  show_version
+  show_menu
 }
 
 
-validate_options;
+validate_options
 
 ## ./portsbuild selection screen
 case "$1" in

@@ -93,3 +93,26 @@ pkg query:
          available, or ``unknown-repository'' otherwise.
 
      %?[drCFODLUGBbA]
+
+
+
+https://www.freebsd.org/cgi/man.cgi?query=ports&sektion=7&manpath=freebsd-release-ports#end
+
+
+ /usr/ports/Mk/bsd.port.mk
+
+# DATADIR               - Name of the directory to install the packages shared data in.
+#                                 Default: ${PREFIX}/share/${PORTNAME}
+# DATADIR_REL   - The DATADIR relative to ${PREFIX}
+#
+# WWWDIR                - Name of the directory to install the packages www data in.
+#                                 Default: ${PREFIX}/www/${PORTNAME}
+# WWWDIR_REL    - The WWWDIR relative to ${PREFIX}
+#
+# USERS                 - List of users to create at install time. Each login must
+#                                 have a corresponding entry in ${UID_FILES}.
+# GROUPS                - List of groups to create at install time. Each group must
+#                                 have a corresponding entry in ${GID_FILES}.
+
+
+
