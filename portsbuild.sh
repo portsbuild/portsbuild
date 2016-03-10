@@ -2619,7 +2619,7 @@ apache_install() {
   # touch ${APACHE_DIR}/ssl/server.crt
   # touch ${APACHE_DIR}/ssl/server.key
 
-  ${OPENSSL_BIN} req -x509 -newkey rsa:2048 -keyout ${APACHE_SSL_KEY} -out ${APACHE_SSL_CRT} -days 9999 -nodes ${OPENSSL_EXTRA}
+  ${OPENSSL_BIN} req -x509 -newkey rsa:2048 -keyout ${APACHE_SSL_KEY} -out ${APACHE_SSL_CRT} -days 9999 -nodes "${OPENSSL_EXTRA}"
 
   ## Set permissions:
   chmod 600 ${APACHE_PATH}/ssl/server.crt
@@ -2642,9 +2642,9 @@ apache_install() {
   ln -s /usr/local/sbin/httpd /usr/sbin/httpd
 
   ## Copy over modified (custom) CB2 conf files to conf/:
-  cp -rf ${PB_PATH}/custom/ap2/conf/ ${APACHE_PATH}/
-  cp -f ${PB_PATH}/custom/ap2/conf/httpd.conf ${APACHE_PATH}/
-  cp -f ${PB_PATH}/custom/ap2/conf/extra/httpd-mpm.conf ${APACHE_EXTRA_PATH}/httpd-mpm.conf
+  cp -rf "${PB_PATH}/custom/ap2/conf/" ${APACHE_PATH}/
+  cp -f "${PB_PATH}/custom/ap2/conf/httpd.conf" ${APACHE_PATH}/
+  cp -f "${PB_PATH}/custom/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRA_PATH}/httpd-mpm.conf
 
   ## Already done (default):
   ${PERL} -pi -e 's/^DefaultType/#DefaultType/' ${APACHE_PATH}/httpd.conf
@@ -2744,6 +2744,9 @@ nginx_install() {
 
 ## Uninstall nginx
 nginx_uninstall() {
+
+  sysrc -x nginx_enable
+
   return;
 }
 
@@ -2752,13 +2755,61 @@ nginx_uninstall() {
 ## Majordomo Uninstall
 majordomo_install() {
 
-return
+  ## majordomo.sh script
+
+  return
 }
 
 ################################################################
 
 ## Majordomo Uninstall
 majordomo_uninstall() {
+  return
+}
+
+################################################################################################################################
+
+## PureFTPD Installation
+pureftpd_install() {
+
+  ### Main Installation
+  make -C "${PORTS_BASE}/${PORT_PUREFTPD}" rmconfig
+  make -C "${PORTS_BASE}/${PORT_PUREFTPD}" config ftp_pure_ftpd_SET="${PUREFTPD_MAKE_OPTIONS_SET}" ftp_pure_ftpd_UNSET="${PUREFTPD_MAKE_OPTIONS_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORTS_BASE}/${PORT_PUREFTPD}" reinstall clean
+
+  return
+}
+################################################################
+
+## PureFTPD Uninstall
+pureftpd_uninstall() {
+
+  sysrc -x pure_ftpd_enable
+  sysrc -x pure_ftpd_flags
+
+  return
+}
+
+################################################################################################################################
+
+## ProFTPD Installation
+proftpd_install() {
+
+  ### Main Installation
+  make -C "${PORTS_BASE}/${PORT_PROFTPD}" rmconfig
+  make -C "${PORTS_BASE}/${PORT_PROFTPD}" config ftp_proftpd_SET="${PROFTPD_MAKE_OPTIONS_SET}" ftp_proftpd_UNSET="${PROFTPD_MAKE_OPTIONS_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORTS_BASE}/${PORT_PROFTPD}" reinstall clean
+
+  return
+}
+
+################################################################
+
+## ProFTPD Installation
+proftpd_uninstall() {
+
+  sysrc -x proftpd_enable
+
   return
 }
 
@@ -2774,8 +2825,8 @@ clamav_install() {
 
   ## Verify:
   if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then
-    wget ${WGET_CONNECT_OPTIONS} -O /usr/local/etc/exim/exim.clamav.load.conf ${PB_MIRROR}/exim/exim.clamav.load.conf
-    wget ${WGET_CONNECT_OPTIONS} -O /usr/local/etc/exim/exim.clamav.conf ${PB_MIRROR}/exim/exim.clamav.conf
+    ${WGET_WITH_OPTIONS} -O /usr/local/etc/exim/exim.clamav.load.conf ${PB_MIRROR}/exim/exim.clamav.load.conf
+    ${WGET_WITH_OPTIONS} -O /usr/local/etc/exim/exim.clamav.conf ${PB_MIRROR}/exim/exim.clamav.conf
   fi
 
   if [ "${CLAMD_CONF}" -eq 0 ]; then
@@ -2783,11 +2834,11 @@ clamav_install() {
       cp -f /usr/local/etc/clamd.conf.sample "${CLAMD_CONF}"
     fi
 
-    perl -pi -e 's|Example|#Example|' "${CLAMD_CONF}"
-    perl -pi -e 's|#PidFile /var/run/clamd.pid|PidFile /var/run/clamd/clamd.pid|' "${CLAMD_CONF}"
-    perl -pi -e 's|#TCPSocket 3310|TCPSocket 3310|' "${CLAMD_CONF}"
-    perl -pi -e 's|#TCPAddr 127.0.0.1|TCPAddr 127.0.0.1|' "${CLAMD_CONF}"
-    perl -pi -e 's|^LocalSocket|#LocalSocket|' "${CLAMD_CONF}"
+    ${PERL} -pi -e 's|Example|#Example|' "${CLAMD_CONF}"
+    ${PERL} -pi -e 's|#PidFile /var/run/clamd.pid|PidFile /var/run/clamd/clamd.pid|' "${CLAMD_CONF}"
+    ${PERL} -pi -e 's|#TCPSocket 3310|TCPSocket 3310|' "${CLAMD_CONF}"
+    ${PERL} -pi -e 's|#TCPAddr 127.0.0.1|TCPAddr 127.0.0.1|' "${CLAMD_CONF}"
+    ${PERL} -pi -e 's|^LocalSocket|#LocalSocket|' "${CLAMD_CONF}"
   fi
 
   if [ "${FRESHCLAM_CONF}" -eq 0 ]; then
@@ -2795,17 +2846,17 @@ clamav_install() {
       cp -f /usr/local/etc/freshclam.conf.sample "${FRESHCLAM_CONF}"
     fi
 
-    perl -pi -e 's|Example|#Example|' "${FRESHCLAM_CONF}"
-    perl -pi -e 's|#LogSyslog yes|LogSyslog yes|' "${FRESHCLAM_CONF}"
-    perl -pi -e 's|#PidFile /var/run/freshclam.pid|PidFile /var/run/clamd/freshclam.pid|' "${FRESHCLAM_CONF}"
-    perl -pi -e 's|#Checks 24|#Checks 24|' "${FRESHCLAM_CONF}"
-    perl -pi -e 's|#NotifyClamd /path/to/clamd.conf|#NotifyClamd /etc/clamd.conf|' "${FRESHCLAM_CONF}"
+    ${PERL} -pi -e 's|Example|#Example|' "${FRESHCLAM_CONF}"
+    ${PERL} -pi -e 's|#LogSyslog yes|LogSyslog yes|' "${FRESHCLAM_CONF}"
+    ${PERL} -pi -e 's|#PidFile /var/run/freshclam.pid|PidFile /var/run/clamd/freshclam.pid|' "${FRESHCLAM_CONF}"
+    ${PERL} -pi -e 's|#Checks 24|#Checks 24|' "${FRESHCLAM_CONF}"
+    ${PERL} -pi -e 's|#NotifyClamd /path/to/clamd.conf|#NotifyClamd /usr/local/etc/clamd.conf|' "${FRESHCLAM_CONF}"
   fi
 
   ## Verify:
   if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then
-    perl -pi -e 's|#.include_if_exists /usr/local/etc/exim.clamav.load.conf|.include_if_exists /etc/exim.clamav.load.conf|' "${EXIM_CONF}"
-    perl -pi -e 's|#.include_if_exists /usr/local/etc/exim.clamav.conf|.include_if_exists /etc/exim.clamav.conf|' "${EXIM_CONF}"
+    ${PERL} -pi -e 's|#.include_if_exists /usr/local/etc/exim.clamav.load.conf|.include_if_exists /usr/local/etc/exim/exim.clamav.load.conf|' "${EXIM_CONF}"
+    ${PERL} -pi -e 's|#.include_if_exists /usr/local/etc/exim.clamav.conf|.include_if_exists /usr/local/etc/exim/exim.clamav.conf|' "${EXIM_CONF}"
   fi
 
   sysrc clamav_clamd_enable="YES"
@@ -2819,7 +2870,7 @@ clamav_install() {
     ${SERVICE} exim restart
   fi
 
-  return;
+  return
 }
 
 ################################################################
@@ -3742,7 +3793,7 @@ run_dataskq() {
 rewrite_vhosts() {
   PATHNAME=${APACHE_EXTRA_PATH}
 
-  if [ "${WEBSERVER}" = "nginx" ]; then
+  if [ "${OPT_WEBSERVER}" = "nginx" ]; then
     PATHNAME="${NGINXCONF}"
   fi
 
@@ -3752,16 +3803,16 @@ rewrite_vhosts() {
 
   echo -n '' > ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf
 
-  if [ "${WEBSERVER}" = "nginx" ]; then
+  if [ "${OPT_WEBSERVER}" = "nginx" ]; then
     for i in $(ls /usr/local/directadmin/data/users/*/nginx.conf); do
-      echo "include $i;" >> ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf
+      echo "include $i;" >> "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf"
     done
-  elif [ "${WEBSERVER}" = "apache" ]; then
+  elif [ "${OPT_WEBSERVER}" = "apache" ]; then
     for i in $(ls /usr/local/directadmin/data/users/*/httpd.conf); do
-      echo "Include $i" >> ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf
+      echo "Include $i" >> "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf"
     done
-  elif [ "${WEBSERVER}" = "nginx_apache" ]; then
-    echo -n '' > ${NGINXCONF}/directadmin-vhosts.conf
+  elif [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    echo -n '' > "${NGINXCONF}/directadmin-vhosts.conf"
     for i in $(ls /usr/local/directadmin/data/users/*/nginx.conf); do
       echo "include $i;" >> "${NGINXCONF}/directadmin-vhosts.conf"
     done
@@ -3776,9 +3827,12 @@ rewrite_vhosts() {
 
 ## Suhosin Installation
 suhosin_install() {
+
+  ## Main Installation
   pkgi "${PORT_SUHOSIN}"
 
-  if [ ${PHP_SUHOSIN_UPLOADSCAN} = "YES" ] && [ ! -e /usr/local/bin/clamdscan ]; then
+  ## Add support for scanning uploads using ClamAV
+  if [ "${OPT_PHP_SUHOSIN_UPLOADSCAN}" = "YES" ] && [ ! -e /usr/local/bin/clamdscan ]; then
     if [ "${CLAMAV_OPT}" = "no" ]; then
       echo "Cannot install suhosin with PHP upload scan using ClamAV, because /usr/local/bin/clamdscan does not exist on the system and clamav=no is set in the options.conf file."
       exit
@@ -3814,7 +3868,7 @@ tokenize_IP() {
   fi
   if [ "${IP}" = "" ]; then
     echo "Unable to detect your server IP. Exiting..."
-    do_exit 0
+    exit 0 # was: do_exit 0
   fi
 
   if [ "$(echo ${IP} | grep -m1 -c ':')" -gt 0 ]; then
