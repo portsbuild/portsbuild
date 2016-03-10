@@ -11,7 +11,7 @@
 #
 #   Install Exim
 #   Install Dovecot
-#   Install ClamAV
+#   Install ClamAV + misc. integrations
 #   Install Majordomo
 #   Install MariaDB/MySQL
 #   Install php-fpm

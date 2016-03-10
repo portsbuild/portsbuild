@@ -52,14 +52,6 @@ if [ "$(id -u)" != "0" ]; then
   exit 1
 fi
 
-# if (expr) then
-#        echo "test"
-# else if (expr2) then
-#        echo "test"
-# else
-#        echo "test"
-# endif
-
 ## $OSTYPE = FreeBSD
 ## $VENDOR = amd
 ## $MACHTYPE = x86_64
@@ -131,6 +123,8 @@ WGET=/usr/local/bin/wget
 WGET_CONNECT_OPTIONS="--connect-timeout=5 --read-timeout=10 --tries=3"
 WGET_WITH_OPTIONS="${WGET} ${WGET_CONNECT_OPTIONS}"
 TAR=/usr/bin/tar
+
+# alias getFile="${WGET_WITH_OPTIONS} "
 
 ## PortsBuild Paths & Files
 PB_PATH=/usr/local/portsbuild
@@ -378,7 +372,6 @@ PORT_PHP70_EXT=lang/php70-extensions
 PORT_MOD_PHP55=www/mod_php55
 PORT_MOD_PHP56=www/mod_php56
 PORT_MOD_PHP70=www/mod_php70
-
 
 PORT_PHPMYADMIN=databases/phpmyadmin
 PORT_IONCUBE=devel/ioncube
@@ -713,7 +706,7 @@ getVal() {
 
   #echo "${GET_VALUE}"
 
-  return;
+  return
 }
 
 ################################################################################################################################
@@ -777,7 +770,7 @@ pkg_update() {
 
 ## Install packages without prompts
 pkgi() {
-  ${PKG} install -y "$1"
+  ${PKG} install -y "$@"
 }
 
 ################################################################
@@ -790,7 +783,7 @@ ports_update() {
 
 ################################################################
 
-## Rinse & Repeat
+## Todo: Rinse & Repeat
 make_install_clean() {
 
   ## Origin: category/portname
@@ -846,6 +839,7 @@ update_hosts() {
 backup_file() {
   return
 }
+
 ################################################################################################################################
 
 ## Get System Timezone (copied from CB2)
@@ -1030,7 +1024,7 @@ global_setup() {
     /sbin/sysctl net.inet6.ip6.v6only=0
 
     ## Disable sendmail if Exim is enabled
-    if [ "${EXIM_ENABLE}" = "YES" ] || [ "${DISABLE_SENDMAIL}" = "YES" ] ; then
+    if [ "${OPT_EXIM_ENABLE}" = "YES" ] || [ "${OPT_DISABLE_SENDMAIL}" = "YES" ] ; then
       echo "Disabling sendmail from running (updating /etc/rc.conf)"
       sysrc sendmail_enable="NONE"
       sysrc sendmail_submit_enable="NO"
@@ -1090,7 +1084,7 @@ global_setup() {
     chown -f diradmin:diradmin ${CB_CONF}
     chmod 755 "${CB_CONF}"
 
-    ## Skip: DirectAdmin Install
+    ## Skiped for now: DirectAdmin Install
     # cd ${DA_PATH} || exit
     # ./directadmin i
 
@@ -1098,7 +1092,7 @@ global_setup() {
     cd ${DA_PATH} || exit
     ./directadmin p
 
-    #${SERVICE} directadmin start
+    # ${SERVICE} directadmin start
 
     basic_system_security
 
@@ -1128,13 +1122,13 @@ update_rc() {
   ## Todo: check for "${SERVICE_NAME}_INSTALL" as well
   ## Todo: directadmin rc script
 
-  if [ "${NAMED_ENABLE}" = "YES" ]; then
+  if [ "${OPT_NAMED_ENABLE}" = "YES" ]; then
     sysrc named_enable="YES"
   else
     sysrc -x named_enable
   fi
 
-  if [ "${APACHE_ENABLE}" = "YES" ]; then
+  if [ "${OPT_APACHE_ENABLE}" = "YES" ]; then
     sysrc apache24_enable="YES"
     sysrc apache24_http_accept_enable="YES"
     sysrc -f /boot/loader.conf accf_http_load="YES"
@@ -1147,7 +1141,7 @@ update_rc() {
     sysrc -f /boot/loader.conf -x accf_data_load
   fi
 
-  if [ "${NGINX_ENABLE}" = "YES" ]; then
+  if [ "${OPT_NGINX_ENABLE}" = "YES" ]; then
     sysrc nginx_enable="YES"
     sysrc -x apache24_enable
     sysrc -x apache24_http_accept_enable
@@ -1157,19 +1151,19 @@ update_rc() {
     sysrc -x nginx_enable
   fi
 
-  if [ "${SQL_DB_ENABLE}" = "YES" ]; then
+  if [ "${OPT_SQL_DB_ENABLE}" = "YES" ]; then
     sysrc mysql_enable="YES"
     sysrc mysql_dbdir="/var/db/mysql"
     sysrc mysql_optfile="/usr/local/etc/my.cnf"
   fi
 
-  if [ "${PHP_ENABLE}" = "YES" ]; then
+  if [ "${OPT_PHP_ENABLE}" = "YES" ]; then
     sysrc php_fpm_enable="YES"
   else
     sysrc -x php_fpm_enable
   fi
 
-  if [ "${EXIM_ENABLE}" = "YES" ]; then
+  if [ "${OPT_EXIM_ENABLE}" = "YES" ]; then
     sysrc exim_enable="YES"
     sysrc exim_flags="-bd -q1h"
     sysrc -f /etc/periodic.conf daily_status_include_submit_mailq="NO"
@@ -1181,13 +1175,13 @@ update_rc() {
     sysrc -f /etc/periodic.conf -x daily_clean_hoststat_enable
   fi
 
-  if [ "${DOVECOT_ENABLE}" = "YES" ]; then
+  if [ "${OPT_DOVECOT_ENABLE}" = "YES" ]; then
     sysrc dovecot_enable="YES"
   else
     sysrc -x dovecot_enable
   fi
 
-  if [ "${PUREFTPD_ENABLE}" = "YES" ]; then
+  if [ "${OPT_PUREFTPD_ENABLE}" = "YES" ]; then
     sysrc ftpd_enable="NO"
     sysrc pureftpd_enable="YES"
     sysrc -x proftpd_enable
@@ -1195,7 +1189,7 @@ update_rc() {
     sysrc -x pureftpd_enable
   fi
 
-  if [ "${PROFTPD_ENABLE}" = "YES" ]; then
+  if [ "${OPT_PROFTPD_ENABLE}" = "YES" ]; then
     sysrc ftpd_enable="NO"
     sysrc proftpd_enable="YES"
     sysrc -x pureftpd_enable
@@ -1203,7 +1197,7 @@ update_rc() {
     sysrc -x proftpd_enable
   fi
 
-  if [ "${SPAMASSASSIN_ENABLE}" = "YES" ]; then
+  if [ "${OPT_SPAMASSASSIN_ENABLE}" = "YES" ]; then
     sysrc spamd_enable="YES"
     sysrc spamd_flags="-c -m 15"
   else
@@ -1211,7 +1205,7 @@ update_rc() {
     sysrc -x spamd_flags
   fi
 
-  if [ "${SAUTILS_ENABLE}" = "YES" ]; then
+  if [ "${OPT_SAUTILS_ENABLE}" = "YES" ]; then
     sysrc -f /etc/periodic.conf daily_sa_enable="YES"
     sysrc -f /etc/periodic.conf daily_sa_quiet="NO"
     sysrc -f /etc/periodic.conf daily_sa_compile_nice="YES"
@@ -1226,7 +1220,7 @@ update_rc() {
     sysrc -f /etc/periodic.conf -x daily_sa_restart_spamd
   fi
 
-  if [ "${CLAMAV_ENABLE}" = "YES" ]; then
+  if [ "${OPT_CLAMAV_ENABLE}" = "YES" ]; then
     sysrc clamav_clamd_enable="YES"
     sysrc clamav_freshclam_enable="YES"
   else
@@ -1642,19 +1636,19 @@ verify_webapps_logrotate() {
 
     NSL_VALUE=${WEBAPPS_USER}:${WEBAPPS_GROUP}
 
-    if [ "${PHP1_MODE}" = "mod_php" ]; then
+    if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
       NSL_VALUE=${APACHE_USER}:${APACHE_GROUP}
     fi
 
-    if [ "${ROUNDCUBE_ENABLE}" = "YES" ]; then
+    if [ "${OPT_ROUNDCUBE_ENABLE}" = "YES" ]; then
       freebsd_set_newsyslog "${WWW_DIR}/roundcube/logs/errors" ${NSL_VALUE}
     fi
 
-    if [ "${SQUIRRELMAIL_ENABLE}" = "YES" ]; then
+    if [ "${OPT_SQUIRRELMAIL_ENABLE}" = "YES" ]; then
       freebsd_set_newsyslog "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" ${NSL_VALUE}
     fi
 
-    if [ "${PHPMYADMIN_ENABLE}" = "YES" ]; then
+    if [ "${OPT_PHPMYADMIN_ENABLE}" = "YES" ]; then
       freebsd_set_newsyslog "${WWW_DIR}/phpMyAdmin/log/auth.log" ${NSL_VALUE}
     fi
 
@@ -2779,7 +2773,7 @@ clamav_install() {
   make -C "${PORTS_BASE}/${PORT_CLAMAV}" reinstall clean
 
   ## Verify:
-  if [ "${CLAMAV_EXIM_ENABLE}" = "YES" ]; then
+  if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then
     wget ${WGET_CONNECT_OPTIONS} -O /usr/local/etc/exim/exim.clamav.load.conf ${PB_MIRROR}/exim/exim.clamav.load.conf
     wget ${WGET_CONNECT_OPTIONS} -O /usr/local/etc/exim/exim.clamav.conf ${PB_MIRROR}/exim/exim.clamav.conf
   fi
@@ -2809,7 +2803,7 @@ clamav_install() {
   fi
 
   ## Verify:
-  if [ "${CLAMAV_EXIM_ENABLE}" = "YES" ]; then
+  if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then
     perl -pi -e 's|#.include_if_exists /usr/local/etc/exim.clamav.load.conf|.include_if_exists /etc/exim.clamav.load.conf|' "${EXIM_CONF}"
     perl -pi -e 's|#.include_if_exists /usr/local/etc/exim.clamav.conf|.include_if_exists /etc/exim.clamav.conf|' "${EXIM_CONF}"
   fi
@@ -2820,7 +2814,7 @@ clamav_install() {
   ${SERVICE} clamav-clamd start
   ${SERVICE} clamav-freshclam start
 
-  if [ "${CLAMAV_EXIM_ENABLE}" = "YES" ]; then
+  if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then
     echo "Restarting Exim"
     ${SERVICE} exim restart
   fi
@@ -3083,7 +3077,7 @@ roundcube_install() {
       fi
 
       ## Pigeonhole plugin (untested):
-      if [ "${PIGEONHOLE_ENABLE}" = "YES" ]; then
+      if [ "${OPT_PIGEONHOLE_ENABLE}" = "YES" ]; then
         if [ -d ${ROUNDCUBE_PATH}/plugins/managesieve ]; then
 
           if [ "$(grep -m1 -c "'managesieve'" ${ROUNDCUBE_CONF})" -eq 0 ]; then
@@ -3133,7 +3127,7 @@ roundcube_install() {
   fi
 
   ## Systems with suhosin cannot have PHP memory_limit set to -1. Must prevent suhosin from loading for RoundCube's .sh scripts
-  if [ "${SUHOSIN_ENABLE}" = "YES" ]; then
+  if [ "${OPT_SUHOSIN_ENABLE}" = "YES" ]; then
     ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/msgimport.sh
     ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/indexcontacts.sh
     ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/msgexport.sh
@@ -3505,7 +3499,7 @@ rewrite_confs() {
     fi
 
     ## mod_security (not done):
-    if [ "${MODSECURITY_ENABLE}" = "yes" ] && [ "${WEBSERVER}" = "apache" ]; then
+    if [ "${OPT_MODSECURITY_ENABLE}" = "yes" ] && [ "${WEBSERVER}" = "apache" ]; then
       ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' "${APACHE_CONF}"
       echo "Include ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf" >> "${PHPMODULES}"
       cp -pf "${MODSECURITY_APACHE_INCLUDE}" ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf
@@ -4243,7 +4237,7 @@ validate_options() {
 
   ## Port/Package Options
   case ${PHP1_VERSION} in
-    55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION} ;;
+    55|56|70) OPT_PHP1_VERSION=${OPT_PHP1_VERSION} ;;
     *) echo "*** Error: Invalid PHP version set in options.conf"; exit ;;
   esac
 
@@ -4255,48 +4249,132 @@ validate_options() {
   ## additional checks for PHP, then:
   ## OPT_PHP_ENABLE="YES"
 
-  case $(uc ${WEBSERVER}) in
-    APACHE|APACHE24) APACHE_ENABLE="YES" ;;
-    NGINX) NGINX_ENABLE="YES" ;;
-    *) echo "*** Error: Invalid WEBSERVER set in options.conf"; exit ;;
-  esac
-
-  case $(uc ${APACHE_MPM}) in
-    EVENT|PREFORK|WORKER) APACHE_ENABLE="YES" ;;
-    *) echo "*** Error: Invalid APACHE_MPM set in options.conf"; exit ;;
-  esac
-
-  case $(uc ${SQL_DB_SERVER}) in
-    MYSQL55|MYSQL56|MYSQL57|MARIADB55|MARIADB100) SQL_DB_ENABLE="YES" ;;
-    *) echo "*** Error: Invalid SQL_DB_Server set in options.conf"; exit ;;
-  esac
-
   case $(lc ${PHP_INI_TYPE}) in
-    production|development) ;;
+    production|development) OPT_PHP_INI_TYPE=${PHP_INI_TYPE} ;;
     custom) ;;
     *) echo "*** Error: Invalid PHP.ini type set in options.conf"; exit ;;
   esac
 
-  ## Optional installations
-  if [ "${PB_SYMLINK}" = "YES" ]; then
+  case $(uc ${WEBSERVER}) in
+    APACHE|APACHE24) OPT_APACHE_ENABLE="YES" ;;
+    NGINX) OPT_NGINX_ENABLE="YES" ;;
+    *) echo "*** Error: Invalid WEBSERVER set in options.conf"; exit ;;
+  esac
+
+  case $(uc ${APACHE_MPM}) in
+    EVENT|PREFORK|WORKER) OPT_APACHE_ENABLE="YES" ;;
+    *) echo "*** Error: Invalid APACHE_MPM set in options.conf"; exit ;;
+  esac
+
+  case $(uc ${SQL_DB_SERVER}) in
+    MYSQL55|MYSQL56|MYSQL57|MARIADB55|MARIADB100) OPT_SQL_DB_ENABLE="YES" ;;
+    *) echo "*** Error: Invalid SQL_DB_Server set in options.conf"; exit ;;
+  esac
+
+  case $(uc ${FTPD_SERVER}) in
+    PUREFTPD|PURE-FTPD) OPT_FTPD_SERVER="PUREFTPD" ;;
+    PROFTPD|PRO-FTPD) OPT_FTPD_SERVER="PROFTPD" ;;
+    *) echo "*** Error: Invalid FTPD_SERVER set in options.conf"; exit ;;
+  esac
+
+  if [ "$(uc ${EXIM_ENABLE})" = "YES" ]; then
+    OPT_EXIM_ENABLE="YES"
+  else
+    OPT_EXIM_ENABLE="NO"
+  fi
+
+  if [ "$(uc ${DOVECOT_ENABLE})" = "YES" ]; then
+    OPT_DOVECOT_ENABLE="YES"
+  else
+    OPT_DOVECOT_ENABLE="NO"
+  fi
+
+  if [ "$(uc ${CLAMAV_ENABLE})" = "YES" ]; then
+    OPT_CLAMAV_ENABLE="YES"
+  else
+    OPT_CLAMAV_ENABLE="NO"
+  fi
+
+  if [ "$(uc ${SPAMASSASSIN_ENABLE})" = "YES" ]; then
+    OPT_SPAMASSASSIN_ENABLE="YES"
+  else
+    OPT_SPAMASSASSIN_ENABLE="NO"
+  fi
+
+  if [ "$(uc "${SAUTILS_ENABLE}")" = "YES" ]; then
+    OPT_SAUTILS_ENABLE="YES"
+  else
+    OPT_SAUTILS_ENABLE="NO"
+  fi
+
+  if [ "$(uc "${CLAMAV_WITH_EXIM}")" = "YES" ]; then
+    OPT_CLAMAV_WITH_EXIM="YES"
+  else
+    OPT_CLAMAV_WITH_EXIM="NO"
+  fi
+
+  if [ "$(uc "${MAJORDOMO_ENABLE}")" = "YES" ]; then
+    OPT_MAJORDOMO_ENABLE="YES"
+  else
+    OPT_MAJORDOMO_ENABLE="NO"
+  fi
+
+  if [ "$(uc "${PHPMYADMIN_ENABLE}")" = "YES" ]; then
+    OPT_PHPMYADMIN_ENABLE="YES"
+  else
+    OPT_PHPMYADMIN_ENABLE="NO"
+  fi
+
+  if [ "$(uc "${SUHOSIN_ENABLE}")" = "YES" ]; then
+    OPT_SUHOSIN_ENABLE="YES"
+  else
+    OPT_SUHOSIN_ENABLE="NO"
+  fi
+
+  if [ "$(uc "${MODSECURITY_ENABLE}")" = "YES" ]; then
+    OPT_MODSECURITY_ENABLE="YES"
+  else
+    OPT_MODSECURITY_ENABLE="NO"
+  fi
+
+  if [ "$(uc "${PIGEONHOLE_ENABLE}")" = "YES" ]; then
+    OPT_PIGEONHOLE_ENABLE="YES"
+  else
+    OPT_PIGEONHOLE_ENABLE="NO"
+  fi
+
+  if [ "$(uc "${ROUNDCUBE_ENABLE}")" = "YES" ]; then
+    OPT_ROUNDCUBE_ENABLE="YES"
+  else
+    OPT_ROUNDCUBE_ENABLE="NO"
+  fi
+
+  if [ "$(uc "${ROUNDCUBE_ENABLE}")" = "YES" ]; then
+    OPT_ROUNDCUBE_ENABLE="YES"
+  else
+    OPT_ROUNDCUBE_ENABLE="NO"
+  fi
+
+  ## Optional stuff
+  if [ "$(uc ${PB_SYMLINK})" = "YES" ]; then
     OPT_PB_SYMLINK="YES"
   else
     OPT_PB_SYMLINK="NO"
   fi
 
-  if [ "${INSTALL_CCACHE}" = "YES" ]; then
+  if [ "$(uc "${INSTALL_CCACHE}")" = "YES" ]; then
     OPT_INSTALL_CCACHE="YES"
   else
     OPT_INSTALL_CCACHE="NO"
   fi
 
-  if [ "${INSTALL_SYNTH}" = "YES" ]; then
+  if [ "$(uc "${INSTALL_SYNTH}")" = "YES" ]; then
     OPT_INSTALL_SYNTH="YES"
   else
     OPT_INSTALL_SYNTH="NO"
   fi
 
-  ## Following is from DA's setup.sh and/or install.sh:
+  ## Following ~20 lines are from DA's setup.sh:
   DA_LAN=0
   if [ -s /root/.lan ]; then
     DA_LAN=$(cat /root/.lan)
@@ -4305,6 +4383,13 @@ validate_options() {
   INSECURE=0
   if [ -s /root/.insecure_download ]; then
     INSECURE=$(cat /root/.insecure_download)
+  fi
+
+  HTTP=https
+  EXTRA_VALUE=""
+  if [ "${INSECURE}" -eq 1 ]; then
+    HTTP=http
+    EXTRA_VALUE='&insecure=yes'
   fi
 
   BIND_ADDRESS=--bind-address=$IP
