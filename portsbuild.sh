@@ -42,7 +42,7 @@
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160308
+PB_BUILD_DATE=20160310
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -317,12 +317,12 @@ NEWSYSLOG_DAYS=10
 ## User Option Defaults:
 # WEBSERVER=apache
 # APACHE_MPM=event
-# SQL_DB_SERVER=mariadb100
-# CLAMAV_ENABLE=YES
-# SPAMASSASSIN_ENABLE=YES
-# SAUTILS_ENABLE=YES
-# PHPMYADMIN_ENABLE=YES
-# ROUNDCUBE_ENABLE=YES
+# SQL_DB=mariadb100
+# CLAMAV=YES
+# SPAMASSASSIN=YES
+# SAUTILS=YES
+# PHPMYADMIN=YES
+# ROUNDCUBE=YES
 
 
 ################################################################################################################################
@@ -410,7 +410,6 @@ PORT_MARIADB100_CLIENT=databases/mariadb100-client
 ## Ports: Web Stats
 PORT_AWSTATS=www/awstats
 PORT_WEBALIZER=www/webalizer
-
 
 ################################################################################################################################
 
@@ -897,7 +896,6 @@ global_setup() {
   ## $4 = server_hostname
   ## $5 = eth_dev
   ## $6 = ip_address
-  ## Note to self: 'shift'
 
   if [ "${DA_ADMIN_EMAIL}" = "" ]; then
     DA_ADMIN_EMAIL="${DA_ADMIN_USERNAME}@${SERVER_DOMAIN}"
@@ -906,7 +904,7 @@ global_setup() {
   ## Make sure all inputs are entered (get rid of IP?)
   if [ "${1}" = "" ] || [ "${2}" = "" ] || [ "${3}" = "" ] || [ "${4}" = "" ] || [ "${5}" = "" ] || [ "${6}" = "" ]; then
     show_menu_setup
-    return;
+    return
   else
     DA_USER_ID=$2
     DA_LICENSE_ID=$3
@@ -1020,11 +1018,10 @@ global_setup() {
     echo "Setting ipv6_ipv4mapping=YES in /etc/rc.conf"
     sysrc ipv6_ipv4mapping="YES"
     sysrc -f /etc/sysctl.conf net.inet6.ip6.v6only=0
-
     /sbin/sysctl net.inet6.ip6.v6only=0
 
     ## Disable sendmail if Exim is enabled
-    if [ "${OPT_EXIM_ENABLE}" = "YES" ] || [ "${OPT_DISABLE_SENDMAIL}" = "YES" ] ; then
+    if [ "${OPT_EXIM}" = "YES" ] || [ "${OPT_DISABLE_SENDMAIL}" = "YES" ] ; then
       echo "Disabling sendmail from running (updating /etc/rc.conf)"
       sysrc sendmail_enable="NONE"
       sysrc sendmail_submit_enable="NO"
@@ -1056,7 +1053,7 @@ global_setup() {
     majordomo_install
     apache_install
     php_install
-    install_app mariadb100
+    install_app mariadb100 ## test
     blockcracking_install
     easyspamfighter_install
     clamav_install
@@ -1069,7 +1066,7 @@ global_setup() {
     directadmin_install
 
     ## Create a spoof CustomBuild2 options.conf for DirectAdmin compatibility.
-    if [ ! -d ${CB_PATH} ]; then
+    if [ ! -d "${CB_PATH}" ]; then
       mkdir -p ${CB_PATH}
     fi
 
@@ -1118,17 +1115,16 @@ update_rc() {
   ## Go through installed/enabled services and make sure they're all enabled.
   ## Perhaps rename this function to verify_rc?
 
-  ## Todo: refactor with "${SERVICE_NAME}_ENABLE"
-  ## Todo: check for "${SERVICE_NAME}_INSTALL" as well
+  ## Todo: refactor with "${SERVICE_NAME}_enable"
   ## Todo: directadmin rc script
 
-  if [ "${OPT_NAMED_ENABLE}" = "YES" ]; then
+  if [ "${OPT_NAMED}" = "YES" ]; then
     sysrc named_enable="YES"
   else
     sysrc -x named_enable
   fi
 
-  if [ "${OPT_APACHE_ENABLE}" = "YES" ]; then
+  if [ "${OPT_WEBSERVER}" = "apache" ]; then
     sysrc apache24_enable="YES"
     sysrc apache24_http_accept_enable="YES"
     sysrc -f /boot/loader.conf accf_http_load="YES"
@@ -1141,7 +1137,7 @@ update_rc() {
     sysrc -f /boot/loader.conf -x accf_data_load
   fi
 
-  if [ "${OPT_NGINX_ENABLE}" = "YES" ]; then
+  if [ "${OPT_WEBSERVER}" = "nginx" ]; then
     sysrc nginx_enable="YES"
     sysrc -x apache24_enable
     sysrc -x apache24_http_accept_enable
@@ -1151,19 +1147,19 @@ update_rc() {
     sysrc -x nginx_enable
   fi
 
-  if [ "${OPT_SQL_DB_ENABLE}" = "YES" ]; then
+  if [ "${OPT_SQL_DB}" != "NO" ]; then
     sysrc mysql_enable="YES"
     sysrc mysql_dbdir="/var/db/mysql"
     sysrc mysql_optfile="/usr/local/etc/my.cnf"
   fi
 
-  if [ "${OPT_PHP_ENABLE}" = "YES" ]; then
+  if [ "${OPT_PHP1_MODE}" = "fpm" ]; then
     sysrc php_fpm_enable="YES"
   else
     sysrc -x php_fpm_enable
   fi
 
-  if [ "${OPT_EXIM_ENABLE}" = "YES" ]; then
+  if [ "${OPT_EXIM}" = "YES" ]; then
     sysrc exim_enable="YES"
     sysrc exim_flags="-bd -q1h"
     sysrc -f /etc/periodic.conf daily_status_include_submit_mailq="NO"
@@ -1175,13 +1171,13 @@ update_rc() {
     sysrc -f /etc/periodic.conf -x daily_clean_hoststat_enable
   fi
 
-  if [ "${OPT_DOVECOT_ENABLE}" = "YES" ]; then
+  if [ "${OPT_DOVECOT}" = "YES" ]; then
     sysrc dovecot_enable="YES"
   else
     sysrc -x dovecot_enable
   fi
 
-  if [ "${OPT_PUREFTPD_ENABLE}" = "YES" ]; then
+  if [ "${OPT_FTPD}" = "pureftpd" ]; then
     sysrc ftpd_enable="NO"
     sysrc pureftpd_enable="YES"
     sysrc -x proftpd_enable
@@ -1189,7 +1185,7 @@ update_rc() {
     sysrc -x pureftpd_enable
   fi
 
-  if [ "${OPT_PROFTPD_ENABLE}" = "YES" ]; then
+  if [ "${OPT_FTPD}" = "proftpd" ]; then
     sysrc ftpd_enable="NO"
     sysrc proftpd_enable="YES"
     sysrc -x pureftpd_enable
@@ -1197,7 +1193,7 @@ update_rc() {
     sysrc -x proftpd_enable
   fi
 
-  if [ "${OPT_SPAMASSASSIN_ENABLE}" = "YES" ]; then
+  if [ "${OPT_SPAMASSASSIN}" = "YES" ]; then
     sysrc spamd_enable="YES"
     sysrc spamd_flags="-c -m 15"
   else
@@ -1205,7 +1201,7 @@ update_rc() {
     sysrc -x spamd_flags
   fi
 
-  if [ "${OPT_SAUTILS_ENABLE}" = "YES" ]; then
+  if [ "${OPT_SAUTILS}" = "YES" ] && [ "${OPT_SPAMASSASSIN}" = "YES" ]; then
     sysrc -f /etc/periodic.conf daily_sa_enable="YES"
     sysrc -f /etc/periodic.conf daily_sa_quiet="NO"
     sysrc -f /etc/periodic.conf daily_sa_compile_nice="YES"
@@ -1220,7 +1216,7 @@ update_rc() {
     sysrc -f /etc/periodic.conf -x daily_sa_restart_spamd
   fi
 
-  if [ "${OPT_CLAMAV_ENABLE}" = "YES" ]; then
+  if [ "${OPT_CLAMAV}" = "YES" ]; then
     sysrc clamav_clamd_enable="YES"
     sysrc clamav_freshclam_enable="YES"
   else
@@ -1235,6 +1231,10 @@ update_rc() {
 
 ## Setup BIND (named)
 bind_setup() {
+
+  if [ "${OPT_NAMED}" = "NO" ]; then
+    return
+  fi
 
   ## Todo: change to PB mirrors instead of using github repo for file storage
 
@@ -1640,15 +1640,15 @@ verify_webapps_logrotate() {
       NSL_VALUE=${APACHE_USER}:${APACHE_GROUP}
     fi
 
-    if [ "${OPT_ROUNDCUBE_ENABLE}" = "YES" ]; then
+    if [ "${OPT_ROUNDCUBE}" = "YES" ]; then
       freebsd_set_newsyslog "${WWW_DIR}/roundcube/logs/errors" ${NSL_VALUE}
     fi
 
-    if [ "${OPT_SQUIRRELMAIL_ENABLE}" = "YES" ]; then
+    if [ "${OPT_SQUIRRELMAIL}" = "YES" ]; then
       freebsd_set_newsyslog "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" ${NSL_VALUE}
     fi
 
-    if [ "${OPT_PHPMYADMIN_ENABLE}" = "YES" ]; then
+    if [ "${OPT_PHPMYADMIN}" = "YES" ]; then
       freebsd_set_newsyslog "${WWW_DIR}/phpMyAdmin/log/auth.log" ${NSL_VALUE}
     fi
 
@@ -2724,7 +2724,7 @@ nginx_install() {
   sysrc -x apache24_enable
   sysrc -x apache24_http_accept_enable
 
-  return;
+  return
 }
 
 ################################################################
@@ -2747,13 +2747,17 @@ nginx_uninstall() {
 
   sysrc -x nginx_enable
 
-  return;
+  return
 }
 
 ################################################################################################################################
 
 ## Majordomo Uninstall
 majordomo_install() {
+
+  if [ "${OPT_MAJORDOMO}" = "NO" ]; then
+    echo "*** Error: Majordomo not enabled in options.conf"
+  fi
 
   ## majordomo.sh script
 
@@ -2771,6 +2775,10 @@ majordomo_uninstall() {
 
 ## PureFTPD Installation
 pureftpd_install() {
+
+  if [ "${OPT_FTPD}" = "NO" ]; then
+    echo "*** Error: FTPD not set in options.conf"
+  fi
 
   ### Main Installation
   make -C "${PORTS_BASE}/${PORT_PUREFTPD}" rmconfig
@@ -2795,10 +2803,18 @@ pureftpd_uninstall() {
 ## ProFTPD Installation
 proftpd_install() {
 
+  if [ "${OPT_FTPD}" = "NO" ]; then
+    echo "*** Error: FTPD not set in options.conf"
+  fi
+
   ### Main Installation
   make -C "${PORTS_BASE}/${PORT_PROFTPD}" rmconfig
   make -C "${PORTS_BASE}/${PORT_PROFTPD}" config ftp_proftpd_SET="${PROFTPD_MAKE_OPTIONS_SET}" ftp_proftpd_UNSET="${PROFTPD_MAKE_OPTIONS_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
   make -C "${PORTS_BASE}/${PORT_PROFTPD}" reinstall clean
+
+  if [ "${OPT_CLAMAV_WITH_PROFTPD}" = "YES" ]; then
+    proftpd_clamav_install
+  fi
 
   return
 }
@@ -2817,6 +2833,10 @@ proftpd_uninstall() {
 
 ## ClamAV Installation Tasks
 clamav_install() {
+
+  if [ "${OPT_CLAMAV}" = "NO" ]; then
+    echo "*** Error: ClamAV not enabled in options.conf"
+  fi
 
   ### Main Installation
   make -C "${PORTS_BASE}/${PORT_CLAMAV}" rmconfig
@@ -2888,6 +2908,11 @@ clamav_uninstall() {
 
 ## RoundCube Installation
 roundcube_install() {
+
+  if [ "${OPT_ROUNDCUBE}" = "NO" ]; then
+    echo "*** Error: RoundCube not enabled in options.conf"
+    return
+  fi
 
   ### Main Installation
   make -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" rmconfig
@@ -3052,7 +3077,7 @@ roundcube_install() {
 
       ## CB2: Changing default options that are set in defaults.inc.php
       ## Add "Inbox" prefix to IMAP folders (if requested)
-      if [ "${WEBAPPS_INBOX_PREFIX}" = "YES" ]; then
+      if [ "${OPT_WEBAPPS_INBOX_PREFIX}" = "YES" ]; then
         {
           echo "\$config['drafts_mbox'] = 'INBOX.Drafts';"
           echo "\$config['junk_mbox'] = '${SPAM_FOLDER}';"
@@ -3088,7 +3113,7 @@ roundcube_install() {
 
       ## mime.types
       if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
-        #if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "litespeed" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+        #if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "litespeed" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
           if [ -s ${APACHE_MIME_TYPES} ]; then
             if grep -m1 -q 'application/java-archive' ${APACHE_MIME_TYPES}; then
               cp -f ${APACHE_MIME_TYPES} ${ROUNDCUBE_PATH}/config/mime.types
@@ -3128,7 +3153,7 @@ roundcube_install() {
       fi
 
       ## Pigeonhole plugin (untested):
-      if [ "${OPT_PIGEONHOLE_ENABLE}" = "YES" ]; then
+      if [ "${OPT_PIGEONHOLE}" = "YES" ]; then
         if [ -d ${ROUNDCUBE_PATH}/plugins/managesieve ]; then
 
           if [ "$(grep -m1 -c "'managesieve'" ${ROUNDCUBE_CONF})" -eq 0 ]; then
@@ -3178,7 +3203,7 @@ roundcube_install() {
   fi
 
   ## Systems with suhosin cannot have PHP memory_limit set to -1. Must prevent suhosin from loading for RoundCube's .sh scripts
-  if [ "${OPT_SUHOSIN_ENABLE}" = "YES" ]; then
+  if [ "${OPT_SUHOSIN}" = "YES" ]; then
     ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/msgimport.sh
     ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/indexcontacts.sh
     ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/msgexport.sh
@@ -3357,7 +3382,7 @@ verify_webapps_tmp() {
 #do_ApacheHostConf() {
 apache_rewrite_confs() {
 
-  if [ "${WEBSERVER}" = "apache" ]; then
+  if [ "${OPT_WEBSERVER}" = "apache" ]; then
 
     APACHE_HOST_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
 
@@ -3452,7 +3477,7 @@ apache_rewrite_confs() {
 ## Rewrite Confs (copied from CB2)
 rewrite_confs() {
 
-  if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
 
     # Copy the new configs
     cp -rf "${PB_PATH}/configure/ap2/" "${APACHE_PATH}"
@@ -3550,7 +3575,7 @@ rewrite_confs() {
     fi
 
     ## mod_security (not done):
-    if [ "${OPT_MODSECURITY_ENABLE}" = "yes" ] && [ "${WEBSERVER}" = "apache" ]; then
+    if [ "${OPT_MODSECURITY}" = "yes" ] && [ "${OPT_WEBSERVER}" = "apache" ]; then
       ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' "${APACHE_CONF}"
       echo "Include ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf" >> "${PHPMODULES}"
       cp -pf "${MODSECURITY_APACHE_INCLUDE}" ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf
@@ -3570,7 +3595,7 @@ rewrite_confs() {
     ## Verfiy:
     if ! grep -m1 -q "${APACHE_LIB_PATH}/mod_mpm_" "${PHPMODULES}"; then
       ## Use event MPM for php-fpm and prefork for mod_php
-      if [ "${APACHE_MPM}" = "AUTO" ]; then
+      if [ "${OPT_APACHE_MPM}" = "auto" ]; then
         if [ "${HAVE_CLI}" = "no" ]; then
           ## Add to httpd-phpmodules.conf
           echo "LoadModule mpm_event_module ${APACHE_LIB_PATH}/mod_mpm_event.so" >> "${PHPMODULES}"
@@ -3578,9 +3603,9 @@ rewrite_confs() {
           ## Add to httpd-phpmodules.conf
           echo "LoadModule mpm_prefork_module ${APACHE_LIB_PATH}/mod_mpm_prefork.so" >> "${PHPMODULES}"
         fi
-      elif [ "${APACHE_MPM}" = "EVENT" ]; then
+      elif [ "${OPT_APACHE_MPM}" = "event" ]; then
         echo "LoadModule mpm_event_module ${APACHE_LIB_PATH}/mod_mpm_event.so" >> "${PHPMODULES}"
-      elif [ "${APACHE_MPM}" = "WORKER" ]; then
+      elif [ "${OPT_APACHE_MPM}" = "worker" ]; then
         echo "LoadModule mpm_worker_module ${APACHE_LIB_PATH}/mod_mpm_worker.so" >> "${PHPMODULES}"
       else
         echo "LoadModule mpm_prefork_module ${APACHE_LIB_PATH}/mod_mpm_prefork.so" >> "${PHPMODULES}"
@@ -3594,8 +3619,8 @@ rewrite_confs() {
     ## Add correct PHP module to httpd-phpmodules.conf
 
     ## PHP1: mod_php
-    if [ "${PHP1_MODE}" = "mod_php" ]; then
-      if [ "${PHP1_VERSION}" = "70" ]; then
+    if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
+      if [ "${OPT_PHP1_VERSION}" = "70" ]; then
         echo "LoadModule  php7_module   ${APACHE_LIB_PATH}/libphp7.so" >> "${PHPMODULES}"
       else
         echo "LoadModule  php5_module   ${APACHE_LIB_PATH}/libphp5.so" >> "${PHPMODULES}"
@@ -3603,8 +3628,8 @@ rewrite_confs() {
     fi
 
     ## PHP2: mod_php
-    if [ "${PHP2_MODE}" = "mod_php" ] && [ "${PHP2_VERSION}" != "" ]; then
-      if [ "${PHP2_VERSION}" = "70" ]; then
+    if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${OPT_PHP2_VERSION}" != "" ]; then
+      if [ "${OPT_PHP2_VERSION}" = "70" ]; then
         echo "LoadModule    php7_module             ${APACHE_LIB_PATH}/libphp7.so" >> "${PHPMODULES}"
       else
         echo "LoadModule    php5_module             ${APACHE_LIB_PATH}/libphp5.so" >> "${PHPMODULES}"
@@ -3675,7 +3700,7 @@ rewrite_confs() {
     ## Todo:
     create_httpd_nginx
 
-    if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+    if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
       echo "Restarting Apache"
       ${SERVICE} apachectl restart
     fi
@@ -3683,7 +3708,7 @@ rewrite_confs() {
 
   ## Nginx:
 
-  if [ "${WEBSERVER}" = "nginx" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+  if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     #copy the new configs
     cp -rf ${NGINXCONFDIR}/* "${NGINX_CONF}"
 
@@ -3762,7 +3787,7 @@ rewrite_confs() {
     service nginx restart
   fi
 
-  if [ "${WEBSERVER}" = "nginx_apache" ]; then
+  if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     setVal nginx 0 ${DA_CONF_TEMPLATE_FILE}
     setVal nginx 0 ${DA_CONF_FILE}
     setVal nginx_proxy 1 ${DA_CONF_TEMPLATE_FILE}
@@ -3879,7 +3904,7 @@ tokenize_IP() {
 
   LAN_IP=$(getDA_Opt lan_ip "")
 
-  if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "litespeed" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "litespeed" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     if [ -e ${TOKENFILE_APACHE} ]; then
       if [ "$(grep -m1 -c '|IP|' ${TOKENFILE_APACHE})" -gt "0" ]; then
         STR="perl -pi -e 's/\|IP\|/$IP/' ${TOKENFILE_APACHE}"
@@ -3888,7 +3913,7 @@ tokenize_IP() {
     fi
   fi
 
-  if [ "${WEBSERVER}" = "nginx" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+  if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     if [ -e "${TOKENFILE_NGINX}" ]; then
       if [ "$(grep -m1 -c '|IP|' ${TOKENFILE_NGINX})" -gt "0" ]; then
         if [ "${LAN_IP}" != "" ]; then
@@ -3937,7 +3962,7 @@ tokenize_ports() {
   fi
   TOKENFILE_NGINX_USERDIR=${NGINXCONF}/nginx-userdir.conf
 
-  if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "litespeed" ]; then
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "litespeed" ]; then
     if [ -e ${TOKENFILE_APACHE} ]; then
       if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_APACHE})" -gt "0" ]; then
         STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_APACHE}"
@@ -3965,7 +3990,7 @@ tokenize_ports() {
     fi
   fi
 
-  if [ "${WEBSERVER}" = "nginx" ]; then
+  if [ "${OPT_WEBSERVER}" = "nginx" ]; then
     if [ -e "${TOKENFILE_NGINX}" ]; then
       if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_NGINX})" -gt "0" ]; then
         STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX}"
@@ -3989,7 +4014,7 @@ tokenize_ports() {
     fi
   fi
 
-  if [ "${WEBSERVER}" = "nginx_apache" ]; then
+  if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     if [ -e "${TOKENFILE_NGINX}" ]; then
       if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_NGINX})" -gt "0" ]; then
         STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX}"
@@ -4082,7 +4107,7 @@ rewrite_php_confs() {
 
   fpmChecks
 
-  if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
 
     doApacheHostConf
 
@@ -4142,7 +4167,7 @@ rewrite_php_confs() {
     fi
   done
 
-  if [ "${WEBSERVER}" = "apache" ] || [ "${WEBSERVER}" = "nginx_apache" ]; then
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
       ## Writing data to suphp.conf:
       (
@@ -4292,12 +4317,14 @@ validate_options() {
   ## Port/Package Options
   case ${PHP1_VERSION} in
     55|56|70) OPT_PHP1_VERSION=${OPT_PHP1_VERSION} ;;
-    *) echo "*** Error: Invalid PHP version set in options.conf"; exit ;;
+    *) echo "*** Error: Invalid PHP1_VERSION value set in options.conf"; exit ;;
   esac
 
-  case $(uc ${PHP1_MODE}) in
-    FPM|SUPHP|MODPHP|MOD_PHP) OPT_PHP1_MODE=${PHP1_MODE} ;;
-    *) echo "*** Error: Invalid PHP mode set in options.conf"; exit ;;
+  case $(lc ${PHP1_MODE}) in
+    fpm|phpfpm|php-fpm) OPT_PHP1_MODE="fpm" ;;
+    suphp) OPT_PHP1_MODE="suphp" ;;
+    modphp|mod_php|mod|mod-php) OPT_PHP1_MODE="modphp" ;;
+    *) echo "*** Error: Invalid PHP1_MODE value set in options.conf"; exit ;;
   esac
 
   ## additional checks for PHP, then:
@@ -4305,60 +4332,57 @@ validate_options() {
 
   case $(lc ${PHP_INI_TYPE}) in
     production|development) OPT_PHP_INI_TYPE=${PHP_INI_TYPE} ;;
-    custom) ;;
+    custom) OPT_PHP_INI_TYPE="custom" ;;
+    no|none) OPT_PHP_INI_TYPE="none" ;;
     *) echo "*** Error: Invalid PHP.ini type set in options.conf"; exit ;;
   esac
 
-  case $(uc ${WEBSERVER}) in
-    APACHE|APACHE24) OPT_APACHE_ENABLE="YES" ;;
-    NGINX) OPT_NGINX_ENABLE="YES" ;;
-    *) echo "*** Error: Invalid WEBSERVER set in options.conf"; exit ;;
+  case $(lc ${WEBSERVER}) in
+    apache|apache24) OPT_WEBSERVER="apache24"
+    case $(lc ${APACHE_MPM}) in
+      event|prefork|worker) OPT_APACHE_MPM="${OPT_APACHE_MPM}" ;;
+      auto) OPT_APACHE_MPM="event" ;;
+      *) echo "*** Error: Invalid APACHE_MPM value set in options.conf"; exit ;;
+    esac ;;
+    nginx) OPT_WEBSERVER="nginx" ;;
+    no|none) OPT_WEBSERVER="NO" ;;
+    *) echo "*** Error: Invalid WEBSERVER value set in options.conf"; exit ;;
   esac
 
-  case $(uc ${APACHE_MPM}) in
-    EVENT|PREFORK|WORKER) OPT_APACHE_ENABLE="YES" ;;
-    *) echo "*** Error: Invalid APACHE_MPM set in options.conf"; exit ;;
+  case $(lc ${SQL_DB}) in
+    mysql55|mysql56|mysql57|mariadb55|mariadb100) OPT_SQL_DB="${SQL_DB}" ;;
+    no|none) OPT_SQL_DB="NO" ;;
+    *) echo "*** Error: Invalid SQL_DB value set in options.conf"; exit ;;
   esac
 
-  case $(uc ${SQL_DB_SERVER}) in
-    MYSQL55|MYSQL56|MYSQL57|MARIADB55|MARIADB100) OPT_SQL_DB_ENABLE="YES" ;;
-    *) echo "*** Error: Invalid SQL_DB_Server set in options.conf"; exit ;;
+  case $(lc ${FTPD_SERVER}) in
+    pureftpd|pure-ftpd) OPT_FTPD_SERVER="pureftpd" ;;
+    proftpd|pro-ftpd) OPT_FTPD_SERVER="proftpd" ;;
+    no|none) OPT_FTPD_SERVER="NO" ;;
+    *) echo "*** Error: Invalid FTPD_SERVER value set in options.conf"; exit ;;
   esac
 
-  case $(uc ${FTPD_SERVER}) in
-    PUREFTPD|PURE-FTPD) OPT_FTPD_SERVER="PUREFTPD" ;;
-    PROFTPD|PRO-FTPD) OPT_FTPD_SERVER="PROFTPD" ;;
-    *) echo "*** Error: Invalid FTPD_SERVER set in options.conf"; exit ;;
+  case "$(uc ${EXIM})" in
+    YES|NO) OPT_EXIM="${EXIM}" ;;
+    *) echo "*** Error: Invalid EXIM option set in options.conf"; exit ;;
   esac
 
-  if [ "$(uc ${EXIM_ENABLE})" = "YES" ]; then
-    OPT_EXIM_ENABLE="YES"
-  else
-    OPT_EXIM_ENABLE="NO"
+  # if [ "$(uc ${EXIM})" = "YES" ]; then
+  #   OPT_EXIM="YES"
+  # if [ "$(uc ${EXIM})" = "NO" ]; then
+  #   OPT_EXIM="NO"
+  # fi
+
+  if [ "$(uc ${DOVECOT})" = "YES" ]; then
+    OPT_DOVECOT="YES"
+  elif [ "$(uc ${DOVECOT})" = "NO" ]; then
+    OPT_DOVECOT="NO"
   fi
 
-  if [ "$(uc ${DOVECOT_ENABLE})" = "YES" ]; then
-    OPT_DOVECOT_ENABLE="YES"
-  else
-    OPT_DOVECOT_ENABLE="NO"
-  fi
-
-  if [ "$(uc ${CLAMAV_ENABLE})" = "YES" ]; then
-    OPT_CLAMAV_ENABLE="YES"
-  else
-    OPT_CLAMAV_ENABLE="NO"
-  fi
-
-  if [ "$(uc ${SPAMASSASSIN_ENABLE})" = "YES" ]; then
-    OPT_SPAMASSASSIN_ENABLE="YES"
-  else
-    OPT_SPAMASSASSIN_ENABLE="NO"
-  fi
-
-  if [ "$(uc "${SAUTILS_ENABLE}")" = "YES" ]; then
-    OPT_SAUTILS_ENABLE="YES"
-  else
-    OPT_SAUTILS_ENABLE="NO"
+  if [ "$(uc ${CLAMAV})" = "YES" ]; then
+    OPT_CLAMAV="YES"
+  elif [ "$(uc ${CLAMAV})" = "NO" ]; then
+    OPT_CLAMAV="NO"
   fi
 
   if [ "$(uc "${CLAMAV_WITH_EXIM}")" = "YES" ]; then
@@ -4367,46 +4391,94 @@ validate_options() {
     OPT_CLAMAV_WITH_EXIM="NO"
   fi
 
-  if [ "$(uc "${MAJORDOMO_ENABLE}")" = "YES" ]; then
-    OPT_MAJORDOMO_ENABLE="YES"
+  if [ "$(uc "${WEBAPPS_INBOX_PREFIX}")" = "YES" ]; then
+    OPT_WEBAPPS_INBOX_PREFIX="YES"
   else
-    OPT_MAJORDOMO_ENABLE="NO"
+    OPT_WEBAPPS_INBOX_PREFIX="NO"
   fi
 
-  if [ "$(uc "${PHPMYADMIN_ENABLE}")" = "YES" ]; then
-    OPT_PHPMYADMIN_ENABLE="YES"
+  if [ "$(uc "${SPAM_INBOX_PREFIX}")" = "YES" ]; then
+    OPT_SPAM_INBOX_PREFIX="YES"
   else
-    OPT_PHPMYADMIN_ENABLE="NO"
+    OPT_SPAM_INBOX_PREFIX="NO"
   fi
 
-  if [ "$(uc "${SUHOSIN_ENABLE}")" = "YES" ]; then
-    OPT_SUHOSIN_ENABLE="YES"
+  if [ "$(uc "${BLOCKCRACKING}")" = "YES" ]; then
+    OPT_BLOCKCRACKING="YES"
   else
-    OPT_SUHOSIN_ENABLE="NO"
+    OPT_BLOCKCRACKING="NO"
   fi
 
-  if [ "$(uc "${MODSECURITY_ENABLE}")" = "YES" ]; then
-    OPT_MODSECURITY_ENABLE="YES"
+  if [ "$(uc "${EASY_SPAM_FIGHTER}")" = "YES" ]; then
+    OPT_EASY_SPAM_FIGHTER="YES"
   else
-    OPT_MODSECURITY_ENABLE="NO"
+    OPT_EASY_SPAM_FIGHTER="NO"
   fi
 
-  if [ "$(uc "${PIGEONHOLE_ENABLE}")" = "YES" ]; then
-    OPT_PIGEONHOLE_ENABLE="YES"
-  else
-    OPT_PIGEONHOLE_ENABLE="NO"
+  if [ "$(uc ${SPAMASSASSIN})" = "YES" ]; then
+    OPT_SPAMASSASSIN="YES"
+    if [ "$(uc "${SAUTILS}")" = "YES" ]; then
+      OPT_SAUTILS="YES"
+    else
+      OPT_SAUTILS="NO"
+    fi
+  elif [ "$(uc ${SPAMASSASSIN})" = "NO" ]; then
+    OPT_SPAMASSASSIN="NO"
+    OPT_SAUTILS="NO"
   fi
 
-  if [ "$(uc "${ROUNDCUBE_ENABLE}")" = "YES" ]; then
-    OPT_ROUNDCUBE_ENABLE="YES"
-  else
-    OPT_ROUNDCUBE_ENABLE="NO"
+  if [ "$(uc "${PROFTPD_UPLOADSCAN}")" = "YES" ]; then
+    OPT_PROFTPD_UPLOADSCAN="YES"
+  elif [ "$(uc "${PROFTPD_UPLOADSCAN}")" = "NO" ]; then
+    OPT_PROFTPD_UPLOADSCAN="NO"
   fi
 
-  if [ "$(uc "${ROUNDCUBE_ENABLE}")" = "YES" ]; then
-    OPT_ROUNDCUBE_ENABLE="YES"
+  if [ "$(uc "${PUREFTPD_UPLOADSCAN}")" = "YES" ]; then
+    OPT_PUREFTPD_UPLOADSCAN="YES"
   else
-    OPT_ROUNDCUBE_ENABLE="NO"
+    OPT_PUREFTPD_UPLOADSCAN="NO"
+  fi
+
+  if [ "$(uc "${MAJORDOMO}")" = "YES" ]; then
+    OPT_MAJORDOMO="YES"
+  else
+    OPT_MAJORDOMO="NO"
+  fi
+
+  if [ "$(uc "${PHPMYADMIN}")" = "YES" ]; then
+    OPT_PHPMYADMIN="YES"
+  else
+    OPT_PHPMYADMIN="NO"
+  fi
+
+  if [ "$(uc "${SUHOSIN}")" = "YES" ]; then
+    OPT_SUHOSIN="YES"
+  else
+    OPT_SUHOSIN="NO"
+  fi
+
+  if [ "$(uc "${PHP_SUHOSIN_UPLOADSCAN}")" = "YES" ]; then
+    OPT_PHP_SUHOSIN_UPLOADSCAN="YES"
+  else
+    OPT_PHP_SUHOSIN_UPLOADSCAN="NO"
+  fi
+
+  if [ "$(uc "${MODSECURITY}")" = "YES" ]; then
+    OPT_MODSECURITY="YES"
+  else
+    OPT_MODSECURITY="NO"
+  fi
+
+  if [ "$(uc "${ROUNDCUBE}")" = "YES" ]; then
+    OPT_ROUNDCUBE="YES"
+  elif [ "$(uc "${ROUNDCUBE}")" = "NO" ]; then
+    OPT_ROUNDCUBE="NO"
+  fi
+
+  if [ "$(uc "${PIGEONHOLE}")" = "YES" ]; then
+    OPT_PIGEONHOLE="YES"
+  else
+    OPT_PIGEONHOLE="NO"
   fi
 
   ## Optional stuff
@@ -4451,7 +4523,7 @@ validate_options() {
     BIND_ADDRESS="";
   fi
 
-  return;
+  return
 }
 
 ################################################################################################################################
