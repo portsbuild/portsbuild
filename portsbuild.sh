@@ -524,8 +524,7 @@ PUREFTPD_MAKE_OPTIONS_UNSET=""
 
 ################################################################################################################################
 
-# if [ ! -f conf/defaults.conf ] || [ ! -f conf/ports.conf ] || [ ! -f options.conf ]; then
-#  echo "Missing files in conf/"
+# if [ ! -f options.conf ]; then
 # # recreate them # exit;
 # fi
 
@@ -557,9 +556,8 @@ elif [ -x /usr/bin/openssl ]; then
 fi
 
 ## Verify:
-OPENSSL_EXTRA="-config ${PB_PATH}/custom/ap2/cert_config.txt"
-
 ## Check for this file and append to OpenSSL calls using -config:
+OPENSSL_EXTRA="-config ${PB_PATH}/custom/ap2/cert_config.txt"
 # -config ${PB_PATH}/custom/ap2/cert_config.txt
 
 ## Source (include) additional files into the script:
@@ -783,7 +781,10 @@ ports_update() {
 ################################################################
 
 ## Todo: Rinse & Repeat
+## (Need to work with eval)
 make_install_clean() {
+  ## $1 = category?
+  ## $2 = port?
 
   ## Origin: category/portname
   CHOSEN_PORT=$1
@@ -1044,19 +1045,19 @@ global_setup() {
     ## Configure named (BIND)
     bind_setup
 
-
     ## Install & configure services and applications
-
     exim_install
     dovecot_install
     spamassassin_install
     majordomo_install
     apache_install
     php_install
-    install_app mariadb100 ## test
+    install_app "${OPT_SQL_DB}" ## test
     blockcracking_install
     easyspamfighter_install
     clamav_install
+    install_app ${OPT_FTPD}
+
 
 
 
@@ -4334,7 +4335,7 @@ validate_options() {
     production|development) OPT_PHP_INI_TYPE=${PHP_INI_TYPE} ;;
     custom) OPT_PHP_INI_TYPE="custom" ;;
     no|none) OPT_PHP_INI_TYPE="none" ;;
-    *) echo "*** Error: Invalid PHP.ini type set in options.conf"; exit ;;
+    *) echo "*** Error: Invalid PHP.ini value set in options.conf"; exit ;;
   esac
 
   case $(lc ${WEBSERVER}) in
@@ -4355,11 +4356,11 @@ validate_options() {
     *) echo "*** Error: Invalid SQL_DB value set in options.conf"; exit ;;
   esac
 
-  case $(lc ${FTPD_SERVER}) in
-    pureftpd|pure-ftpd) OPT_FTPD_SERVER="pureftpd" ;;
-    proftpd|pro-ftpd) OPT_FTPD_SERVER="proftpd" ;;
-    no|none) OPT_FTPD_SERVER="NO" ;;
-    *) echo "*** Error: Invalid FTPD_SERVER value set in options.conf"; exit ;;
+  case $(lc ${FTPD}) in
+    pureftpd|pure-ftpd) OPT_FTPD="pureftpd" ;;
+    proftpd|pro-ftpd) OPT_FTPD="proftpd" ;;
+    no|none) OPT_FTPD="NO" ;;
+    *) echo "*** Error: Invalid FTPD value set in options.conf"; exit ;;
   esac
 
   case "$(uc ${EXIM})" in
