@@ -361,6 +361,8 @@ PORT_APACHE24=www/apache24
 PORT_NGINX=www/nginx
 # PORT_NGHTTP2=www/nghttp2
 
+PORT_LETSENCRYPT=security/letsencrypt.sh
+
 ## Ports: PHP
 PORT_PHP55=lang/php55
 PORT_PHP55_EXT=lang/php55-extensions
@@ -1050,18 +1052,15 @@ global_setup() {
     dovecot_install
     spamassassin_install
     majordomo_install
-    apache_install
-    php_install
     install_app "${OPT_SQL_DB}" ## test
+    php_install
+    apache_install
+    phpmyadmin_install
+    roundcube_install
     blockcracking_install
     easyspamfighter_install
     clamav_install
-    install_app ${OPT_FTPD}
-
-
-
-
-
+    install_app "${OPT_FTPD}"
 
     ## Go for the main attraction
     directadmin_install
@@ -1661,7 +1660,12 @@ verify_webapps_logrotate() {
 ## Exim Installation
 exim_install() {
 
-  ### Main Installation
+  if [ "${OPT_EXIM}" != "NO" ]; then
+    # echo
+    return
+  fi
+
+  ### Main Installation (verify: exim_user/exim_group arguments)
   make -C "${PORTS_BASE}/${PORT_EXIM}" rmconfig
   make -C "${PORTS_BASE}/${PORT_EXIM}" config EXIM_USER="${EXIM_USER}" EXIM_GROUP="${EXIM_GROUP}" mail_exim_SET="${EXIM_MAKE_OPTIONS_SET}" mail_exim_UNSET="${EXIM_MAKE_OPTIONS_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
   make -C "${PORTS_BASE}/${PORT_EXIM}" reinstall clean
@@ -1672,9 +1676,6 @@ exim_install() {
   mkdir -p ${VIRTUAL_PATH}
   chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}
   chmod 755 ${VIRTUAL_PATH}
-
-  ## replace $(hostname)
-  hostname >> ${VIRTUAL_PATH}/domains
 
   if [ ! -s "${VIRTUAL_PATH}/limit" ]; then
     echo "${LIMIT_DEFAULT}" > "${VIRTUAL_PATH}/limit"
@@ -1711,6 +1712,10 @@ exim_install() {
     touch "${VIRTUAL_PATH}/${file}"
     chmod 600 "${VIRTUAL_PATH}/${file}"
   done
+
+  ## Todo: add check first before adding 'hostname'
+  ## Verify: replace $(hostname)
+  hostname >> ${VIRTUAL_PATH}/domains
 
   chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}/*
 
@@ -1757,14 +1762,15 @@ exim_install() {
   ## Tel DA new path to Exim binary.
   setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_FILE}
 
+  ## Todo:
   ## Replace sendmail programs with Exim binaries.
   ## If I recall correctly, there's another way to do this via mail/exim and typing "make something"
   if [ ! -e /etc/mail/mailer.conf ]; then
     echo "Creating /etc/mail/mailer.conf"
     #touch /etc/mail/mailer.conf
 
-    cp ${PB_PATH}/configure/etc/mailer.93.conf /etc/mail/mailer.conf
-    cp ${PB_PATH}/configure/etc/mailer.100.conf /etc/mail/mailer.conf
+    cp "${PB_PATH}/configure/etc/mailer.93.conf" /etc/mail/mailer.conf
+    cp "${PB_PATH}/configure/etc/mailer.100.conf" /etc/mail/mailer.conf
 
   # else
     ## Update /etc/mail/mailer.conf:
@@ -2093,7 +2099,15 @@ dovecot_uninstall() {
 
 ## Webalizer Installation (incomplete)
 webalizer_install() {
-  if [ "${AWSTATS_OPT}" = "no" ]; then
+
+  ### Main Installation
+  make -C "${PORTS_BASE}/${PORT_WEBALIZER}" rmconfig
+  make -C "${PORTS_BASE}/${PORT_WEBALIZER}" config www_webalizer_SET="${WEBALIZER_MAKE_OPTIONS_SET}" www_webalizer_UNSET="${WEBALIZER_MAKE_OPTIONS_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORTS_BASE}/${PORT_WEBALIZER}" reinstall clean
+
+  ### Post-Installation Tasks
+
+  if [ "${OPT_AWSTATS}" = "no" ]; then
     setVal awstats 0 ${DA_CONF_TEMPLATE_FILE}
     setVal awstats 0 ${DA_CONF_FILE}
   else
@@ -2113,11 +2127,18 @@ webalizer_install() {
 ## AwStats Installation (incomplete)
 awstats_install() {
 
+  ### Main Installation
+  make -C "${PORTS_BASE}/${PORT_AWSTATS}" rmconfig
+  make -C "${PORTS_BASE}/${PORT_AWSTATS}" config www_awstats_SET="${AWSTATS_MAKE_OPTIONS_SET}" www_awstats_UNSET="${AWSTATS_MAKE_OPTIONS_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORTS_BASE}/${PORT_AWSTATS}" reinstall clean
+
+  ### Post-Installation Tasks
+
   ## Setup directadmin.conf
   setVal awstats 1 ${DA_CONF_TEMPLATE_FILE}
   setVal awstats 1 ${DA_CONF_FILE}
 
-  if [ "${WEBALIZER_OPT}" = "no" ]; then
+  if [ "${OPT_WEBALIZER}" = "no" ]; then
     setVal webalizer 0 ${DA_CONF_TEMPLATE_FILE}
     setVal webalizer 0 ${DA_CONF_FILE}
   else
@@ -2132,39 +2153,43 @@ awstats_install() {
 
 ## Verify my.cnf (copied from CB2)
 verify_my_cnf() {
-  ## $1 = path to .cnf
-  ## $2 = username
-  ## $3 = password
-  ## $4 = optional source file to compare with. Update 1 if 4 is newer.
-  # CB2: host will be on the command line, as that's how DA already does it.
+  ## $1 = Path to current .cnf file
+  ## $2 = Username
+  ## $3 = Password
+  ## $4 = Optional source file to compare with. Update $1 if $4 is newer.
 
-  E_MY_CNF=$1
+  ## CB2 Note: SQL server hostname will be on the command line (that's how DA does it).
 
+  EXISTING_MY_CNF=$1
+
+  ## See if file exist, else we'll create a new one
   W=0
-  if [ ! -s "${E_MY_CNF}" ]; then
+  if [ ! -s "${EXISTING_MY_CNF}" ]; then
     W=1
   fi
 
+  ## Compare
   if [ "${W}" = "0" ] && [ "${4}" != "" ]; then
     if [ ! -s "${4}" ]; then
-      echo "verify_my_cnf: cannot find $4"
+      echo "*** Notice: verify_my_cnf(): Cannot find $4"
       W=1
     else
-      MY_CNF_T=$("${file_mtime} ${E_MY_CNF}")
-      SRC_CNF_T=$("${file_mtime} ${4}")
+      MY_CNF_TIMESTAMP=$("${file_mtime} ${EXISTING_MY_CNF}")
+      SRC_CNF_TIMESTAMP=$("${file_mtime} ${4}")
 
-      if [ "${MY_CNF_T}" -lt "${SRC_CNF_T}" ]; then
-        echo "Found outdated ${E_MY_CNF}. Rewriting from ${4}."
+      if [ "${MY_CNF_TIMESTAMP}" -lt "${SRC_CNF_TIMESTAMP}" ]; then
+        echo "*** Notice: Found outdated ${EXISTING_MY_CNF}. Rewriting from ${4}."
         W=1
       fi
     fi
   fi
 
+  ## Create new .cnf file
   if [ "${W}" = "1" ]; then
-    echo '[client]' > "${E_MY_CNF}"
-    chmod 600 "${E_MY_CNF}"
-    echo "user=${2}" >> "${E_MY_CNF}"
-    echo "password=${3}" >> "${E_MY_CNF}"
+    echo '[client]' > "${EXISTING_MY_CNF}"
+    chmod 600 "${EXISTING_MY_CNF}"
+    echo "user=${2}" >> "${EXISTING_MY_CNF}"
+    echo "password=${3}" >> "${EXISTING_MY_CNF}"
   fi
 }
 
@@ -2786,8 +2811,20 @@ pureftpd_install() {
   make -C "${PORTS_BASE}/${PORT_PUREFTPD}" config ftp_pure_ftpd_SET="${PUREFTPD_MAKE_OPTIONS_SET}" ftp_pure_ftpd_UNSET="${PUREFTPD_MAKE_OPTIONS_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
   make -C "${PORTS_BASE}/${PORT_PUREFTPD}" reinstall clean
 
+  if [ "${OPT_PUREFTPD_UPLOADSCAN}" = "YES" ]; then
+    pureftpd_clamav_install
+  fi
+
   return
 }
+
+################################################################
+
+# PureFTPD Upload Scan (ClamAV) Integration Installation
+pureftpd_clamav_install() {
+  return
+}
+
 ################################################################
 
 ## PureFTPD Uninstall
@@ -2819,6 +2856,14 @@ proftpd_install() {
 
   return
 }
+
+################################################################
+
+# ProFTPD Upload Scan (ClamAV) Integration Installation
+proftpd_clamav_install() {
+  return
+}
+
 
 ################################################################
 
@@ -2924,9 +2969,10 @@ roundcube_install() {
 
   ## Clarifications
   # _CONF = RC's config.inc.php
-  # _CNF  = MySQL settings
+  # _CNF  = RC's SQL settings
   # _PATH = path to RC
 
+  ## PB: Verify:
   ## CB2: verify_webapps_logrotate
 
   ## Fetch MySQL Settings from directadmin/conf/my.cnf
@@ -2936,7 +2982,7 @@ roundcube_install() {
   ## ROUNDCUBE_CONFIG_DB= custom config from CB2
   #ROUNDCUBE_PATH=${WWW_DIR}/roundcube
 
-  ## Create & generate credentials for the database:
+  ## Generate new credentials for the database:
   ROUNDCUBE_DB=da_roundcube
   ROUNDCUBE_DB_USER=da_roundcube
   ROUNDCUBE_DB_PASS=$(random_pass 12)
@@ -2944,21 +2990,29 @@ roundcube_install() {
   ROUNDCUBE_MY_CNF=${ROUNDCUBE_PATH}/config/my.cnf
   ROUNDCUBE_CONF_SAMPLE=${ROUNDCUBE_PATH}/config/config.inc.php.sample
 
-  # if [ -e ${ROUNDCUBE_PATH} ]; then
-  #     if [ -d ${ROUNDCUBE_PATH}/logs ]; then
-  #         cp -fR ${ROUNDCUBE_PATH}/logs ${ROUNDCUBE_PATH} >/dev/null 2>&1
+  if [ ! -e "${ROUNDCUBE_PATH}" ]; then
+    echo "*** Error: RoundCube does not exist at: ${ROUNDCUBE_PATH}"
+    exit 1
+  fi
+
+  ## PB: Verify:
+  ## Copy log files and temp directory from Alias to Real path
+  # if [ -e ${ROUNDCUBE_PATH_ALIAS} ]; then
+  #     if [ -d ${ROUNDCUBE_PATH_ALIAS}/logs ]; then
+  #         cp -fR ${ROUNDCUBE_PATH_ALIAS}/logs ${ROUNDCUBE_PATH} >/dev/null 2>&1
   #     fi
-  #     if [ -d ${ROUNDCUBE_PATH}/temp ]; then
-  #         cp -fR ${ROUNDCUBE_PATH}/temp ${ROUNDCUBE_PATH} >/dev/null 2>&1
+  #     if [ -d ${ROUNDCUBE_PATH_ALIAS}/temp ]; then
+  #         cp -fR ${ROUNDCUBE_PATH_ALIAS}/temp ${ROUNDCUBE_PATH} >/dev/null 2>&1
   #     fi
   # fi
 
-  ## Link it from a fake path:
-  #/bin/rm -f ${ALIASPATH}
-  #/bin/ln -sf roundcubemail-${ROUNDCUBE_VER} ${ALIASPATH}
+  ## PB: 2016-03-12: not needed since ports/pkg always installs RC in the same place
+  ## CB2: Delete alias (symlink) and relink it from a fake (new alias) path:
+  # /bin/rm -f ${ALIASPATH}
+  # /bin/ln -sf roundcubemail-${ROUNDCUBE_VER} ${ALIASPATH}
 
-  ## Set permissions:
-  chown -h ${WEBAPPS_USER}:${WEBAPPS_USER} ${ROUNDCUBE_PATH}
+  ## Set permissions (use -h on alias path):
+  chown ${WEBAPPS_USER}:${WEBAPPS_USER} ${ROUNDCUBE_PATH}
 
   cd ${ROUNDCUBE_PATH} || exit
 
@@ -2968,38 +3022,37 @@ roundcube_install() {
   # EDIT_DB=${EDIT_CONFIG}
   # DB_DIST=${CONFIG_DIST}
 
-  ## Insert data to SQL DB and create database/user for RoundCube:
+  ## New installations of RoundCube
   if ! ${MYSQLSHOW} --defaults-extra-file=${DA_MYSQL_CNF} --host=${MYSQL_HOST} | grep -m1 -q ' da_roundcube '; then
+    ## Insert data to SQL DB and create RoundCube database and user
     if [ -d "${ROUNDCUBE_PATH}/SQL" ]; then
       echo "Creating RoundCube SQL user and database."
       ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "CREATE DATABASE ${ROUNDCUBE_DB};" --host=${MYSQL_HOST} 2>&1
       ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
 
+      ## External SQL server
       if [ "${MYSQL_HOST}" != "localhost" ]; then
         grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2 | while IFS= read -r access_host_ip
         do
           ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
         done
-
-        # for access_host_ip in $(grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2); do {
-        #   ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
-        # }; done
       fi
 
-      ## Needed?
+      ## PB: Needed?
+      ## Recreate RoundCube sql.cnf
       rm -f ${ROUNDCUBE_MY_CNF}
-      #verify_my_cnf ${ROUNDCUBE_MY_CNF} "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
+      verify_my_cnf ${ROUNDCUBE_MY_CNF} "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
 
-      ## Import RoundCube's initial.sql file to create the necessary database tables.
-      ${MYSQL} --defaults-extra-file=${ROUNDCUBE_MY_CNF} -e "use ${ROUNDCUBE_DB}; source SQL/mysql.initial.sql;" --host=${MYSQL_HOST} 2>&1
+      ## Import RoundCube's initial.sql file to initialize the necessary database tables
+      ${MYSQL} --defaults-extra-file=${ROUNDCUBE_MY_CNF} -e "use ${ROUNDCUBE_DB}; source ${ROUNDCUBE_PATH}/SQL/mysql.initial.sql;" --host=${MYSQL_HOST} 2>&1
 
       echo "Database created, ${ROUNDCUBE_DB_USER} password is ${ROUNDCUBE_DB_PASS}"
     else
-      echo "Cannot find the SQL directory in ${ROUNDCUBE_PATH}"
-      exit 0
+      echo "*** Error: Cannot find the SQL directory in ${ROUNDCUBE_PATH}"
+      exit 1
     fi
-  else
-    ## RoundCube config & database already exists, so fetch existing values:
+  else ## Existing RoundCube database found
+    ## RoundCube config & database already exists, so fetch existing values (from custom configuration?):
     if [ -e "${ROUNDCUBE_CONF}" ]; then
       COUNT_MYSQL=$(grep -m1 -c 'mysql://' ${ROUNDCUBE_CONF})
       if [ "${COUNT_MYSQL}" -gt 0 ]; then
@@ -3012,6 +3065,7 @@ roundcube_install() {
       fi
     fi
 
+    ## Grant access and set password
     ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
     ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST}
 
@@ -3024,25 +3078,28 @@ roundcube_install() {
       done
     fi
 
-    #in case anyone uses it for backups
+    ## PB: needed?
+    ## Recreate RoundCube sql.cnf
+    ## CB2: delete existing file, in case anyone uses it for backups
     rm -f ${ROUNDCUBE_MY_CNF}
-    #verify_my_cnf ${ROUNDCUBE_MY_CNF} "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
+    verify_my_cnf ${ROUNDCUBE_MY_CNF} "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
   fi
 
-  # Cleanup config
+  ## PB2: Verify:
+  ## CB2: Cleanup editing config
   #rm -f ${ROUNDCUBE_CONF}
 
   ## Install the proper config (e.g. stock or custom):
-  if [ -d ../roundcube ]; then
+  if [ -d "${ROUNDCUBE_PATH}" ]; then
     echo "Editing roundcube configuration..."
 
     cd ${ROUNDCUBE_PATH}/config || exit
 
-    ## (not implemented) RoundCube Custom Configuration
-    # if [ -e "${ROUNDCUBE_CONF_CUSTOM}" ]; then
-    #   echo "Installing custom RoundCube Config: ${ROUNDCUBE_CONF_CUSTOM}"
-    #  cp -f "${ROUNDCUBE_CONF_CUSTOM}" ${ROUNDCUBE_CONF}
-    # fi
+    ## PB: Todo: RoundCube Custom Configuration
+    if [ -e "${CUSTOM_ROUNDCUBE_CONFIG}" ]; then
+      echo "Installing custom RoundCube configuration file: ${CUSTOM_ROUNDCUBE_CONFIG}"
+     cp -f "${CUSTOM_ROUNDCUBE_CONFIG}" ${ROUNDCUBE_CONF}
+    fi
 
     if [ -e "${ROUNDCUBE_CONFIG_DB}" ]; then
       if [ ! -e ${ROUNDCUBE_CONF} ]; then
@@ -3124,7 +3181,7 @@ roundcube_install() {
       fi
 
       if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
-        ${WGET} "${WGET_CONNECT_OPTIONS}" -O mime.types http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
+        ${WGET_WITH_OPTIONS} -O mime.types http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
       fi
 
       echo "\$config['mime_types'] = '${ROUNDCUBE_PATH}/config/mime.types';" >> ${ROUNDCUBE_CONF}
@@ -4438,6 +4495,18 @@ validate_options() {
     OPT_PUREFTPD_UPLOADSCAN="YES"
   else
     OPT_PUREFTPD_UPLOADSCAN="NO"
+  fi
+
+  if [ "$(uc "${AWSTATS}")" = "YES" ]; then
+    OPT_AWSTATS="YES"
+  elif [ "$(uc "${AWSTATS}")" = "NO" ]; then
+    OPT_AWSTATS="NO"
+  fi
+
+  if [ "$(uc "${WEBALIZER}")" = "YES" ]; then
+    OPT_WEBALIZER="YES"
+  elif [ "$(uc "${WEBALIZER}")" = "NO" ]; then
+    OPT_WEBALIZER="NO"
   fi
 
   if [ "$(uc "${MAJORDOMO}")" = "YES" ]; then

@@ -1,24 +1,25 @@
 # Notes
 
 ### Todo for first release:
-* Finalize defaults.conf and options.conf
-* RoundCube
+* Finalize options.conf
+* RoundCube testing
 * Exception handling and friendlier error messages
 * Implement additional validation controls
 * Refactor certain functions
 * Cleanup unused variables or forgotten strings
 * Setup hosted WWW repo to download files needed by PB (like files.directadmin.com)
 * Final shellcheck verification
-* Create HOWTO or "Get Started" guide
+* Create HOWTO or "Quick Start" / "Get Started" guide
 * Ask DirectAdmin Staff and Martynas for their blessing
 
 
 ### Upcoming:
-* Validate selected options by the user (set in options.conf)
+* Additional validation of selected options by the user (set in options.conf)
 * Create test units via shunit2
 * Test on FreeBSD 10.3
 * Test Perl 5.22
-* Bash completion script
+* Let's Encrypt support
+* Command completion script via 'complete'
 
 ### Menu Overview:
 
