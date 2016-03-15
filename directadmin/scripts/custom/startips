@@ -1,0 +1,39 @@
+#!/bin/sh
+# Description: Load IP Addresses into the network interface.
+
+## 2016-03-15: Modified for PortsBuild
+
+case "$1" in
+  stop) exit 0 ;;
+esac
+
+DACONF=/usr/local/directadmin/conf/directadmin.conf
+IPPATH="/usr/local/directadmin/data/admin/"
+IPDIR="ips/"
+IPLIST="ip.list"
+ADDIP=$(grep addip $DACONF | cut -d= -f2)
+
+ETH_DEV=$(grep ifconfig /etc/rc.conf | cut -d= -f1 | cut -d_ -f2)
+
+if [ "$(grep -c ethernet_dev $DACONF)" -gt "0" ]; then
+  ETH_DEV=$(grep ethernet_dev $DACONF | cut -d= -f2 | cut -d: -f1)
+fi
+
+## PB: Replaced with "while read do"
+grep -v '^ *#' < "${IPPATH}${IPLIST}" | while IFS= read -r line
+do
+  if [ "server" != "$(grep status "${IPPATH}${IPDIR}${line}" | cut -d= -f2)" ]; then
+    NETMASK=$(grep netmask "${IPPATH}${IPDIR}${line}" | cut -d= -f2)
+    $ADDIP "$line $NETMASK $ETH_DEV"
+  fi
+done
+
+# for i in $(cat ${IPPATH}${IPLIST});
+# do
+#   if [ "server" != $(grep status ${IPPATH}${IPDIR}${i} | cut -d= -f2) ]; then
+#       NETMASK=$(grep netmask ${IPPATH}${IPDIR}${i} | cut -d= -f2);
+#       $ADDIP $i $NETMASK $ETH_DEV;
+#   fi
+# done
+
+exit 0;

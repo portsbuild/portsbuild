@@ -49,7 +49,7 @@ addLog /var/log/directadmin/login.log diradmin:diradmin -
 #addLog /usr/local/php60/var/log/php-fpm.log '' - "/var/run/php-fpm60.pid\t30"
 
 addLog /usr/local/www/roundcube/logs/errors webapps:webapps -
-addLog /usr/local/www/squirrelmail/data/squirrelmail_access_log webapps:webapps -
+#addLog /usr/local/www/squirrelmail/data/squirrelmail_access_log webapps:webapps -
 addLog /usr/local/www/phpMyAdmin/log/auth.log webapps:webapps -
 
 exit 1;

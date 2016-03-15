@@ -1,0 +1,87 @@
+#!/bin/sh
+
+#find the eth0:# and add the ip to the system
+
+## 2016-03-15: Modified for PortsBuild
+
+addIPv6() {
+  MASK=/64
+  MCOUNT=$(echo $2 | grep -c /)
+  if [ "$MCOUNT" -gt 0 ]; then
+    MASK=$2
+  fi
+
+  /sbin/ifconfig $ETH_DEV inet6 add ${1}${MASK}
+  exit 0;
+}
+
+getBroadcast() {
+  IP1=$(echo $1 | cut -d. -f1);
+  IP2=$(echo $1 | cut -d. -f2);
+  IP3=$(echo $1 | cut -d. -f3);
+  IP4=$(echo $1 | cut -d. -f4);
+
+  NM1=$(echo $2 | cut -d. -f1);
+  NM2=$(echo $2 | cut -d. -f2);
+  NM3=$(echo $2 | cut -d. -f3);
+  NM4=$(echo $2 | cut -d. -f4);
+
+  BC1=$((($IP1 & $NM1) | (255 & ~$NM1)));
+  BC2=$((($IP2 & $NM2) | (255 & ~$NM2)));
+  BC3=$((($IP3 & $NM3) | (255 & ~$NM3)));
+  BC4=$((($IP4 & $NM4) | (255 & ~$NM4)));
+
+  BROADCAST="$BC1.$BC2.$BC3.$BC4";
+}
+
+ETH_DEV=eth0
+if [ $# -lt 1 ] # we need the ip
+then
+    echo "Usage: $0 <ip> (<netmask> (<eth dev> (<broadcast>)))";
+    echo "example: $0 1.2.3.4 255.255.255.0 eth0";
+    exit 1;
+fi
+
+#check to make sure it isn't already running
+NUMIP=$(/sbin/ifconfig | grep -c "$1 ");
+if [ $NUMIP -gt "0" ]
+then
+    echo "IP $1 already exists on eth0";
+    exit 1;
+fi
+
+if [ $# -gt "2" ]
+then
+        #echo "have device: $3";
+        ETH_DEV=$3;
+fi
+
+IPV6COUNT=$(echo $1 | grep -c :)
+if [ "$IPV6COUNT" -gt 0 ]; then
+    addIPv6 $1
+fi
+
+#DEVNUM=`/sbin/ifconfig | grep -c $ETH_DEV:`;
+NETMASK=255.255.255.0
+
+if [ $# -gt "1" ]
+then
+    #echo "have netmask: $2";
+    NETMASK=$2;
+fi
+
+NETMASK=255.255.255.255
+
+if [ $# -gt "3" ]
+then
+        BROADCAST=$4;
+else
+    getBroadcast $1 $2
+fi
+
+
+/sbin/ifconfig $ETH_DEV inet $1 netmask $NETMASK broadcast $BROADCAST alias
+#/sbin/route add -host $1 127.0.0.1 0
+#/sbin/route add default $1
+exit 0;
+

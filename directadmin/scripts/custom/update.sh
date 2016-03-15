@@ -17,6 +17,7 @@ DA_TQ=${DA_PATH}/data/task.queue
   echo "action=syscheck"
 } >> $DA_TQ
 
+## PB: Verify this:
 if [ ! -d /usr/local/sysbk ]; then
   cd $DA_SCRIPTS || exit
   ./sysbk.sh
@@ -32,8 +33,8 @@ if [ -e /usr/local/etc/rc.d/da-popb4smtp ]; then
   /usr/local/etc/rc.d/da-popb4smtp restart
 fi
 
-perl -pi -e 's/\sN\s/\t-\t/' /etc/newsyslog.conf
-perl -pi -e 's/\sU\s/\t-\t/' /etc/newsyslog.conf
+/usr/local/bin/perl -pi -e 's/\sN\s/\t-\t/' /usr/local/etc/newsyslog.conf.d/directadmin.conf
+/usr/local/bin/perl -pi -e 's/\sU\s/\t-\t/' /usr/local/etc/newsyslog.conf.d/directadmin.conf
 
 ## PB: Fix this:
 $DA_SCRIPTS/newsyslog.sh
@@ -79,13 +80,16 @@ fi
 # Very important update to allow DA to listen correctly on IPv4 and IPv6 interfaces.
 COUNT=$(grep -c ipv6_ipv4mapping /etc/rc.conf)
 if [ "$COUNT" -eq 0 ]; then
-  echo "ipv6_ipv4mapping=\"YES\"" >> /etc/rc.conf
+  ## PB: echo "ipv6_ipv4mapping=\"YES\"" >> /etc/rc.conf
+  sysrc ipv6_ipv4mapping="YES"
 fi
 
 COUNT=$(grep -c net.inet6.ip6.v6only /etc/sysctl.conf)
 if [ "$COUNT" -eq 0 ]; then
-  echo "net.inet6.ip6.v6only=0" >> /etc/sysctl.conf
-  /etc/rc.d/sysctl restart
+  ## PB: echo "net.inet6.ip6.v6only=0" >> /etc/sysctl.conf
+  sysrc -f /etc/sysctl.conf net.inet6.ip6.v6only=0
+  #/etc/rc.d/sysctl restart
+  service sysctl restart
 fi
 
 /sbin/sysctl net.inet6.ip6.v6only=0 >/dev/null 2>&1

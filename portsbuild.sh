@@ -168,6 +168,12 @@ DA_SSL_CA=${DA_PATH}/conf/carootcert.pem
 
 DA_FREEBSD_SERVICES="services_freebsd90_64.tar.gz"
 
+DA_LAN=0
+DA_INSECURE=0
+HTTP=https
+EXTRA_VALUE=""
+BIND_ADDRESS=--bind-address=$IP
+
 ## CustomBuild Paths & Files
 CB_PATH=${DA_PATH}/custombuild
 CB_CONF=${CB_PATH}/options.conf
@@ -230,10 +236,10 @@ ROUNDCUBE_CONF=${ROUNDCUBE_PATH}/config/config.inc.php
 ROUNDCUBE_CONFIG_CUSTOM=${ROUNDCUBE_CONF}
 
 ## Custom configuration files from CB2
-ROUNDCUBE_PLUGINS=${CB_PATH}/custom/roundcube/plugins
-ROUNDCUBE_SKINS=${CB_PATH}/custom/roundcube/skins
-ROUNDCUBE_PROGRAM=${CB_PATH}/custom/roundcube/program
-ROUNDCUBE_HTACCESS=${CB_PATH}/custom/roundcube/.htaccess
+ROUNDCUBE_PLUGINS=${PB_PATH}/custom/roundcube/plugins
+ROUNDCUBE_SKINS=${PB_PATH}/custom/roundcube/skins
+ROUNDCUBE_PROGRAM=${PB_PATH}/custom/roundcube/program
+ROUNDCUBE_HTACCESS=${PB_PATH}/custom/roundcube/.htaccess
 
 ## phpMyAdmin
 PMA_PATH=${WWW_DIR}/phpMyAdmin
@@ -1338,9 +1344,9 @@ directadmin_install() {
   ## Get DirectAdmin binary:
   if [ ! -e "${DA_PATH}/update.tar.gz" ]; then
     if [ "${DA_LAN}" -eq 0 ]; then
-      ${WGET_WITH_OPTIONS} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address="${DA_SERVER_IP}" "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+      ${WGET_WITH_OPTIONS} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address="${DA_SERVER_IP}" "${HTTP}://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
     elif [ "${DA_LAN}" -eq 1 ]; then
-      ${WGET_WITH_OPTIONS} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "https://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+      ${WGET_WITH_OPTIONS} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "${HTTP}://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
     fi
   fi
 
@@ -1365,8 +1371,20 @@ directadmin_install() {
     exit 5
   fi
 
-  ## These were in do_checks()
+  ## PB: Update addip and startips scripts with improved versions
+  if [ ! -e ${DA_PATH}/scripts/custom/addip ]; then
+    if [ -e "${PB_PATH}/directadmin/scripts/custom/addip" ]; then
+      cp "${PB_PATH}/directadmin/scripts/custom/addip" ${DA_PATH}/scripts/custom/addip
+    else
+      echo "downloading missing file"
+      ## download file
+    fi
+  fi
 
+  echo "addip=${DA_PATH}/scripts/custom/addip" >> "${DA_CONF_FILE}"
+  echo "addip=${DA_PATH}/scripts/custom/addip" >> "${DA_CONF_TEMPLATE_FILE}"
+
+  ## The following lines were in DA's install/setup do_checks():
   ## Check for a separate /home partition (for quota support).
   HOME_YES=$(grep -c /home < /etc/fstab)
   if [ "$HOME_YES" -lt "1" ]; then
@@ -1475,11 +1493,8 @@ directadmin_install() {
     chmod 710 /etc/ssh
   fi
 
-  ## PB: Change this:
-  HTTP="http"
-
+  ## Download DirectAdmin License file (untested)
   if [ ! -e "${DA_LICENSE_FILE}" ]; then
-    ## Get the DirectAdmin License Key File (untested)
     ${WGET_WITH_OPTIONS} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
     if [ $? -ne 0 ]; then
@@ -3171,22 +3186,23 @@ roundcube_install() {
 
       ## mime.types
       if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
-        #if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "litespeed" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+        if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "litespeed" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
           if [ -s ${APACHE_MIME_TYPES} ]; then
             if grep -m1 -q 'application/java-archive' ${APACHE_MIME_TYPES}; then
               cp -f ${APACHE_MIME_TYPES} ${ROUNDCUBE_PATH}/config/mime.types
             fi
           fi
-        #fi
+        fi
       fi
 
+      ## Download a fresh copy of mime.types from Apache's repo
       if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
-        ${WGET_WITH_OPTIONS} -O mime.types http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
+        ${WGET_WITH_OPTIONS} -O "${ROUNDCUBE_PATH}/config/mime.types" http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
       fi
 
       echo "\$config['mime_types'] = '${ROUNDCUBE_PATH}/config/mime.types';" >> ${ROUNDCUBE_CONF}
 
-      ## Password plugin
+      ## DirectAdmin Password plugin
       if [ -e ${ROUNDCUBE_PATH}/plugins/password ]; then
         ${PERL} -pi -e "s|\['plugins'] = array\(\n|\['plugins'] = array\(\n    'password',\n|" ${ROUNDCUBE_CONF} > /dev/null
 
@@ -3234,28 +3250,28 @@ roundcube_install() {
     ## Custom configurations for RoundCube:
     if [ -d "${ROUNDCUBE_PLUGINS}" ]; then
       echo "Copying files from ${ROUNDCUBE_PLUGINS} to ${ROUNDCUBE_PATH}/plugins"
-      cp -Rp ${ROUNDCUBE_PLUGINS}/* ${ROUNDCUBE_PATH}/plugins
+      cp -Rp "${ROUNDCUBE_PLUGINS}/*" ${ROUNDCUBE_PATH}/plugins
     fi
 
     if [ -d "${ROUNDCUBE_SKINS}" ]; then
       echo "Copying files from ${ROUNDCUBE_SKINS} to ${ROUNDCUBE_PATH}/skins"
-      cp -Rp ${ROUNDCUBE_SKINS}/* ${ROUNDCUBE_PATH}/skins
+      cp -Rp "${ROUNDCUBE_SKINS}/*" ${ROUNDCUBE_PATH}/skins
     fi
 
-    if [ -d ${ROUNDCUBE_PROGRAM} ]; then
+    if [ -d "${ROUNDCUBE_PROGRAM}" ]; then
       echo "Copying files from ${ROUNDCUBE_PROGRAM} to ${ROUNDCUBE_PATH}/program"
-      cp -Rp ${ROUNDCUBE_PROGRAM}/* ${ROUNDCUBE_PATH}/program
+      cp -Rp "${ROUNDCUBE_PROGRAM}/*" ${ROUNDCUBE_PATH}/program
     fi
 
-    if [ -e ${ROUNDCUBE_HTACCESS} ]; then
+    if [ -e "${ROUNDCUBE_HTACCESS}" ]; then
       echo "Copying .htaccess file from ${ROUNDCUBE_HTACCESS} to ${ROUNDCUBE_PATH}/.htaccess"
-      cp -pf ${ROUNDCUBE_HTACCESS} ${ROUNDCUBE_PATH}/.htaccess
+      cp -pf "${ROUNDCUBE_HTACCESS}" ${ROUNDCUBE_PATH}/.htaccess
     fi
 
     #echo "Roundcube ${ROUNDCUBE_VER} has been installed successfully."
   fi
 
-  #systems with "system()" in disable_functions need to use no php.ini:
+  ## CB2: systems with "system()" in disable_functions need to use no php.ini:
   if [ "$(have_php_system)" = "0" ]; then
     ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' "${ROUNDCUBE_PATH}/bin/update.sh"
   fi
@@ -3276,7 +3292,7 @@ roundcube_install() {
   ## Set the permissions:
   chown -R ${WEBAPPS_USER}:${WEBAPPS_USER} ${ROUNDCUBE_PATH}
 
-  ## Verify this (770 compatible with FPM?):
+  ## PB: Verify this (770 compatible with FPM?):
   if [ "${WEBAPPS_GROUP}" = "apache" ]; then
     chown -R apache ${ROUNDCUBE_PATH}/temp ${ROUNDCUBE_PATH}/logs
     /bin/chmod -R 770 ${ROUNDCUBE_PATH}/temp
@@ -3332,7 +3348,7 @@ webapps_install() {
   /usr/sbin/pw useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
 
   ## Set permissions on temp directory:
-  if [ ${PHP1_MODE} = "FPM" ]; then
+  if [ ${PHP1_MODE} = "fpm" ]; then
     chmod 755 ${WWW_DIR}/tmp
   else
     chmod 777 ${WWW_DIR}/tmp
@@ -3342,9 +3358,9 @@ webapps_install() {
   ## Create webmail/tmp directory:
   ## Verify whether 770 will work or not (750 for FPM?)
   mkdir -p ${WWW_DIR}/webmail/tmp
-  chmod -R 770 ${WWW_DIR}/webmail/tmp;
+  chmod -R 770 ${WWW_DIR}/webmail/tmp
   chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail
-  chown -R ${APACHE_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail/tmp;
+  chown -R ${APACHE_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail/tmp
   echo "Deny from All" >> ${WWW_DIR}/webmail/tmp/.htaccess
 
   ### Main Installation
@@ -3411,10 +3427,10 @@ verify_webapps_php_ini() {
     cp -f "${PHP_CUSTOM_PHP_CONF_D_INI_PATH}/50-webapps.ini" ${PHP_INI_WEBAPPS}
   else
     {
-      echo "[PATH=${WWW_DIR}]";
-      echo "session.save_path=${WWW_TMP_DIR}";
-      echo "upload_tmp_dir=${WWW_TMP_DIR}";
-      echo "disable_functions=exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname";
+      echo "[PATH=${WWW_DIR}]"
+      echo "session.save_path=${WWW_TMP_DIR}"
+      echo "upload_tmp_dir=${WWW_TMP_DIR}"
+      echo "disable_functions=exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname"
     } >> ${PHP_INI_WEBAPPS}
   fi
 }
@@ -4570,27 +4586,22 @@ validate_options() {
     OPT_INSTALL_SYNTH="NO"
   fi
 
-  ## Following ~20 lines are from DA's setup.sh:
-  DA_LAN=0
+  ## Following lines are from DA's setup.sh:
   if [ -s /root/.lan ]; then
     DA_LAN=$(cat /root/.lan)
   fi
 
-  INSECURE=0
   if [ -s /root/.insecure_download ]; then
-    INSECURE=$(cat /root/.insecure_download)
+    DA_INSECURE=$(cat /root/.insecure_download)
   fi
 
-  HTTP=https
-  EXTRA_VALUE=""
-  if [ "${INSECURE}" -eq 1 ]; then
+  if [ "${DA_INSECURE}" -eq 1 ]; then
     HTTP=http
     EXTRA_VALUE='&insecure=yes'
   fi
 
-  BIND_ADDRESS=--bind-address=$IP
   if [ "${DA_LAN}" -eq 1 ]; then
-    BIND_ADDRESS="";
+    BIND_ADDRESS=""
   fi
 
   return
@@ -4604,40 +4615,42 @@ validate_options() {
 install_app() {
 
   case $2 in
-    apache) apache_install ;;
-    bfm) bfm_setup ;;
-    blockcracking) blockcracking_install ;;
-    directadmin) directadmin_install ;;
-    dkim) pkgi ${PORT_LIBDKIM} ;;
-    easy_spam_fighter) easyspamfighter_install ;;
-    exim) exim_install ;;
-    ioncube) pkgi "${PORT_IONCUBE}" ;;
-    ipfw) ipfw_setup ;;
-    libspf2) pkgi ${PORT_LIBSPF2} ;;
-    mariadb55)
+    "apache"|"apache24") apache_install ;;
+    "awstats") awstats_install ;;
+    "bfm") bfm_setup ;;
+    "blockcracking"|"bc") blockcracking_install ;;
+    "directadmin") directadmin_install ;;
+    "dkim") pkgi ${PORT_LIBDKIM} ;;
+    "easy_spam_fighter"|"esf") easyspamfighter_install ;;
+    "exim") exim_install ;;
+    "ioncube") pkgi "${PORT_IONCUBE}" ;;
+    "ipfw") ipfw_setup ;;
+    "libspf2"|"libspf") pkgi ${PORT_LIBSPF2} ;;
+    "mariadb55")
       /usr/sbin/pkg -y ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
       sql_post_install ;;
-    mariadb100)
+    "mariadb100")
       /usr/sbin/pkg -y ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
       sql_post_install ;;
-    mysql55)
+    "mysql55")
       /usr/sbin/pkg -y ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
       sql_post_install ;;
-    mysql56)
+    "mysql56")
       /usr/sbin/pkg -y ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
       sql_post_install ;;
-    mysql57)
+    "mysql57")
       /usr/sbin/pkg -y ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
       sql_post_install ;;
-    nginx) nginx_install ;;
-    php55|php56|php70) php_install ;;
-    phpmyadmin) phpmyadmin_install ;;
-    proftpd) proftpd_install ;;
-    pureftpd) pureftpd_install ;;
-    roundcube) roundcube_install ;;
-    spamassassin) spamassassin_install ;;
-    suhosin) suhosin_install ;;
-    *) echo "Script error"; return;
+    "nginx") nginx_install ;;
+    "php"|"php55"|"php56"|"php70") php_install ;;
+    "phpmyadmin"|"pma") phpmyadmin_install ;;
+    "proftpd") proftpd_install ;;
+    "pureftpd") pureftpd_install ;;
+    "roundcube") roundcube_install ;;
+    "spamassassin") spamassassin_install ;;
+    "suhosin") suhosin_install ;;
+    "webalizer") webalizer_install ;;
+    *) show_install ;;
   esac
 }
 
@@ -4666,7 +4679,7 @@ update() {
   #fetch -o ./${PORTSBUILD_NAME}.tar.gz "${PB_MIRROR}/${PORTSBUILD_NAME}.tar.gz"
 
   if [ -s "${PORTSBUILD_NAME}.tar.gz" ]; then
-    echo "Extracting ${NAME}.tar.gz..."
+    echo "Extracting ${PORTSBUILD_NAME}.tar.gz..."
 
     tar xvf "${PORTSBUILD_NAME}.tar.gz" --no-same-owner
 
@@ -4759,7 +4772,71 @@ show_debug() {
 
 ## Show Installation Menu
 show_install() {
-  printf "Install:\n"
+
+#  ( printf "Package Version Origin\n" ; pkg query -i -x "%n %v %o" '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
+
+  available_packages="\
+  apache,Apache 2.4 \
+  awstats,Awstats \
+  bfm,Brute Force Monitor \
+  bc,Blockcracking \
+  directadmin,DirectAdmin \
+  dkim,DKIM \
+  esf,Easy Spam Fighter \
+  exim,Exim \
+  ioncube,Ioncube \
+  ipfw,IPFW Firewall setup \
+  libspf2,libspf \
+  mariadb,MariaDB \
+  mysql,MySQL \
+  nginx,Nginx \
+  php,PHP \
+  pma,phpMyAdmin \
+  proftpd,ProFTPd \
+  pureftpd,PureFTPd \
+  roundcube,RoundCube \
+  spamassassin,SpamAssassin \
+  suhosin,Suhosin \
+  webalizer,Webalizer \
+  "
+
+  printf "Available packages to install:\n"
+
+  for file in ${available_packages}; do
+    printf "%s\n" "${file}"
+  done | column -t -s,
+
+  # echo "Available packages to install:"
+  # echo "apache Apache 2.4"
+  # echo "awstats Awstats"
+  # echo "bfm Brute Force Monitor"
+  # echo "bc Blockcracking"
+  # echo "directadmin DirectAdmin"
+  # echo "dkim DKIM"
+  # echo "esf Easy Spam Fighter"
+  # echo "exim Exim"
+  # echo "ioncube Ioncube"
+  # echo "ipfw IPFW Firewall setup"
+  # echo "libspf2 libspf"
+  # echo "mariadb MariaDB"
+  # # echo "mariadb55 MariaDB 5.5"
+  # # echo "mariadb100 MariaDB 10.0"
+  # echo "mysql MySQL"
+  # # echo "mysql55 MySQL 5.5"
+  # # echo "mysql56 MySQL 5.6"
+  # # echo "mysql57 MySQL 5.7"
+  # echo "nginx Nginx"
+  # echo "php PHP"
+  # echo "pma phpMyAdmin"
+  # echo "proftpd ProFTPd"
+  # echo "pureftpd PureFTPd"
+  # echo "roundcube RoundCube"
+  # echo "spamassassin SpamAssassin"
+  # echo "suhosin Suhosin"
+  # echo "webalizer Webalizer"
+
+  return
+
 }
 
 ################################################################################################################################
@@ -4856,7 +4933,7 @@ case "$1" in
   # set)  ;;
   # check_options) ;;
   "d"|"debug") show_debug ;;          ## show debugging info
-  "i"|"install") show_install ;;      ## install an application
+  "i"|"install") install_app ;;      ## install an application
   "o"|"outdated") show_outdated ;;    ##
   "setup") global_setup "$@" ;;       ## first time setup
   "upd"|"update") update ;;             ## update PB script

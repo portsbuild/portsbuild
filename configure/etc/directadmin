@@ -1,0 +1,48 @@
+#!/bin/sh
+
+# PROVIDE: directadmin
+# REQUIRE: NETWORKING
+# #BEFORE: SERVERS
+# KEYWORD: shutdown
+
+# 2016-03-15: DirectAdmin Startup Script for PortsBuild
+
+#
+# Add the following lines to /etc/rc.conf to enable DirectAdmin:
+# directadmin_enable (bool):              Run DirectAdmin, the control panel (or NO).
+# directadmin_program (str):              Path to directadmin, if you want a different one.
+# directadmin_conf (str):                 Path to the configuration file
+# directadmin_flags (str):                Use this for flags OTHER than -u and -c
+# directadmin_uid (str):                  User to run directadmin as
+#
+
+. /etc/rc.subr
+
+name=directadmin
+desc="DirectAdmin startup script"
+rcvar=directadmin_enable
+
+extra_commands=reload
+load_rc_config ${name}
+
+# start_precmd=directadmin_prestart
+# start_postcmd=directadmin_poststart
+# reload_cmd=directadmin_reload
+# stop_cmd=directadmin_stop
+# stop_postcmd=directadmin_poststop
+
+directadmin_enable=${directadmin_enable:-"NO"}
+directadmin_program=${directadmin_program:-"/usr/local/directadmin/directadmin"}
+directadmin_conf=${directadmin_conf:-"/usr/local/directadmin/conf/directadmin.conf"}
+directadmin_flags=${directadmin_flags:-"d"}
+directadmin_uid=${directadmin_uid:-"directadmin"}
+
+pidfile=${directadmin_pidfile:-"/var/run/directadmin.pid"}
+command=${directadmin_program:-"/usr/local/directadmin/directadmin"}
+command_args=${directadmin_flags:-"d"}
+required_files=/usr/local/directadmin/conf/directadmin.conf
+
+# start,stop,reload,restart,status
+# poll,rcvar,enabled
+
+run_rc_command "$1"
