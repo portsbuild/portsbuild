@@ -42,7 +42,7 @@
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160310
+PB_BUILD_DATE=20160316
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -2876,6 +2876,19 @@ proftpd_install() {
 
 # ProFTPD Upload Scan (ClamAV) Integration Installation
 proftpd_clamav_install() {
+
+  if [ "${OPT_FTPD}" = "NO" ]; then
+    echo "*** Error: FTPD not set in options.conf"
+  fi
+
+  ### Main Installation
+  pkgi ${PORT_PROFTPD_CLAMAV}
+
+  # make -C "${PORTS_BASE}/${PORT_PROFTPD_CLAMAV}" rmconfig
+  # make -C "${PORTS_BASE}/${PORT_PROFTPD_CLAMAV}" config _SET="${}" _UNSET="${}" \
+  # OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
+  # make -C "${PORTS_BASE}/${PORT_PROFTPD_CLAMAV}" reinstall clean
+
   return
 }
 
