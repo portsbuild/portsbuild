@@ -12,26 +12,37 @@
 #  DirectAdmin Homepage : http://www.directadmin.com
 #  DirectAdmin Forums   : http://forums.directadmin.com
 #
-#  PortsBuild WWW       : http://www.portsbuild.org (coming soon)
-#  PortsBuild GitHub    : http://github.com/portsbuild/portsbuild
+#  PortsBuild WWW       : https://www.portsbuild.org (coming soon)
+#  PortsBuild GitHub    : https://github.com/portsbuild/portsbuild
+#
+# *************************************************************************************************
+#
+#  ** Need help? Visit the DirectAdmin Forums and look for the PB thread *URL here*
+#
+#  ** Found a bug? Please submit an issue: https://github.com/portsbuild/portsbuild/issues
+#
+#  ** Want to contribute or improve PortsBuild? Please fork and submit a pull request. :)
 #
 # *************************************************************************************************
 #
 #  Requirements:
-#  - DirectAdmin 1.46 and above (with a valid license).
-#  - FreeBSD 9.3 or 10.2-amd64
+#  - DirectAdmin 1.46 and above (with a valid license)
+#  - FreeBSD 9.3 or 10.2 (amd64 only)
 #  - chmod +x portsbuild.sh
 #  - (optional) mv portsbuild.sh portsbuild
 #  - Patience.
 #
 #  New Installations:
-#  - Run: ./portsbuild.sh setup <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> (<IP_ADDRESS>)
+#  - Modify: options.conf
+#  - Setup : ./portsbuild.sh setup <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> (<IP_ADDRESS>)
 #
 #  Existing users:
-#  - Update: ./portsbuild.sh update
-#  - Verify: ./portsbuild.sh verify
+#  - Update : ./portsbuild.sh update
+#  - Upgrade: ./portsbuild.sh upgrade <package|port|service>
+#  - Rewrite: ./portsbuild.sh rewrite <configuration>
+#  - Verify : ./portsbuild.sh verify
 #
-# Changelog/History: see CHANGELOG for more details
+#  Changelog/History: see CHANGELOG for more details
 #
 # *************************************************************************************************
 #
@@ -42,7 +53,7 @@
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160310
+PB_BUILD_DATE=20160315
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -70,13 +81,13 @@ if [ "${OS}" = "FreeBSD" ]; then
       echo ""
     else
       echo "Warning: Unsupported FreeBSD operating system detected."
-      echo "PortsBuild is tested to work with FreeBSD versions 9.3, 10.1 and 10.2 amd64 only."
+      echo "PortsBuild has been tested to work with FreeBSD versions 9.3, 10.1 and 10.2 amd64 only."
       echo "You can press CTRL+C within 5 seconds to quit the PortsBuild script now, or proceed at your own risk."
       sleep 5
     fi
   else
     echo "Error: i386 (x86) systems are not supported."
-    echo "PortsBuild requires FreeBSD 9.3+ amd64 (x64)."
+    echo "PortsBuild requires the 64-bit version (amd64) of FreeBSD."
     exit 1
   fi
 else
@@ -128,7 +139,7 @@ TAR=/usr/bin/tar
 
 ## PortsBuild Paths & Files
 PB_PATH=/usr/local/portsbuild
-if [ ! -e ${PB_PATH} ] || [ "$(pwd)" = "${PB_PATH}" ]; then
+if [ ! -e ${PB_PATH} ] || [ "$(pwd)" != "${PB_PATH}" ]; then
   PB_PATH=$(pwd)
 fi
 
@@ -383,6 +394,7 @@ PORT_MOD_PHP70=www/mod_php70
 
 PORT_PHPMYADMIN=databases/phpmyadmin
 PORT_IONCUBE=devel/ioncube
+PORT_SUHOSIN=security/suhosin
 # PORT_PCRE=devel/pcre
 
 ## Ports: Mail & Related Services
@@ -1746,7 +1758,7 @@ exim_install() {
   ## See: http://help.directadmin.com/item.php?id=245
   ${OPENSSL_BIN} req -x509 -newkey rsa:2048 -keyout ${EXIM_SSL_KEY} -out ${EXIM_SSL_CRT} -days 9000 -nodes "${OPENSSL_EXTRA}"
 
-  ## Symlink for DA compat
+  ## Symlink for DA compat:
   ln -s ${EXIM_SSL_KEY} /etc/exim.key
   ln -s ${EXIM_SSL_CRT} /etc/exim.cert
 
@@ -1779,13 +1791,12 @@ exim_install() {
 
   ## Todo:
   ## Replace sendmail programs with Exim binaries.
-  ## If I recall correctly, there's another way to do this via mail/exim and typing "make something"
   if [ ! -e /etc/mail/mailer.conf ]; then
     echo "Creating /etc/mail/mailer.conf"
-    #touch /etc/mail/mailer.conf
+    touch /etc/mail/mailer.conf
 
-    cp "${PB_PATH}/configure/etc/mailer.93.conf" /etc/mail/mailer.conf
-    cp "${PB_PATH}/configure/etc/mailer.100.conf" /etc/mail/mailer.conf
+    # cp "${PB_PATH}/configure/etc/mailer.93.conf" /etc/mail/mailer.conf
+    # cp "${PB_PATH}/configure/etc/mailer.100.conf" /etc/mail/mailer.conf
 
   # else
     ## Update /etc/mail/mailer.conf:
@@ -1796,13 +1807,16 @@ exim_install() {
     #hoststat       /usr/libexec/sendmail/sendmail
     #purgestat      /usr/libexec/sendmail/sendmail
 
-    ## Change to:
-    # sendmail        /usr/local/sbin/exim
-    # send-mail       /usr/local/sbin/exim
-    # mailq           /usr/local/sbin/exim -bp
-    # newaliases      /usr/bin/true
-    # rmail           /usr/local/sbin/exim -i -oee
-  fi
+    fi
+
+    {
+      printf "%s\t%s\n" "sendmail" "/usr/local/sbin/exim"
+      printf "%s\t%s\n" "send-mail" "/usr/local/sbin/exim"
+      printf "%s\t%s\n" "mailq" "/usr/local/sbin/exim -bp"
+      printf "%s\t%s\n" "newaliases" "/usr/bin/true"
+      printf "%s\t%s\n" "rmail" "/usr/local/sbin/exim -i -oee"
+    } > /etc/mail/mailer.conf
+
 
 }
 
@@ -1813,7 +1827,7 @@ spamassassin_install() {
 
   ### Main Installation
   make -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" rmconfig
-  make -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" config mail_spamassassin_SET="${mail_spamassassin_SET}" mail_spamassassin_UNSET="${mail_spamassassin_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
+  make -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" config mail_spamassassin_SET="${SPAMASSASSIN_MAKE_OPTIONS_SET}" mail_spamassassin_UNSET="${SPAMASSASSIN_MAKE_OPTIONS_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_OPTIONS_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_OPTIONS_UNSET}"
   make -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" reinstall clean
 
   ## SpamAssassin Post-Installation Tasks

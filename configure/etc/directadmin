@@ -10,10 +10,12 @@
 #
 # Add the following lines to /etc/rc.conf to enable DirectAdmin:
 # directadmin_enable (bool):              Run DirectAdmin, the control panel (or NO).
+#
+# Optional settings (modifying not recommended):
 # directadmin_program (str):              Path to directadmin, if you want a different one.
 # directadmin_conf (str):                 Path to the configuration file
-# directadmin_flags (str):                Use this for flags OTHER than -u and -c
-# directadmin_uid (str):                  User to run directadmin as
+# directadmin_flags (str):                Use this for flags OTHER than 'd'
+# directadmin_uid (str):                  User to run directadmin as (default: "directadmin")
 #
 
 . /etc/rc.subr
