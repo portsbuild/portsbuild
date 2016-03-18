@@ -257,12 +257,10 @@ PMA_PATH=${WWW_DIR}/phpMyAdmin
 PMA_CONFIG=${PMA_PATH}/config.inc.php
 
 ## PHP
-PHP_VERSION=56
-PHP_MODE=FPM
-PHP1_VERSION=${PHP_VERSION}
-PHP1_MODE=${PHP_MODE}
+PHP1_VERSION=56
+PHP1_MODE=fpm
 # PHP2_VERSION=70
-# PHP2_MODE=FPM
+# PHP2_MODE=fpm
 
 PHP_ETC_PATH=/usr/local/etc/php
 # PHP_DIR=${PHP_ETC_PATH}
@@ -348,7 +346,7 @@ NEWSYSLOG_DAYS=10
 # SQL_DB=mariadb100
 # CLAMAV=YES
 # SPAMASSASSIN=YES
-# SAUTILS=YES
+# SPAMASSASSIN_UTILITIES=YES
 # PHPMYADMIN=YES
 # ROUNDCUBE=YES
 
@@ -526,8 +524,8 @@ EXIM_MAKE_UNSET=""
 SPAMASSASSIN_MAKE_SET="DKIM SPF_QUERY" # DCC PYZOR RAZOR RELAY_COUNTRY
 SPAMASSASSIN_MAKE_UNSET=""
 
-SAUTILS_MAKE_SET="SACOMPILE"
-SAUTILS_MAKE_UNSET=""
+SPAMASSASSIN_UTILITIES_MAKE_SET="SACOMPILE"
+SPAMASSASSIN_UTILITIES_MAKE_UNSET=""
 
 DOVECOT2_MAKE_SET="" #
 DOVECOT2_MAKE_UNSET=""
@@ -591,7 +589,7 @@ fi
 OPENSSL_EXTRA="-config ${PB_PATH}/custom/ap2/cert_config.txt"
 # -config ${PB_PATH}/custom/ap2/cert_config.txt
 
-
+################################################################################################################################
 
 ## Source (include) additional files into the script:
 . options.conf
@@ -1264,7 +1262,7 @@ update_rc() {
     sysrc -x spamd_flags
   fi
 
-  if [ "${OPT_SPAMASSASSIN_UTILS}" = "YES" ] && [ "${OPT_SPAMASSASSIN}" = "YES" ]; then
+  if [ "${OPT_SPAMASSASSIN_UTILITIES}" = "YES" ] && [ "${OPT_SPAMASSASSIN}" = "YES" ]; then
     sysrc -f /etc/periodic.conf daily_sa_enable="YES"
     sysrc -f /etc/periodic.conf daily_sa_quiet="NO"
     sysrc -f /etc/periodic.conf daily_sa_compile_nice="YES"
@@ -2953,12 +2951,14 @@ pureftpd_install() {
   sysrc pureftpd_enable="YES"
   sysrc pureftpd_flags="-B -A -C 15 -E -H -k 99 -L 10000:8 -O stats:${PUREFTPD_LOG} -l puredb:${PUREFTPD_DB} -p 35000:35999 -u 100 -U 133:022 -w -Z -Y 1 -J -S:HIGH:MEDIUM:+TLSv1:!SSLv2:+SSLv3"
 
+  ## Update directadmin.conf
   setVal pureftp 1 ${DA_CONF_TEMPLATE_FILE}
   setVal pureftp 1 ${DA_CONF_FILE}
 
   #${SERVICE} directadmin restart
   directadmin_restart
 
+  ## Update services.status
   set_service proftpd delete
   set_service pure-ftpd ON
 
@@ -3001,14 +3001,17 @@ proftpd_install() {
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" rmconfig
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" ftp_proftpd_SET="${PROFTPD_MAKE_SET}" ftp_proftpd_UNSET="${PROFTPD_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
+  sysrc -x pureftpd_enable
+
+  ## Update directadmin.conf
   setVal pureftp 0 ${DA_CONF_TEMPLATE_FILE}
   setVal pureftp 0 ${DA_CONF_FILE}
 
+  ## Update services.status
   set_service pure-ftpd delete
   set_service proftpd ON
 
-  sysrc -x pureftpd_enable
-
+  ## Stop PureFTPD if it's running
   ${SERVICE} pure-ftpd onestop
 
   if [ "${OPT_PROFTPD_UPLOADSCAN}" = "YES" ] && [ "${OPT_CLAMAV}" = "YES" ]; then
@@ -3024,8 +3027,8 @@ proftpd_install() {
     pkgi ${PORT_PROFTPD_CLAMAV}
 
     ## Verify:
-    if ! grep -m1 -q '^Include /usr/local/etc/proftpd.clamav.conf' /usr/local/etc/proftpd.conf; then
-      perl -pi -e 's#</Global>#</Global>\n\nInclude /usr/local/etc/proftpd.clamav.conf#' /usr/local/etc/proftpd.conf
+    if ! grep -m1 -q '^Include ${PROFTPD_CLAMAV_CONF}' /usr/local/etc/proftpd.conf; then
+      perl -pi -e 's#</Global>#</Global>\n\nInclude ${PROFTPD_CLAMAV_CONF}#' /usr/local/etc/proftpd.conf
     fi
 
     /usr/local/bin/prxs -c -i -d mod_clamav.c
@@ -3041,7 +3044,7 @@ proftpd_install() {
       echo '  ClamPort 3310'
       echo '  ClamMaxSize 5 Mb'
       echo '</IfModule>'
-    } > /usr/local/etc/proftpd.clamav.conf
+    } > ${PROFTPD_CLAMAV_CONF}
 
     # <IfModule mod_clamav.c>
     #   ClamAV on
@@ -3051,7 +3054,7 @@ proftpd_install() {
 
   else
     ## Truncate the configuration file
-    echo "" > /usr/local/etc/proftpd.clamav.conf
+    echo "" > ${PROFTPD_CLAMAV_CONF}
   fi
 
   # /usr/local/libexec/proftpd --configtest
@@ -4710,14 +4713,14 @@ validate_options() {
 
   if [ "$(uc ${SPAMASSASSIN})" = "YES" ]; then
     OPT_SPAMASSASSIN="YES"
-    if [ "$(uc "${SAUTILS}")" = "YES" ]; then
-      OPT_SPAMASSASSIN_UTILS="YES"
+    if [ "$(uc "${SPAMASSASSIN_UTILITIES}")" = "YES" ]; then
+      OPT_SPAMASSASSIN_UTILITIES="YES"
     else
-      OPT_SPAMASSASSIN_UTILS="NO"
+      OPT_SPAMASSASSIN_UTILITIES="NO"
     fi
   elif [ "$(uc ${SPAMASSASSIN})" = "NO" ]; then
     OPT_SPAMASSASSIN="NO"
-    OPT_SPAMASSASSIN_UTILS="NO"
+    OPT_SPAMASSASSIN_UTILITIES="NO"
   fi
 
  if [ "$(uc "${BLOCKCRACKING}")" = "YES" ]; then
@@ -5027,7 +5030,7 @@ show_config() {
     echo "BlockCracking: ${OPT_BLOCKCRACKING}"
     echo "Easy Spam Fighter: ${OPT_EASY_SPAM_FIGHTER}"
     echo "SpamAssassin: ${OPT_SPAMASSASSIN}"
-    echo "SpamAssassin Utilities: ${OPT_SPAMASSASSIN_UTILS}"
+    echo "SpamAssassin Utilities: ${OPT_SPAMASSASSIN_UTILITIES}"
     echo "ProFTPd Upload Scan: ${OPT_PROFTPD_UPLOADSCAN}"
     echo "PureFTPd Upload Scan: ${OPT_PUREFTPD_UPLOADSCAN}"
     echo "Awstats: ${OPT_AWSTATS}"
