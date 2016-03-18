@@ -220,7 +220,6 @@ APACHE_PID=/var/run/httpd.pid
 
 ## Nginx (untested)
 NGINX_PATH=/usr/local/etc/nginx
-NGINX_DIR=${NGINX_PATH}
 NGINX_CONF=${NGINX_PATH}/nginx.conf
 NGINX_VHOSTS_PATH=${NGINX_PATH}/vhosts
 
@@ -1170,7 +1169,7 @@ update_rc() {
     sysrc mysql_optfile="/usr/local/etc/my.cnf"
   fi
 
-  if [ "${OPT_PHP1_MODE}" = "fpm" ]; then
+  if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
     sysrc php_fpm_enable="YES"
   else
     sysrc -x php_fpm_enable
@@ -1249,7 +1248,7 @@ update_rc() {
 ## Setup BIND (named)
 bind_setup() {
 
-  if [ "${OPT_NAMED}" = "NO" ]; then
+  if [ "${OPT_NAMED}" != "YES" ]; then
     return
   fi
 
@@ -2102,7 +2101,7 @@ dovecot_install() {
 ## Dovecot Configuration
 dovecot_config() {
 
-  return;
+  return
 }
 
 ################################################################
@@ -2110,7 +2109,7 @@ dovecot_config() {
 ## Dovecot Upgrade
 dovecot_upgrade() {
 
-  return;
+  return
 }
 
 ################################################################
@@ -2118,13 +2117,18 @@ dovecot_upgrade() {
 ## Dovecot Uninstall
 dovecot_uninstall() {
 
-  return;
+  return
 }
 
 ################################################################################################################################
 
 ## Webalizer Installation (incomplete)
 webalizer_install() {
+
+  if [ "${OPT_WEBALIZER}" != "YES" ]; then
+    echo "***"
+    return
+  fi
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" rmconfig
@@ -2151,6 +2155,11 @@ webalizer_install() {
 
 ## AwStats Installation (incomplete)
 awstats_install() {
+
+  if [ "${OPT_AWSTATS}" != "YES" ]; then
+    echo "***"
+    return
+  fi
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" rmconfig
@@ -3399,7 +3408,7 @@ webapps_install() {
   /usr/sbin/pw useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
 
   ## Set permissions on temp directory:
-  if [ "${OPT_PHP1_MODE}" = "fpm" ]; then
+  if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
     chmod 755 ${WWW_DIR}/tmp
   else
     chmod 777 ${WWW_DIR}/tmp
@@ -3514,7 +3523,7 @@ apache_rewrite_confs() {
 
     ## Set this for now since PB only supports 1 instance of PHP.
     #OPT_PHP1_MODE="php-fpm"
-    #PHP1_MODE="fpm"
+    #PHP1_MODE="php-fpm"
     #PHP1_VERSION="56"
 
     ## Copy custom/ file
@@ -3530,7 +3539,7 @@ apache_rewrite_confs() {
 
       echo "<Directory ${WWW_DIR}>" >> ${APACHE_HOST_CONF}
 
-      if [ "${OPT_PHP1_MODE}" = "fpm" ]; then
+      if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
         {
           echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">';
           echo "AddHandler \"proxy:unix:/usr/local/php${PHP1_VERSION}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${PHP1_VERSION} .phtml";
@@ -3626,10 +3635,10 @@ rewrite_confs() {
     chmod 710 "${APACHE_EXTRA_PATH}"
 
     ## Swap the |WEBAPPS_PHP_RELEASE| token.
-    if [ "${OPT_PHP1_MODE}" = "fpm" ] || [ "${OPT_PHP2_MODE}" = "fpm" ]; then
+    if [ "${OPT_PHP1_MODE}" = "php-fpm" ] || [ "${OPT_PHP2_MODE}" = "php-fpm" ]; then
       PHPV=""
 
-      if [ "${OPT_PHP1_MODE}" = "fpm" ]; then
+      if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
         PHPV=$(${PERL} -e "print ${OPT_PHP1_VERSION}")
       elif [ "${OPT_PHP2_VERSION}" != "" ]; then
         PHPV=$(${PERL} -e "print ${OPT_PHP2_VERSION}")
@@ -4255,9 +4264,9 @@ rewrite_php_confs() {
       echo "AddHandler application/x-httpd-php-source .phps" >> "${PHP_HANDLERS_HTTPD}"
     fi
 
-    echo '</FilesMatch>' >> ${PHP_HANDLERS_HTTPD}
+    echo '</FilesMatch>' >> "${PHP_HANDLERS_HTTPD}"
 
-    echo "AddType text/html .php" >> ${PHP_HANDLERS_HTTPD}
+    echo "AddType text/html .php" >> "${PHP_HANDLERS_HTTPD}"
   fi
 
   for php_shortrelease in `echo ${PHP1_SHORTRELEASE_SET}`; do
@@ -4265,15 +4274,13 @@ rewrite_php_confs() {
   done
 
   if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
-
-      "${INITDDIR}/php-fpm${PHP1_SHORTRELEASE}" restart
-
+    "${INITDDIR}/php-fpm${PHP1_SHORTRELEASE}" restart
     set_service php-fpm${PHP1_SHORTRELEASE} ON
-    eval `echo "HAVE_FPM${PHP1_SHORTRELEASE}=yes"`
+    eval $(echo "HAVE_FPM${PHP1_SHORTRELEASE}=yes")
   fi
 
   if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${OPT_PHP2_RELEASE}" != "no" ]; then
-        ${INITDDIR}/php-fpm${PHP2_SHORTRELEASE} restart
+     ${INITDDIR}/php-fpm${PHP2_SHORTRELEASE} restart
      # set_service php-fpm${PHP2_SHORTRELEASE} ON
     # eval `echo "HAVE_FPM${PHP2_SHORTRELEASE}=yes"`
   fi
@@ -4443,7 +4450,36 @@ validate_options() {
 
   ## Port/Package Options
   case ${PHP1_VERSION} in
-    55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION} ;;
+    55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION}
+      case $(lc ${PHP1_MODE}) in
+        "fpm"|"phpfpm"|"php-fpm"|"php_fpm")
+          OPT_PHP1_MODE="php-fpm"
+          HAVE_FPM_CGI="YES"
+          ;;
+        "suphp"|"su_php"|"su-php"|"su")
+          OPT_PHP1_MODE="suphp"
+          HAVE_SUPHP_CGI=YES
+          ;;
+        "modphp"|"mod_php"|"mod"|"mod-php")
+          OPT_PHP1_MODE="mod_php"
+          HAVE_CLI="YES"
+          ;;
+        *) echo "*** Error: Invalid PHP1_MODE value set in options.conf"; exit;;
+      esac
+      case $(lc ${PHP_INI_TYPE}) in
+        "production"|"development") OPT_PHP_INI_TYPE=${PHP_INI_TYPE} ;;
+        "custom") OPT_PHP_INI_TYPE="custom" ;;
+        "no"|"none") OPT_PHP_INI_TYPE="none" ;;
+        *) echo "*** Error: Invalid PHP ini Type set in options.conf"; exit ;;
+      esac
+      ;;
+    "no"|"none")
+      OPT_PHP1_VERSION="NO"
+      OPT_PHP1_MODE="NO"
+      HAVE_FPM_CGI="NO"
+      HAVE_SUPHP_CGI="NO"
+      HAVE_CLI="NO"
+      ;;
     *) echo "*** Error: Invalid PHP1_VERSION value set in options.conf"; exit ;;
   esac
 
@@ -4452,24 +4488,8 @@ validate_options() {
   #   *) echo "*** Error: Invalid PHP2_VERSION value set in options.conf"; exit ;;
   # esac
 
-  case $(lc ${PHP1_MODE}) in
-    "fpm"|"phpfpm"|"php-fpm")
-      OPT_PHP1_MODE="fpm"
-      HAVE_FPM_CGI="YES"
-      ;;
-    "suphp")
-      OPT_PHP1_MODE="suphp"
-      HAVE_SUPHP_CGI=YES
-      ;;
-    "modphp"|"mod_php"|"mod"|"mod-php")
-      OPT_PHP1_MODE="mod_php"
-      HAVE_CLI="YES"
-      ;;
-    *) echo "*** Error: Invalid PHP1_MODE value set in options.conf"; exit ;;
-  esac
-
   # case $(lc ${PHP2_MODE}) in
-  #   fpm|phpfpm|php-fpm) OPT_PHP1_MODE="fpm" ;;
+  #   fpm|phpfpm|php-fpm) OPT_PHP1_MODE="php-fpm" ;;
   #   suphp) OPT_PHP1_MODE="suphp" ;;
   #   modphp|mod_php|mod|mod-php) OPT_PHP1_MODE="modphp" ;;
   #   *) echo "*** Error: Invalid PHP2_MODE value set in options.conf"; exit ;;
@@ -4477,13 +4497,6 @@ validate_options() {
 
   ## additional checks for PHP, then:
   ## OPT_PHP_ENABLE="YES"
-
-  case $(lc ${PHP_INI_TYPE}) in
-    "production"|"development") OPT_PHP_INI_TYPE=${PHP_INI_TYPE} ;;
-    "custom") OPT_PHP_INI_TYPE="custom" ;;
-    "no"|"none") OPT_PHP_INI_TYPE="none" ;;
-    *) echo "*** Error: Invalid PHP ini Type set in options.conf"; exit ;;
-  esac
 
   case $(lc ${WEBSERVER}) in
     "apache"|"apache24") OPT_WEBSERVER="apache"
@@ -4726,6 +4739,8 @@ install_app() {
     "webalizer") webalizer_install ;;
     *) show_install ;;
   esac
+
+  return
 }
 
 ################################################################
@@ -4735,22 +4750,22 @@ install_app() {
 ## e.g. uninstall_app exim
 uninstall_app() {
 
-  case "$1" in
-    *) exit;
+  case "$2" in
+    *) exit ;;
   esac
 
-  return;
+  return
 }
 
 ################################################################################################################################
 
-## Update PortsBuild Script
+## Todo: Update PortsBuild Script
 update() {
-  echo "PortsBuild script update"
+  echo "PortsBuild update script"
   # wget -O portsbuild.sh ${PB_MIRROR}/portsbuild.sh
 
   ## Backup configuration file
-  cp -f options.conf ../portsbuild.conf.backup
+  cp -f "${PB_CONF}" "${PB_CONF}.backup"
 
   #fetch -o ./${PORTSBUILD_NAME}.tar.gz "${PB_MIRROR}/${PORTSBUILD_NAME}.tar.gz"
 
@@ -4768,21 +4783,27 @@ update() {
   if [ "${OPT_PB_SYMLINK}" = "YES" ]; then
     ln -s /usr/local/directadmin/portsbuild/portsbuild.sh /usr/local/bin/pb
   fi
+
+  return
 }
 
 ################################################################################################################################
 
-## Upgrade
+## Todo: Upgrade
 upgrade() {
-    case $2 in
-    "") show_menu_upgrade ;;
-    esac
+
+  case $2 in
+  *) show_menu_upgrade ;;
+  esac
+
+  return
 }
 
 ################################################################
 
 ## Upgrade an application or service
 upgrade_app() {
+
   case $2 in
     apache) apache_upgrade ;;
     awstats) awstats_upgrade ;;
@@ -4808,15 +4829,17 @@ upgrade_app() {
     webalizer) webalizer_upgrade ;;
     *) show_menu_upgrade ;;
   esac
+
+  return
 }
 
 ################################################################################################################################
 
 ## Show Menu for Upgrades
 show_menu_upgrade() {
+
   echo ""
   echo "Listing possible upgrades"
-
   return
 }
 
@@ -4824,6 +4847,7 @@ show_menu_upgrade() {
 
 ## Show Setup Menu
 show_menu_setup() {
+
   echo "To setup PortsBuild and DirectAdmin for the first time, run:"
   echo "  ./portsbuild setup <USER_ID> <LICENSE_ID> <SERVER_HOSTNAME> <ETH_DEV> <IP_ADDRESS>"
   echo ""
@@ -4877,16 +4901,70 @@ show_config() {
 
 ## Show Debugging Information
 show_debug() {
-  printf "Debugging Information\n"
-  printf "=====================\n"
+
+  printf "Debugging Information\n\n"
+  printf "===[PB]========================\n"
+  show_version
+  # printf "PortsBuild Version/Build: %s / %s\n" ${PB_VER} ${PB_BUILD_DATE}
+  printf "===[OS]========================\n"
+  printf "Detected: %s\n" "${OS} ${OS_VER} $MACHTYPE"
+  printf "Actual: %s\n" "$(uname -v)"
+  printf "===[SSL]=======================\n"
   printf "OpenSSL binary path: %s\n" ${OPENSSL_BIN}
+  printf "OpenSSL extra options: %s\n" "${OPENSSL_EXTRA}"
+  printf "Prefer Apache SSL Certificates: %s\n" ${OPT_PREFER_APACHE_SSL_CERTS}
+  printf "Prefer Exim SSL Certificates: %s\n" ${OPT_PREFER_EXIM_SSL_CERTS}
+  printf "Prefer Custom SSL Certificates: %s\n" ${OPT_PREFER_CUSTOM_SSL_CERTS}
+  printf "===[Misc]======================\n"
   printf "PortsBuild Symlink Enabled: %s\n" ${OPT_PB_SYMLINK}
   printf "\n"
+
+  return
+}
+
+################################################################
+
+
+## Verify: Rewrite Menu
+rewrite_app() {
+
+  case $2 in
+    "apache"|"apache24") apache_rewrite_confs ;;
+    "exim") exim_rewrite_confs ;;
+    "dovecot") dovecot_rewrite_confs ;;
+    "named"|"bind"|"dns") named_rewrite_confs ;;
+    "nginx") rewrite_nginx_confs ;;
+    "php") rewrite_php_confs ;;
+    "virtual") rewrite_virtual_confs ;;
+    *) show_rewrite_menu ;;
+  esac
+
+  return
+}
+
+
+################################################################
+
+## Show Rewrite Menu
+show_rewrite_menu() {
+
+  printf "Rewrite Configuration Files\n"
+  {
+    echo "apache: Rewrite Apache configuration files and virtual hosts"
+    echo "exim: Rewrite Exim configuration files"
+    echo "dovecot: Rewrite Dovecot configuration files"
+    echo "named: Rewrite Named (Bind) DNS files"
+    echo "nginx: Rewrite Nginx configuration files and virtual hosts"
+    echo "php: Rewrite PHP configuration files"
+    echo "virtual: Rewrite /etc/virtual directory"
+  } | column -t -s:
+
+  return
 }
 
 ################################################################################################################################
 
-## Show Installation Menu
+## Todo: Show Installation Menu
 show_install() {
 
 #  ( printf "Package Version Origin\n" ; pkg query -i -x "%n %v %o" '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
@@ -4959,14 +5037,14 @@ show_install() {
 
 ## Show logo :)
 show_logo() {
-  echo "               ___\/_ "
-  echo "              /  //\  "
-  echo "      _______/  /___  "
-  echo "     /  __  / ___  /  "
-  echo "    /  /_/ / /__/ /   "
-  echo "   /  ____/______/    "
-  echo "  /  /                "
-  echo " /__/                 "
+  echo "                ___\/_ "
+  echo "               /  //\  "
+  echo "       _______/  /___  "
+  echo "      /  __  / ___  /  "
+  echo "     /  /_/ / /__/ /   "
+  echo "    /  ____/______/    "
+  echo "   /  /                "
+  echo "  /__/                 "
   echo ""
 }
 
@@ -4974,7 +5052,8 @@ show_logo() {
 
 ## Show version
 show_version() {
-  echo "portsbuild version ${PB_VER} build ${PB_BUILD_DATE}"
+  printf "  PortsBuild version %s build %s\n" "${PB_VER}" "${PB_BUILD_DATE}"
+  return
 }
 
 ################################################################
@@ -4983,53 +5062,73 @@ show_version() {
 show_versions() {
   ## alternative way: awk '{printf("%15s %10s\n", $1, $2)}'
   ( printf "Package Version Origin\n" ; pkg query -i -x "%n %v %o" '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
+  return
 }
 
 ################################################################
 
 ## Show outdated versions of packages
 show_outdated() {
-  echo "List of packages that are out of date"
+  printf "List of installed packages that are out of date:\n"
   ( printf "Package Outdated\n" ; pkg version -l '<' -x '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
+  return
 }
 
 ################################################################
 
 ## About PortsBuild
-about() {
+show_about() {
+  show_logo
   show_version
-  echo "visit portsbuild.org"
+  echo "Visit portsbuild.org or github.com/portsbuild/portsbuild"
+  return
 }
 
 ################################################################
 
 ## Show selection menu
 show_menu() {
+
   echo ""
-  echo "Usage: "
-  echo "  pb command [options] [arguments]"
+  echo "  Usage: "
+  echo "    $0 command [options] [arguments]"
   echo ""
-  # echo "Options:"
-  # echo "  -h, --help"
-  # echo "  -q, --quiet"
-  # echo "  -v, --verbose"
+
+  # Options:
+  #   -h, --help                     Display this help message
+  #   -q, --quiet                    Do not output any message
+  #   -V, --version                  Display this application version
+  #       --ansi                     Force ANSI output
+  #       --no-ansi                  Disable ANSI output
+  #   -n, --no-interaction           Do not ask any interactive question
+  #       --profile                  Display timing and memory usage information
+  #   -d, --working-dir=WORKING-DIR  If specified, use the given directory as working directory.
+  #   -v|vv|vvv, --verbose           Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+
+  # echo "  Options:"
+  # echo "    -h, --help"
+  # echo "    -q, --quiet"
+  # echo "    -v, --verbose"
   # echo ""
-  echo "Available commands:"
-  echo "  config      Display the current configuration option values"
-  echo "  debug       Displays debugging information"
-  echo "  help        Displays help information"
-  # echo "  info      Displays information about an application or service"
-  echo "  install     Install an application or service"
-  # echo "  options     Show configured PortsBuild options"
-  echo "  outdated    Show outdated applications or services on the system"
-  echo "  rewrite     Rewrite (update) a configuration file for an application or service"
-  echo "  setup       Setup PortsBuild and DirectAdmin (first-time installations)"
-  echo "  update      Updates the portsbuild script"
-  echo "  upgrade     Upgrades an application or service"
-  #echo "  verify      Verify something"
-  # echo "  "
-  echo "  version     Show version information on all applications and services installed"
-  echo ""
+
+  echo "  Available commands:"
+  {
+    echo "    config: Display the current configuration option values"
+    echo "    debug: Displays debugging information"
+    echo "    help: Displays help information"
+    # echo "  info Displays information about an application or service"
+    echo "    install: Install an application or service"
+    # echo "  options: Show configured PortsBuild options"
+    echo "    outdated: Show outdated applications or services on the system"
+    echo "    rewrite: Rewrite (update) a configuration file for an application or service"
+    echo "    setup: Setup PortsBuild and DirectAdmin (first-time installations)"
+    echo "    update: Updates the portsbuild script"
+    echo "    upgrade: Upgrades an application or service"
+    #echo "    verify: Verify something"
+    # echo "  "
+    echo "    version: Show version information on all applications and services installed"
+    echo ""
+  } | column -t -s:
 
 # menu_command
 # menu_command_desc
@@ -5051,6 +5150,7 @@ show_main_menu() {
   show_menu
 }
 
+################################################################
 
 validate_options
 
@@ -5059,10 +5159,12 @@ case "$1" in
   # create_options)  ;;
   # set)  ;;
   # check_options) ;;
-  "c"|"config") show_config ;;
+  "about") show_about ;;                     ## show about
+  "c"|"config") show_config ;;          ## show configured option values
   "d"|"debug") show_debug ;;            ## show debugging info
-  "i"|"install") install_app ;;         ## install an application
-  "o"|"outdated") show_outdated ;;      ##
+  "i"|"install") install_app "$@" ;;    ## install an application
+  "o"|"outdated") show_outdated ;;      ## show installed packages that are out of date
+  "r"|"rewrite") rewrite_app "$@" ;;
   "setup") global_setup "$@" ;;         ## first time setup
   "upd"|"update") update ;;             ## update PB script
   "upg"|"upgrade") upgrade "$@" ;;      ## let portsbuild upgrade an app/service (e.g. php via pkg)
