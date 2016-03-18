@@ -658,7 +658,7 @@ setOpt() {
   ## Revalidate by asking user
   for i in $(eval_var "${VAR}_SET"); do
     if [ "${i}" = "${2}" ] || [ "${i}" = "userinput" ]; then
-      VALID="yes"
+      VALID="YES"
       break
     fi
   done
@@ -1218,7 +1218,7 @@ update_rc() {
     sysrc -x spamd_flags
   fi
 
-  if [ "${OPT_SAUTILS}" = "YES" ] && [ "${OPT_SPAMASSASSIN}" = "YES" ]; then
+  if [ "${OPT_SPAMASSASSIN_UTILS}" = "YES" ] && [ "${OPT_SPAMASSASSIN}" = "YES" ]; then
     sysrc -f /etc/periodic.conf daily_sa_enable="YES"
     sysrc -f /etc/periodic.conf daily_sa_quiet="NO"
     sysrc -f /etc/periodic.conf daily_sa_compile_nice="YES"
@@ -2363,7 +2363,7 @@ sql_post_install() {
 ## PHP Installation Tasks
 php_install() {
 
-  case ${PHP1_VERSION} in
+  case ${OPT_PHP1_VERSION} in
     55) PORT_PHP="${PORT_PHP55}"
         PORT_PHP_EXT="${PORT_PHP55_EXT}"
         PORT_MOD_PHP="${PORT_MOD_PHP55}"
@@ -2397,16 +2397,17 @@ php_install() {
     *) ;;
   esac
 
-  ## PORT_MOD_PHP55
-  case ${PHP1_MODE} in
+  case ${OPT_PHP1_MODE} in
     fpm)
         make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" rmconfig
         make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" OPTIONS_SET="${PHP_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
+        make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" rmconfig
         make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
         ;;
     mod_php)
         make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" rmconfig
         make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" OPTIONS_SET="${PHP_MOD_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_MOD_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
+        make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
         ;;
     fastcgi) ;;
     suphp) ;;
@@ -2416,16 +2417,16 @@ php_install() {
   # make -DNO_DIALOG -C "${PORT_PHP_EXT}" reinstall clean
 
   ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
-  cp -f "${PB_PATH}/configure/fpm/conf/php-fpm.conf.${PHP1_VERSION}" /usr/local/etc/php-fpm.conf
+  cp -f "${PB_PATH}/configure/fpm/conf/php-fpm.conf.${OPT_PHP1_VERSION}" /usr/local/etc/php-fpm.conf
 
-  if [ "${PHP_INI_TYPE}" = "production" ]; then
+  if [ "${OPT_PHP_INI_TYPE}" = "production" ]; then
     cp -f /usr/local/etc/php.ini-production /usr/local/etc/php.ini
-  elif [ "${PHP_INI_TYPE}" = "development" ]; then
+  elif [ "${OPT_PHP_INI_TYPE}" = "development" ]; then
     cp -f /usr/local/etc/php.ini-development /usr/local/etc/php.ini
   fi
 
   ## e.g. PHP1_VER="56"
-  PHP1_PATH="/usr/local/php${PHP1_VERSION}"
+  PHP1_PATH="/usr/local/php${OPTPHP1_VERSION}"
 
   ## Create directories for DA compat:
   mkdir -p ${PHP1_PATH}
@@ -2497,7 +2498,7 @@ php_install() {
 
 ## Upgrade PHP and related components
 php_upgrade() {
-  pkg upgrade "$(pkg query %o | grep php${PHP1_VERSION})"
+  pkg upgrade "$(pkg query %o | grep php${OPT_PHP1_VERSION})"
 
   #pkg query -i -x "%o %v" '(php)'
 }
@@ -2754,6 +2755,7 @@ apache_uninstall() {
 
   sysrc -x apache24_enable
   sysrc -x apache24_http_accept_enable
+
   return
 }
 
@@ -2769,7 +2771,7 @@ nginx_install() {
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" www_nginx_SET="${NGINX_MAKE_SET}" www_nginx_UNSET="${NGINX_MAKE_UNSET}"  OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" www_nginx_SET="${NGINX_MAKE_SET}" www_nginx_UNSET="${NGINX_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ### Post-Installation Tasks
 
@@ -2832,6 +2834,7 @@ majordomo_install() {
   fi
 
   ## majordomo.sh script
+  ./scripts/majordomo.sh
 
   return
 }
@@ -2849,13 +2852,12 @@ majordomo_uninstall() {
 pureftpd_install() {
 
   if [ "${OPT_FTPD}" != "pureftpd" ]; then
-    echo "*** Error: FTPD not set in options.conf"
+    echo "*** Error: PureFTPD not set in options.conf"
   fi
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" config ftp_pure_ftpd_SET="${PUREFTPD_MAKE_SET}" ftp_pure_ftpd_UNSET="${PUREFTPD_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" ftp_pure_ftpd_SET="${PUREFTPD_MAKE_SET}" ftp_pure_ftpd_UNSET="${PUREFTPD_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   if [ "${OPT_PUREFTPD_UPLOADSCAN}" = "YES" ]; then
     pureftpd_clamav_install
@@ -2890,7 +2892,7 @@ pureftpd_uninstall() {
 proftpd_install() {
 
   if [ "${OPT_FTPD}" != "proftpd" ]; then
-    echo "*** Error: FTPD not set in options.conf"
+    echo "*** Error: ProFTPD not set in options.conf"
     return
   fi
 
@@ -3397,7 +3399,7 @@ webapps_install() {
   /usr/sbin/pw useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
 
   ## Set permissions on temp directory:
-  if [ ${PHP1_MODE} = "fpm" ]; then
+  if [ "${OPT_PHP1_MODE}" = "fpm" ]; then
     chmod 755 ${WWW_DIR}/tmp
   else
     chmod 777 ${WWW_DIR}/tmp
@@ -3512,7 +3514,7 @@ apache_rewrite_confs() {
 
     ## Set this for now since PB only supports 1 instance of PHP.
     #OPT_PHP1_MODE="php-fpm"
-    #PHP1_MODE="FPM"
+    #PHP1_MODE="fpm"
     #PHP1_VERSION="56"
 
     ## Copy custom/ file
@@ -3522,13 +3524,13 @@ apache_rewrite_confs() {
     else
       echo '' > ${APACHE_HOST_CONF}
 
-      # if [ "${HAVE_FPM_CGI}" = "yes" ]; then
+      # if [ "${HAVE_FPM_CGI}" = "YES" ]; then
       #   echo 'SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1' >> ${APACHE_HOST_CONF}
       # fi
 
       echo "<Directory ${WWW_DIR}>" >> ${APACHE_HOST_CONF}
 
-      if [ "${PHP1_MODE}" = "FPM" ]; then
+      if [ "${OPT_PHP1_MODE}" = "fpm" ]; then
         {
           echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">';
           echo "AddHandler \"proxy:unix:/usr/local/php${PHP1_VERSION}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${PHP1_VERSION} .phtml";
@@ -3565,7 +3567,7 @@ apache_rewrite_confs() {
         SUEXEC_PER_DIR=$(/usr/local/sbin/suexec -V 2>&1 | grep -c 'AP_PER_DIR')
       fi
 
-      # if [ "${PHP1_MODE}" = "fastcgi" ]; then
+      # if [ "${OPT_PHP1_MODE}" = "fastcgi" ]; then
       #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
       #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP1_VERSION}.sh .php" >> ${APACHE_HOST_CONF}
       #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
@@ -3624,13 +3626,13 @@ rewrite_confs() {
     chmod 710 "${APACHE_EXTRA_PATH}"
 
     ## Swap the |WEBAPPS_PHP_RELEASE| token.
-    if [ "${PHP1_MODE}" = "FPM" ] || [ "${PHP2_MODE}" = "FPM" ]; then
+    if [ "${OPT_PHP1_MODE}" = "fpm" ] || [ "${OPT_PHP2_MODE}" = "fpm" ]; then
       PHPV=""
 
-      if [ "${PHP1_MODE}" = "FPM" ]; then
-        PHPV=$(${PERL} -e "print ${PHP1_VERSION}")
-      elif [ "${PHP2_VERSION}" != "" ]; then
-        PHPV=$(${PERL} -e "print ${PHP2_VERSION}")
+      if [ "${OPT_PHP1_MODE}" = "fpm" ]; then
+        PHPV=$(${PERL} -e "print ${OPT_PHP1_VERSION}")
+      elif [ "${OPT_PHP2_VERSION}" != "" ]; then
+        PHPV=$(${PERL} -e "print ${OPT_PHP2_VERSION}")
       fi
 
       if [ "${PHPV}" != "" ]; then
@@ -3693,13 +3695,13 @@ rewrite_confs() {
 
     echo -n "" > "${PHPMODULES}"
 
-    if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+    if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
       ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' "${APACHE_CONF}"
       echo "LoadModule  suphp_module    ${APACHE_LIB_PATH}/mod_suphp.so" >> "${PHPMODULES}"
     fi
 
     ## mod_security (not done):
-    if [ "${OPT_MODSECURITY}" = "yes" ] && [ "${OPT_WEBSERVER}" = "apache" ]; then
+    if [ "${OPT_MODSECURITY}" = "YES" ] && [ "${OPT_WEBSERVER}" = "apache" ]; then
       ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' "${APACHE_CONF}"
       echo "Include ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf" >> "${PHPMODULES}"
       cp -pf "${MODSECURITY_APACHE_INCLUDE}" ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf
@@ -3707,8 +3709,8 @@ rewrite_confs() {
     fi
 
     ## HTScanner (not done):
-    if [ "${HTSCANNER_OPT}" = "yes" ]; then
-      if [ "${HAVE_FCGID}" = "yes" ] || [ "${HAVE_FPM_CGI}" = "yes" ] || [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+    if [ "${HTSCANNER_OPT}" = "YES" ]; then
+      if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
         ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' "${APACHE_CONF}"
         echo "LoadModule  htscanner_module    ${APACHE_LIB_PATH}/mod_htscanner2.so" >> "${PHPMODULES}"
       fi
@@ -3761,7 +3763,7 @@ rewrite_confs() {
     fi
 
     ## fcgid
-    # if [ "${HAVE_FCGID}" = "yes" ]; then
+    # if [ "${HAVE_FCGID}" = "YES" ]; then
     #   if [ -e ${PHPMODULES} ]; then
     #     if ! grep -m1 -c 'fcgid_module' ${PHPMODULES}; then
     #       ${PERL} -pi -e 's|^LoadModule  fcgid_module|#LoadModule  fcgid_module|' /etc/httpd/conf/httpd.conf
@@ -3781,7 +3783,7 @@ rewrite_confs() {
 
     #   for php_shortrelease in `echo ${PHP1_SHORTRELEASE_SET}`; do
     #     EVAL_CHECK_VAR=HAVE_FCGID${php_shortrelease}
-    #     if [ "$(eval_var ${EVAL_CHECK_VAR})" = "yes" ]; then
+    #     if [ "$(eval_var ${EVAL_CHECK_VAR})" = "YES" ]; then
     #       cp -f ${CWD}/configure/fastcgi/fcgid${php_shortrelease}.sh /usr/local/safe-bin/fcgid${php_shortrelease}.sh
     #       if [ -e ${CWD}/custom/fastcgi/fcgid${php_shortrelease}.sh ]; then
     #         cp -f ${CWD}/custom/fastcgi/fcgid${php_shortrelease}.sh /usr/local/safe-bin/fcgid${php_shortrelease}.sh
@@ -3792,7 +3794,7 @@ rewrite_confs() {
     #   done
     # fi
 
-    if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+    if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
       if [ -e "${PHPMODULES}" ]; then
         if ! grep -m1 -q 'suphp_module' "${PHPMODULES}"; then
           echo "LoadModule  suphp_module    ${APACHE_LIB_PATH}/mod_suphp.so" >> "${PHPMODULES}"
@@ -3844,7 +3846,7 @@ rewrite_confs() {
     verify _server_ca
     ensure_dhparam "${NGINX_CONF}/ssl.crt/dhparams.pem"
 
-    if [ "${MODSECURITY_OPT}" = "yes" ]; then
+    if [ "${MODSECURITY_OPT}" = "YES" ]; then
       doModSecurityRules norestart
     fi
 
@@ -4219,7 +4221,7 @@ tokenize_ports() {
 ## Rewrite PHP Configuration (copied from CB2: doPhpConf)
 rewrite_php_confs() {
 
-  if [ "${HAVE_FPM_CGI}" = "yes" ]; then
+  if [ "${HAVE_FPM_CGI}" = "YES" ]; then
     for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
       set_service "php-fpm${php_shortrelease}" OFF
     done
@@ -4245,7 +4247,7 @@ rewrite_php_confs() {
       echo "AddHandler application/x-httpd-php .inc .php .php5 .php${PHP1_SHORTRELEASE} .phtml" >> "${PHP_HANDLERS_HTTPD}"
     fi
 
-    # if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+    # if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${OPT_PHP2_RELEASE}" != "no" ]; then
     #   echo "AddHandler application/x-httpd-php .php${PHP2_SHORTRELEASE}" >> "${PHP_HANDLERS_HTTPD}"
     # fi
 
@@ -4270,7 +4272,7 @@ rewrite_php_confs() {
     eval `echo "HAVE_FPM${PHP1_SHORTRELEASE}=yes"`
   fi
 
-  if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+  if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${OPT_PHP2_RELEASE}" != "no" ]; then
         ${INITDDIR}/php-fpm${PHP2_SHORTRELEASE} restart
      # set_service php-fpm${PHP2_SHORTRELEASE} ON
     # eval `echo "HAVE_FPM${PHP2_SHORTRELEASE}=yes"`
@@ -4292,7 +4294,7 @@ rewrite_php_confs() {
   done
 
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+    if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
       ## Writing data to suphp.conf:
       (
         echo -n ""
@@ -4338,12 +4340,13 @@ rewrite_php_confs() {
       ) > "${SUPHP_CONF_FILE}"
 
       if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
-        echo "x-httpd-php${PHP1_SHORTRELEASE}=\"php:/usr/local/php${PHP1_SHORTRELEASE}/bin/php-cgi${PHP1_SHORTRELEASE}\"" >> "${SUPHP_CONF_FILE}"
+        echo "x-httpd-php${OPT_PHP1_VERSION}=\"php:/usr/local/php${OPT_PHP1_VERSION}/bin/php-cgi${OPT_PHP1_VERSION}\"" >> "${SUPHP_CONF_FILE}"
       fi
 
-      if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
-        echo "x-httpd-php${PHP2_SHORTRELEASE}=\"php:/usr/local/php${PHP2_SHORTRELEASE}/bin/php-cgi${PHP2_SHORTRELEASE}\"" >> "${SUPHP_CONF_FILE}"
-      fi
+      ## Todo: PHP2
+      # if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${OPT_PHP2_RELEASE}" != "no" ]; then
+      #   echo "x-httpd-php${PHP2_SHORTRELEASE}=\"php:/usr/local/php${PHP2_SHORTRELEASE}/bin/php-cgi${PHP2_SHORTRELEASE}\"" >> "${SUPHP_CONF_FILE}"
+      # fi
 
       {
         echo ""
@@ -4362,14 +4365,16 @@ rewrite_php_confs() {
         echo "AddHandler x-httpd-php${PHP1_SHORTRELEASE} .inc .php .php3 .php4 .php5 .php${PHP1_SHORTRELEASE} .phtml" >> "${SUPHP_HTTPD}"
       fi
 
-      # if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+      ## Todo: PHP2
+      # if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${OPT_PHP2_RELEASE}" != "no" ]; then
       #   echo "AddHandler x-httpd-php${PHP2_SHORTRELEASE} .php${PHP2_SHORTRELEASE}" >> ${SUPHP_HTTPD}
       # fi
 
-      echo '</FilesMatch>' >> "${SUPHP_HTTPD}"
-
-      echo "<Location />" >> "${SUPHP_HTTPD}"
-      echo "suPHP_Engine on" >> "${SUPHP_HTTPD}"
+      {
+        echo "</FilesMatch>"
+        echo "<Location />"
+        echo "suPHP_Engine on"
+      } >> "${SUPHP_HTTPD}"
 
       if [ -d "/usr/local/php${PHP1_SHORTRELEASE}/lib" ]; then
         echo "suPHP_ConfigPath /usr/local/php${PHP1_SHORTRELEASE}/lib/" >> "${SUPHP_HTTPD}"
@@ -4378,10 +4383,11 @@ rewrite_php_confs() {
       fi
 
       if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
-        echo "suPHP_AddHandler x-httpd-php${PHP1_SHORTRELEASE}" >> ${SUPHP_HTTPD}
+        echo "suPHP_AddHandler x-httpd-php${PHP1_SHORTRELEASE}" >> "${SUPHP_HTTPD}"
       fi
 
-      # if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+      ## Todo: PHP2
+      # if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${OPT_PHP2_RELEASE}" != "no" ]; then
       #   echo "suPHP_AddHandler x-httpd-php${PHP2_SHORTRELEASE}" >> ${SUPHP_HTTPD}
       # fi
 
@@ -4413,22 +4419,17 @@ bfm_setup() {
   #pure_pw=/usr/bin/pure-pw
 }
 
-## IPFW Setup (not done)
+################################################################
+
+## Todo: IPFW Setup
 ipfw_setup() {
-  return;
+  return
 }
 
 ################################################################################################################################
 
 ## Validate Options
 validate_options() {
-
-  ## Verify if PortsBuild directory exists.
-  # if [ ! -d "/usr/local/directadmin/portsbuild" ]; then
-  #   FOUND_PORTSBUILD=0
-  # else
-  #   FOUND_PORTSBUILD=1
-  # fi
 
   ## Parse Defaults and User Options, then pass computed values to PB
 
@@ -4452,9 +4453,18 @@ validate_options() {
   # esac
 
   case $(lc ${PHP1_MODE}) in
-    fpm|phpfpm|php-fpm) OPT_PHP1_MODE="fpm" ;;
-    suphp) OPT_PHP1_MODE="suphp" ;;
-    modphp|mod_php|mod|mod-php) OPT_PHP1_MODE="modphp" ;;
+    "fpm"|"phpfpm"|"php-fpm")
+      OPT_PHP1_MODE="fpm"
+      HAVE_FPM_CGI="YES"
+      ;;
+    "suphp")
+      OPT_PHP1_MODE="suphp"
+      HAVE_SUPHP_CGI=YES
+      ;;
+    "modphp"|"mod_php"|"mod"|"mod-php")
+      OPT_PHP1_MODE="mod_php"
+      HAVE_CLI="YES"
+      ;;
     *) echo "*** Error: Invalid PHP1_MODE value set in options.conf"; exit ;;
   esac
 
@@ -4469,39 +4479,39 @@ validate_options() {
   ## OPT_PHP_ENABLE="YES"
 
   case $(lc ${PHP_INI_TYPE}) in
-    production|development) OPT_PHP_INI_TYPE=${PHP_INI_TYPE} ;;
-    custom) OPT_PHP_INI_TYPE="custom" ;;
-    no|none) OPT_PHP_INI_TYPE="none" ;;
-    *) echo "*** Error: Invalid PHP.ini value set in options.conf"; exit ;;
+    "production"|"development") OPT_PHP_INI_TYPE=${PHP_INI_TYPE} ;;
+    "custom") OPT_PHP_INI_TYPE="custom" ;;
+    "no"|"none") OPT_PHP_INI_TYPE="none" ;;
+    *) echo "*** Error: Invalid PHP ini Type set in options.conf"; exit ;;
   esac
 
   case $(lc ${WEBSERVER}) in
-    apache|apache24) OPT_WEBSERVER="apache"
+    "apache"|"apache24") OPT_WEBSERVER="apache"
     case $(lc ${APACHE_MPM}) in
-      event|prefork|worker) OPT_APACHE_MPM="${OPT_APACHE_MPM}" ;;
-      auto) OPT_APACHE_MPM="event" ;;
+      "event"|"prefork"|"worker") OPT_APACHE_MPM="${APACHE_MPM}" ;;
+      "auto") OPT_APACHE_MPM="event" ;;
       *) echo "*** Error: Invalid APACHE_MPM value set in options.conf"; exit ;;
     esac ;;
-    nginx) OPT_WEBSERVER="nginx" ;;
-    no|none) OPT_WEBSERVER="NO" ;;
+    "nginx") OPT_WEBSERVER="nginx" ;;
+    "no"|"none") OPT_WEBSERVER="NO" ;;
     *) echo "*** Error: Invalid WEBSERVER value set in options.conf"; exit ;;
   esac
 
   case $(lc ${SQL_DB}) in
-    mysql55|mysql56|mysql57|mariadb55|mariadb100) OPT_SQL_DB="${SQL_DB}" ;;
-    no|none) OPT_SQL_DB="NO" ;;
+    "mysql55"|"mysql56"|"mysql57"|"mariadb55"|"mariadb100") OPT_SQL_DB="${SQL_DB}" ;;
+    "no"|"none") OPT_SQL_DB="NO" ;;
     *) echo "*** Error: Invalid SQL_DB value set in options.conf"; exit ;;
   esac
 
   case $(lc ${FTPD}) in
-    pureftpd|pure-ftpd) OPT_FTPD="pureftpd" ;;
-    proftpd|pro-ftpd) OPT_FTPD="proftpd" ;;
-    no|none) OPT_FTPD="NO" ;;
+    "pureftpd"|"pure-ftpd"|"pureftp") OPT_FTPD="pureftpd" ;;
+    "proftpd"|"pro-ftpd"|"proftp") OPT_FTPD="proftpd" ;;
+    "no"|"none") OPT_FTPD="NO" ;;
     *) echo "*** Error: Invalid FTPD value set in options.conf"; exit ;;
   esac
 
   case "$(uc ${EXIM})" in
-    YES|NO) OPT_EXIM="${EXIM}" ;;
+    "YES"|"NO") OPT_EXIM="${EXIM}" ;;
     *) echo "*** Error: Invalid EXIM option set in options.conf"; exit ;;
   esac
 
@@ -4556,13 +4566,13 @@ validate_options() {
   if [ "$(uc ${SPAMASSASSIN})" = "YES" ]; then
     OPT_SPAMASSASSIN="YES"
     if [ "$(uc "${SAUTILS}")" = "YES" ]; then
-      OPT_SAUTILS="YES"
+      OPT_SPAMASSASSIN_UTILS="YES"
     else
-      OPT_SAUTILS="NO"
+      OPT_SPAMASSASSIN_UTILS="NO"
     fi
   elif [ "$(uc ${SPAMASSASSIN})" = "NO" ]; then
     OPT_SPAMASSASSIN="NO"
-    OPT_SAUTILS="NO"
+    OPT_SPAMASSASSIN_UTILS="NO"
   fi
 
   if [ "$(uc "${PROFTPD_UPLOADSCAN}")" = "YES" ]; then
@@ -4718,6 +4728,8 @@ install_app() {
   esac
 }
 
+################################################################
+
 ## Uninstall Application
 ## $1 = name of service
 ## e.g. uninstall_app exim
@@ -4767,6 +4779,8 @@ upgrade() {
     esac
 }
 
+################################################################
+
 ## Upgrade an application or service
 upgrade_app() {
   case $2 in
@@ -4806,6 +4820,8 @@ show_menu_upgrade() {
   return
 }
 
+################################################################
+
 ## Show Setup Menu
 show_menu_setup() {
   echo "To setup PortsBuild and DirectAdmin for the first time, run:"
@@ -4818,6 +4834,8 @@ show_menu_setup() {
 ## Show Configuration Values
 show_config() {
 
+  printf "Configured Option Values\n"
+  printf "========================\n"
   {
     echo "PHP1 Version: ${OPT_PHP1_VERSION}"
     echo "PHP1 Mode: ${OPT_PHP1_MODE}"
@@ -4835,7 +4853,7 @@ show_config() {
     echo "BlockCracking: ${OPT_BLOCKCRACKING}"
     echo "Easy Spam Fighter: ${OPT_EASY_SPAM_FIGHTER}"
     echo "SpamAssassin: ${OPT_SPAMASSASSIN}"
-    echo "SpamAssassin Utilities: ${OPT_SAUTILS}"
+    echo "SpamAssassin Utilities: ${OPT_SPAMASSASSIN_UTILS}"
     echo "ProFTPd Upload Scan: ${OPT_PROFTPD_UPLOADSCAN}"
     echo "PureFTPd Upload Scan: ${OPT_PUREFTPD_UPLOADSCAN}"
     echo "Awstats: ${OPT_AWSTATS}"
@@ -4952,10 +4970,14 @@ show_logo() {
   echo ""
 }
 
+################################################################
+
 ## Show version
 show_version() {
   echo "portsbuild version ${PB_VER} build ${PB_BUILD_DATE}"
 }
+
+################################################################
 
 ## Show versions
 show_versions() {
@@ -4963,17 +4985,23 @@ show_versions() {
   ( printf "Package Version Origin\n" ; pkg query -i -x "%n %v %o" '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
 }
 
+################################################################
+
 ## Show outdated versions of packages
 show_outdated() {
   echo "List of packages that are out of date"
   ( printf "Package Outdated\n" ; pkg version -l '<' -x '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
 }
 
+################################################################
+
 ## About PortsBuild
 about() {
   show_version
   echo "visit portsbuild.org"
 }
+
+################################################################
 
 ## Show selection menu
 show_menu() {
@@ -5014,6 +5042,8 @@ show_menu() {
   return
 }
 
+################################################################
+
 ## Show the main menu
 show_main_menu() {
   show_logo
@@ -5029,6 +5059,7 @@ case "$1" in
   # create_options)  ;;
   # set)  ;;
   # check_options) ;;
+  "c"|"config") show_config ;;
   "d"|"debug") show_debug ;;            ## show debugging info
   "i"|"install") install_app ;;         ## install an application
   "o"|"outdated") show_outdated ;;      ##
