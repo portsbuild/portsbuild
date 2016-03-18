@@ -299,3 +299,16 @@ UPPERCASE_SECTION=`echo $1 | tr "[a-z]" "[A-Z]"`
      XSL=off: XSL support (Implies DOM)
      ZIP=off: ZIP support
      ZLIB=off: ZLIB support
+
+
+Exim now drops privileges when alternate configuration
+files are used.  You can set make variable TRUSTED_CONFIG_LIST
+to specify the list of configuration files for which
+root privileges will be retained.
+
+You can whitelist some macros using the make variable
+WHITELIST_D_MACROS.  This is useful if you are running
+with DISABLE_D_OPT set, but macros whitelisting will be
+removed in some future Exim release, so it is better
+to use TRUSTED_CONFIG_LIST to set the list of trusted
+configuration files.

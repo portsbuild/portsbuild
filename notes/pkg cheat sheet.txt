@@ -44,6 +44,18 @@ archivers/php56-zlib
 
 
 
+
+.if !target(config)
+.if !defined(NO_DIALOG)
+config: pre-config do-config
+.else
+config:
+        @${ECHO_MSG} "===> Skipping 'config' as NO_DIALOG is defined"
+.endif
+.endif # config
+
+
+
 pkg upgrade `pkg query %o | grep 'php56'`
 
 
