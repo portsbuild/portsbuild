@@ -193,7 +193,7 @@ CB_CONF=${CB_PATH}/options.conf
 MIN_PASS_LENGTH=12
 MAX_PASS_LENGTH=16
 
-## Virtual Mail Directory (keeping this path as-is for simplicity).
+## Virtual Mail Directory (keeping this path as-is for simplicity)
 VIRTUAL_PATH=/etc/virtual
 # VIRTUAL=/etc/virtual
 # VIRTUAL_DIR=${VIRTUAL_PATH}
@@ -299,6 +299,18 @@ DOVECOT_SSL_CA=${DOVECOT_PATH}/ssl/dovecot.ca
 ## ClamAV
 CLAMD_CONF=/usr/local/etc/clamd.conf
 FRESHCLAM_CONF=/usr/local/etc/freshclam.conf
+CLAMDSCAN_BIN=/usr/local/bin/clamdscan
+
+## PureFTPD
+PATH_TO_UPLOADSCAN=/usr/local/bin/pureftpd_uploadscan.sh
+PUREFTPD_UPLOADSCAN_SCRIPT=${PB_PATH}/configure/pureftpd/pureftpd_uploadscan.sh
+if [ -e "${PB_PATH}/custom/pureftpd/pureftpd_uploadscan.sh" ]; then
+  PUREFTPD_UPLOADSCAN_SCRIPT=${PB_PATH}/custom/pureftpd/pureftpd_uploadscan.sh
+fi
+
+## ProFTPD
+PROFTPD_CONF=/usr/local/etc/proftpd.conf
+PROFTPD_CLAMAV_CONF=/usr/local/etc/proftpd.clamav.conf
 
 ## MySQL/MariaDB
 ## DA default data path is: /home/mysql
@@ -538,7 +550,7 @@ CLAMAV_MAKE_UNSET=""
 PROFTPD_MAKE_SET=""
 PROFTPD_MAKE_UNSET=""
 
-PUREFTPD_MAKE_SET="UPLOADSCRIPT LARGEFILE"
+PUREFTPD_MAKE_SET="UPLOADSCRIPT LARGEFILE" # PERUSERLIMITS THROTTLING
 PUREFTPD_MAKE_UNSET=""
 
 ################################################################################################################################
@@ -578,6 +590,8 @@ fi
 ## Check for this file and append to OpenSSL calls using -config:
 OPENSSL_EXTRA="-config ${PB_PATH}/custom/ap2/cert_config.txt"
 # -config ${PB_PATH}/custom/ap2/cert_config.txt
+
+
 
 ## Source (include) additional files into the script:
 . options.conf
@@ -723,6 +737,39 @@ getVal() {
   #echo "${GET_VALUE}"
 
   return
+}
+
+################################################################################################################################
+
+## Used to set values ON/OFF in the services.status (copied from CB2)
+## set_service name ON|OFF|delete
+set_service() {
+  if [ ! -e ${DA_SERVICES} ]; then
+    return
+  fi
+
+  SERVICE_COUNT=`grep -m1 -c "^$1=" ${DA_SERVICES}`
+
+  if [ "$2" = "delete" ]; then
+    if [ "${SERVICE_COUNT}" -eq 0 ]; then
+      return
+    else
+      perl -pi -e "s/^${1}=.*\n//" ${DA_SERVICES}
+    fi
+    return
+  fi
+
+  if [ "$2" = "ON" ] || [ "$2" = "OFF" ]; then
+    if [ "${SERVICE_COUNT}" -eq 0 ]; then
+      echo "$1=$2" >> ${DA_SERVICES}
+    else
+      perl -pi -e "s/^$1=.*/$1=$2/" ${DA_SERVICES}
+    fi
+
+    return
+  fi
+
+  echo "setService $1: unknown option: $2"
 }
 
 ################################################################################################################################
@@ -1037,7 +1084,7 @@ global_setup() {
     echo "Setting ipv6_ipv4mapping=YES in /etc/rc.conf"
     sysrc ipv6_ipv4mapping="YES"
     sysrc -f /etc/sysctl.conf net.inet6.ip6.v6only=0
-    /sbin/sysctl net.inet6.ip6.v6only=0
+    ${SYSCTL} net.inet6.ip6.v6only=0
 
     ## Disable sendmail if Exim is enabled
     if [ "${OPT_EXIM}" = "YES" ] || [ "${OPT_DISABLE_SENDMAIL}" = "YES" ] ; then
@@ -2696,6 +2743,7 @@ apache_install() {
   # touch ${APACHE_DIR}/ssl/server.crt
   # touch ${APACHE_DIR}/ssl/server.key
 
+  ## Generate self-signed SSL certificate for Apache:
   ${OPENSSL_BIN} req -x509 -newkey rsa:2048 -keyout ${APACHE_SSL_KEY} -out ${APACHE_SSL_CRT} -days 9999 -nodes "${OPENSSL_EXTRA}"
 
   ## Set permissions:
@@ -2718,12 +2766,12 @@ apache_install() {
   ## Symlink for DA compat:
   ln -s /usr/local/sbin/httpd /usr/sbin/httpd
 
-  ## Copy over modified (custom) CB2 conf files to conf/:
+  ## Copy over modified (custom) configuration files to conf/:
   cp -rf "${PB_PATH}/custom/ap2/conf/" ${APACHE_PATH}/
   cp -f "${PB_PATH}/custom/ap2/conf/httpd.conf" ${APACHE_PATH}/
   cp -f "${PB_PATH}/custom/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRA_PATH}/httpd-mpm.conf
 
-  ## Already done (default):
+  ## This is already done (Apache default):
   ${PERL} -pi -e 's/^DefaultType/#DefaultType/' ${APACHE_PATH}/httpd.conf
 
   chmod 710 ${APACHE_PATH}
@@ -2754,6 +2802,7 @@ apache_install() {
   ${SERVICE} apache24 start
 
   ## Remove nginx startup if defined
+  ## Soon: verify if nginx_apache reverse proxy is configured
   sysrc -x nginx_enable
 }
 
@@ -2761,6 +2810,8 @@ apache_install() {
 
 ## Apache Uninstall
 apache_uninstall() {
+
+  pkg -f delete apache24
 
   sysrc -x apache24_enable
   sysrc -x apache24_http_accept_enable
@@ -2803,6 +2854,7 @@ nginx_install() {
   ${SERVICE} nginx start
 
   ## Remove Apache24 startup if defined
+  ## Soon: verify if nginx_apache reverse proxy is configured
   sysrc -x apache24_enable
   sysrc -x apache24_http_accept_enable
 
@@ -2827,6 +2879,8 @@ nginx_install() {
 ## Uninstall nginx
 nginx_uninstall() {
 
+  pkg -f delete nginx
+
   sysrc -x nginx_enable
 
   return
@@ -2842,7 +2896,7 @@ majordomo_install() {
     return
   fi
 
-  ## majordomo.sh script
+  ## Verify: majordomo.sh script
   ./scripts/majordomo.sh
 
   return
@@ -2862,35 +2916,73 @@ pureftpd_install() {
 
   if [ "${OPT_FTPD}" != "pureftpd" ]; then
     echo "*** Error: PureFTPD not set in options.conf"
+    return
   fi
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" rmconfig
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" ftp_pure_ftpd_SET="${PUREFTPD_MAKE_SET}" ftp_pure_ftpd_UNSET="${PUREFTPD_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
-  if [ "${OPT_PUREFTPD_UPLOADSCAN}" = "YES" ]; then
-    pureftpd_clamav_install
+  if [ "${OPT_PUREFTPD_UPLOADSCAN}" = "YES" ] && [ "${OPT_CLAMAV}" = "YES" ]; then
+    if [ ! -e ${CLAMDSCAN_BIN} ]; then
+      clamav_install
+    fi
+
+    if [ ! -e ${CLAMDSCAN_BIN} ]; then
+      echo "*** Error: Cannot enable upload scanning in Pure-FTPD because there is no ClamAV (${CLAMDSCAN_BIN}) on the system."
+      exit 1
+    fi
+
+    echo "Enabling Pure-FTPD upload scanning script..."
+    cp -f "${PUREFTPD_UPLOADSCAN_SCRIPT}" ${PATH_TO_UPLOADSCAN}
+    chmod 711 ${PATH_TO_UPLOADSCAN}
+
+    sysrc pureftpd_upload_enable="YES"
+    sysrc pureftpd_uploadscript="${PATH_TO_UPLOADSCAN}"
+  else
+    rm -f ${PATH_TO_UPLOADSCAN}
+    sysrc -x pureftpd_upload_enable
+    sysrc -x pureftpd_uploadscript
   fi
 
   return
-}
 
-################################################################
+  PUREFTPD_LOG=/var/log/pureftpd.log
+  PUREFTPD_DB=/etc/pureftpd.pdb
 
-# PureFTPD Upload Scan (ClamAV) Integration Installation
-pureftpd_clamav_install() {
+  sysrc pureftpd_enable="YES"
+  sysrc pureftpd_flags="-B -A -C 15 -E -H -k 99 -L 10000:8 -O stats:${PUREFTPD_LOG} -l puredb:${PUREFTPD_DB} -p 35000:35999 -u 100 -U 133:022 -w -Z -Y 1 -J -S:HIGH:MEDIUM:+TLSv1:!SSLv2:+SSLv3"
 
+  setVal pureftp 1 ${DA_CONF_TEMPLATE_FILE}
+  setVal pureftp 1 ${DA_CONF_FILE}
+
+  #${SERVICE} directadmin restart
+  directadmin_restart
+
+  set_service proftpd delete
+  set_service pure-ftpd ON
+
+  ## Verify:
+  /usr/local/bin/pure-pw mkdb /usr/local/etc/pureftpd.pdb -f /usr/local/etc/proftpd.passwd
+
+  echo "Restarting PureFTPD"
+  ${SERVICE} pureftpd restart
 
   return
 }
+
 
 ################################################################
 
 ## PureFTPD Uninstall
 pureftpd_uninstall() {
 
-  sysrc -x pure_ftpd_enable
-  sysrc -x pure_ftpd_flags
+  sysrc -x pureftpd_enable
+  sysrc -x pureftpd_flags
+  sysrc -x pureftpd_upload_enable
+  sysrc -x pureftpd_uploadscript
+
+  rm -f ${PATH_TO_UPLOADSCAN}
 
   return
 }
@@ -2909,45 +3001,74 @@ proftpd_install() {
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" rmconfig
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" ftp_proftpd_SET="${PROFTPD_MAKE_SET}" ftp_proftpd_UNSET="${PROFTPD_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
-  if [ "${OPT_CLAMAV_WITH_PROFTPD}" = "YES" ]; then
-    proftpd_clamav_install
+  setVal pureftp 0 ${DA_CONF_TEMPLATE_FILE}
+  setVal pureftp 0 ${DA_CONF_FILE}
+
+  set_service pure-ftpd delete
+  set_service proftpd ON
+
+  sysrc -x pureftpd_enable
+
+  ${SERVICE} pure-ftpd onestop
+
+  if [ "${OPT_PROFTPD_UPLOADSCAN}" = "YES" ] && [ "${OPT_CLAMAV}" = "YES" ]; then
+    if [ ! -e "${CLAMDSCAN_BIN}" ]; then
+      clamav_install
+    fi
+
+    if [ ! -e "${CLAMDSCAN_BIN}" ]; then
+      echo "*** Error: Cannot enable upload scanning in ProFTPD because there is no ClamAV (${CLAMDSCAN_BIN}) on the system."
+      exit 1
+    fi
+
+    pkgi ${PORT_PROFTPD_CLAMAV}
+
+    ## Verify:
+    if ! grep -m1 -q '^Include /usr/local/etc/proftpd.clamav.conf' /usr/local/etc/proftpd.conf; then
+      perl -pi -e 's#</Global>#</Global>\n\nInclude /usr/local/etc/proftpd.clamav.conf#' /usr/local/etc/proftpd.conf
+    fi
+
+    /usr/local/bin/prxs -c -i -d mod_clamav.c
+
+    {
+      echo -n ''
+      echo '<IfModule mod_dso.c>'
+      echo '  LoadModule mod_clamav.c'
+      echo '</IfModule>'
+      echo '<IfModule mod_clamav.c>'
+      echo '  ClamAV on'
+      echo '  ClamServer 127.0.0.1'
+      echo '  ClamPort 3310'
+      echo '  ClamMaxSize 5 Mb'
+      echo '</IfModule>'
+    } > /usr/local/etc/proftpd.clamav.conf
+
+    # <IfModule mod_clamav.c>
+    #   ClamAV on
+    #   ClamServer localhost
+    #   ClamPort 3310
+    # </IfModule>
+
+  else
+    ## Truncate the configuration file
+    echo "" > /usr/local/etc/proftpd.clamav.conf
   fi
+
+  # /usr/local/libexec/proftpd --configtest
+
+  echo "Starting ProFTPD"
+  ${SERVICE} proftpd restart
 
   return
 }
 
 ################################################################
 
-# ProFTPD Upload Scan (ClamAV) Integration Installation
-proftpd_clamav_install() {
-
-  if [ "${OPT_FTPD}" != "proftpd" ]; then
-    echo "*** Error: FTPD not set in options.conf"
-    return
-  fi
-
-  if [ "${OPT_CLAMAV_WITH_PROFTPD}" != "YES" ]; then
-    return
-  fi
-
-  ### Main Installation
-  pkgi ${PORT_PROFTPD_CLAMAV}
-
-  # make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD_CLAMAV}" rmconfig
-  # make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD_CLAMAV}" config _SET="${}" _UNSET="${}" \
-  # OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  # make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD_CLAMAV}" reinstall clean
-
-  return
-}
-
-
-################################################################
-
-## ProFTPD Installation
+## ProFTPD Uninstall
 proftpd_uninstall() {
 
   sysrc -x proftpd_enable
+  sysrc -x proftpd_flags
 
   return
 }
@@ -4523,6 +4644,29 @@ validate_options() {
     *) echo "*** Error: Invalid FTPD value set in options.conf"; exit ;;
   esac
 
+  ## Copied from CB2:
+  if [ "${OPT_FTPD}" = "pureftpd" ]; then
+    if [ -s "${DA_CONF_FILE}" ]; then
+      UNIFIED_FTP=$(/usr/local/directadmin/directadmin c | grep -m1 unified_ftp_password_file | cut -d= -f2)
+      if [ "$UNIFIED_FTP" != "1" ]; then
+        echo "unified_ftp_password_file is not set to 1.  You must convert before you can use pureftpd"
+        echo "Please read this guide: http://www.directadmin.com/features.php?id=1134"
+        echo ""
+        echo "Simulation:"
+        echo "     cd /usr/local/directadmin"
+        echo "     echo 'action=convert&value=unifiedftp&simulate=yes' >> data/task.queue"
+        echo "     ./dataskq d1"
+        echo ""
+        echo "Conversion:"
+        echo "     cd /usr/local/directadmin"
+        echo "     echo 'unified_ftp_password_file=1' >> conf/directadmin.conf"
+        echo "     echo 'action=convert&value=unifiedftp' >> data/task.queue"
+        echo "     ./dataskq d1"
+        exit 1
+      fi
+    fi
+  fi
+
   case "$(uc ${EXIM})" in
     "YES"|"NO") OPT_EXIM="${EXIM}" ;;
     *) echo "*** Error: Invalid EXIM option set in options.conf"; exit ;;
@@ -4564,7 +4708,19 @@ validate_options() {
     OPT_SPAM_INBOX_PREFIX="NO"
   fi
 
-  if [ "$(uc "${BLOCKCRACKING}")" = "YES" ]; then
+  if [ "$(uc ${SPAMASSASSIN})" = "YES" ]; then
+    OPT_SPAMASSASSIN="YES"
+    if [ "$(uc "${SAUTILS}")" = "YES" ]; then
+      OPT_SPAMASSASSIN_UTILS="YES"
+    else
+      OPT_SPAMASSASSIN_UTILS="NO"
+    fi
+  elif [ "$(uc ${SPAMASSASSIN})" = "NO" ]; then
+    OPT_SPAMASSASSIN="NO"
+    OPT_SPAMASSASSIN_UTILS="NO"
+  fi
+
+ if [ "$(uc "${BLOCKCRACKING}")" = "YES" ]; then
     OPT_BLOCKCRACKING="YES"
   else
     OPT_BLOCKCRACKING="NO"
@@ -4576,16 +4732,10 @@ validate_options() {
     OPT_EASY_SPAM_FIGHTER="NO"
   fi
 
-  if [ "$(uc ${SPAMASSASSIN})" = "YES" ]; then
-    OPT_SPAMASSASSIN="YES"
-    if [ "$(uc "${SAUTILS}")" = "YES" ]; then
-      OPT_SPAMASSASSIN_UTILS="YES"
-    else
-      OPT_SPAMASSASSIN_UTILS="NO"
-    fi
-  elif [ "$(uc ${SPAMASSASSIN})" = "NO" ]; then
-    OPT_SPAMASSASSIN="NO"
-    OPT_SPAMASSASSIN_UTILS="NO"
+  if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ] && [ "${OPT_SPAMASSASSIN}" = "NO" ]; then
+    echo "*** Error: Easy Spam Fighter (ESF) requires SpamAssassin to be enabled."
+    echo "Set SPAMASSASSIN=YES in options.conf"
+    exit 1
   fi
 
   if [ "$(uc "${PROFTPD_UPLOADSCAN}")" = "YES" ]; then
@@ -5076,6 +5226,13 @@ show_outdated() {
 
 ################################################################
 
+## Show Audit
+show_audit() {
+  pkg audit
+}
+
+################################################################
+
 ## About PortsBuild
 show_about() {
   show_logo
@@ -5126,7 +5283,7 @@ show_menu() {
     echo "    upgrade: Upgrades an application or service"
     #echo "    verify: Verify something"
     # echo "  "
-    echo "    version: Show version information on all applications and services installed"
+    echo "    versions: Show version information on all applications and services installed"
     echo ""
   } | column -t -s:
 
@@ -5159,18 +5316,20 @@ case "$1" in
   # create_options)  ;;
   # set)  ;;
   # check_options) ;;
-  "about") show_about ;;                     ## show about
+  "about") show_about ;;                ## show about
+  "audit") show_audit ;;                ## run "pkg audit"
   "c"|"config") show_config ;;          ## show configured option values
   "d"|"debug") show_debug ;;            ## show debugging info
   "i"|"install") install_app "$@" ;;    ## install an application
+  # "installed") show_installed ;;        ## show currently installed packages
   "o"|"outdated") show_outdated ;;      ## show installed packages that are out of date
-  "r"|"rewrite") rewrite_app "$@" ;;
+  "r"|"rewrite") rewrite_app "$@" ;;    ## rewrite a configuration file (e.g. apache vhosts)
   "setup") global_setup "$@" ;;         ## first time setup
   "upd"|"update") update ;;             ## update PB script
   "upg"|"upgrade") upgrade "$@" ;;      ## let portsbuild upgrade an app/service (e.g. php via pkg)
   "check"|"verify") verify ;;           ## verify system state
   "version") show_version ;;            ## show portsbuild version
-  "v"|"versions") show_app_versions ;;  ## app/service versions via pkg
+  "v"|"versions"|"installed") show_app_versions ;;  ## show app/service versions via pkg
   *) show_main_menu ;;
 esac
 
