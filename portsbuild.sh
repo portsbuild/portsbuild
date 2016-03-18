@@ -817,7 +817,7 @@ make_install_clean() {
 
   ## /usr/bin/make
   make -DNO_DIALOG -C "${PORTS_BASE}/${CHOSEN_PORT}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${CHOSEN_PORT}" config OPTIONS_SET="${_MAKE_SET}" OPTIONS_UNSET="${_MAKE_UNSET}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${CHOSEN_PORT}" OPTIONS_SET="${_MAKE_SET}" OPTIONS_UNSET="${_MAKE_UNSET}" reinstall clean
   # fi
 }
 
@@ -1692,8 +1692,9 @@ exim_install() {
   fi
 
   ### Main Installation (verify: exim_user/exim_group arguments)
+  # EXIM_USER="${EXIM_USER}" EXIM_GROUP="${EXIM_GROUP}"
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_EXIM}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_EXIM}" config EXIM_USER="${EXIM_USER}" EXIM_GROUP="${EXIM_GROUP}" mail_exim_SET="${EXIM_MAKE_SET}" mail_exim_UNSET="${EXIM_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_EXIM}" mail_exim_SET="${EXIM_MAKE_SET}" mail_exim_UNSET="${EXIM_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ### Pre-Installation Tasks
 
@@ -1825,8 +1826,7 @@ spamassassin_install() {
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" config mail_spamassassin_SET="${SPAMASSASSIN_MAKE_SET}" mail_spamassassin_UNSET="${SPAMASSASSIN_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" mail_spamassassin_SET="${SPAMASSASSIN_MAKE_SET}" mail_spamassassin_UNSET="${SPAMASSASSIN_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ## SpamAssassin Post-Installation Tasks
   sysrc spamd_enable="YES"
@@ -1964,8 +1964,7 @@ dovecot_install() {
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" config mail_dovecot2_SET="${DOVECOT2_MAKE_SET}" mail_dovecot2_UNSET="${DOVECOT2_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" mail_dovecot2_SET="${DOVECOT2_MAKE_SET}" mail_dovecot2_UNSET="${DOVECOT2_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ### Post-Installation Tasks
 
@@ -2129,8 +2128,7 @@ webalizer_install() {
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" config www_webalizer_SET="${WEBALIZER_MAKE_SET}" www_webalizer_UNSET="${WEBALIZER_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" www_webalizer_SET="${WEBALIZER_MAKE_SET}" www_webalizer_UNSET="${WEBALIZER_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ### Post-Installation Tasks
 
@@ -2156,8 +2154,7 @@ awstats_install() {
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" config www_awstats_SET="${AWSTATS_MAKE_SET}" www_awstats_UNSET="${AWSTATS_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" www_awstats_SET="${AWSTATS_MAKE_SET}" www_awstats_UNSET="${AWSTATS_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ### Post-Installation Tasks
 
@@ -2369,6 +2366,7 @@ php_install() {
   case ${PHP1_VERSION} in
     55) PORT_PHP="${PORT_PHP55}"
         PORT_PHP_EXT="${PORT_PHP55_EXT}"
+        PORT_MOD_PHP="${PORT_MOD_PHP55}"
         PHP_MAKE_SET="${PHP55_MAKE_SET}"
         PHP_MAKE_UNSET="${PHP55_MAKE_UNSET}"
         PHP_EXT_MAKE_SET="${PHP55_EXT_MAKE_SET}"
@@ -2378,6 +2376,7 @@ php_install() {
         ;;
     56) PORT_PHP="${PORT_PHP56}"
         PORT_PHP_EXT="${PORT_PHP56_EXT}"
+        PORT_MOD_PHP="${PORT_MOD_PHP56}"
         PHP_MAKE_SET="${PHP56_MAKE_SET}"
         PHP_MAKE_UNSET="${PHP56_MAKE_SET}"
         PHP_EXT_MAKE_SET="${PHP56_EXT_MAKE_SET}"
@@ -2387,6 +2386,7 @@ php_install() {
         ;;
     70) PORT_PHP="${PORT_PHP70}"
         PORT_PHP_EXT="${PORT_PHP70_EXT}"
+        PORT_MOD_PHP="${PORT_MOD_PHP70}"
         PHP_MAKE_SET="${PHP70_MAKE_SET}"
         PHP_MAKE_UNSET="${PHP70_MAKE_SET}"
         PHP_EXT_MAKE_SET="${PHP70_EXT_MAKE_SET}"
@@ -2399,17 +2399,20 @@ php_install() {
 
   ## PORT_MOD_PHP55
   case ${PHP1_MODE} in
-    fpm) ;;
-    mod_php) ;;
+    fpm)
+        make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" rmconfig
+        make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" OPTIONS_SET="${PHP_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
+        make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
+        ;;
+    mod_php)
+        make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" rmconfig
+        make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" OPTIONS_SET="${PHP_MOD_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_MOD_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
+        ;;
     fastcgi) ;;
     suphp) ;;
   esac
 
   ### Main Installation
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" config OPTIONS_SET="${PHP_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" config OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" reinstall clean
   # make -DNO_DIALOG -C "${PORT_PHP_EXT}" reinstall clean
 
   ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
@@ -2490,6 +2493,8 @@ php_install() {
   sysrc php_fpm_enable="YES"
 }
 
+################################################################
+
 ## Upgrade PHP and related components
 php_upgrade() {
   pkg upgrade "$(pkg query %o | grep php${PHP1_VERSION})"
@@ -2497,6 +2502,7 @@ php_upgrade() {
   #pkg query -i -x "%o %v" '(php)'
 }
 
+################################################################
 
 ## Have PHP System (copied from CB2)
 ## Needed?
@@ -2529,10 +2535,14 @@ have_php_system() {
 ## phpMyAdmin Installation
 phpmyadmin_install() {
 
+  if [ "${OPT_PHPMYADMIN}" != "YES" ]; then
+    echo "***"
+    return
+  fi
+
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHPMYADMIN}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHPMYADMIN}" config databases_phpmyadmin_SET="${PMA_MAKE_SET}" databases_phpmyadmin_UNSET"${PMA_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORT_PHPMYADMIN}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHPMYADMIN}" databases_phpmyadmin_SET="${PMA_MAKE_SET}" databases_phpmyadmin_UNSET"${PMA_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ### Post-Installation Tasks
 
@@ -2630,7 +2640,7 @@ phpmyadmin_install() {
 
 ## Upgrade phpMyAdmin
 phpmyadmin_upgrade() {
-  return;
+  return
 }
 
 ################################################################################################################################
@@ -2638,10 +2648,14 @@ phpmyadmin_upgrade() {
 ## Apache 2.4 Installation
 apache_install() {
 
+  if [ "${OPT_WEBSERVER}" != "apache" ]; then
+    echo "***"
+    return
+  fi
+
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" config www_apache24_SET="${APACHE24_MAKE_SET} " www_apache24_UNSET="${APACHE24_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" www_apache24_SET="${APACHE24_MAKE_SET} " www_apache24_UNSET="${APACHE24_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ## Todo:
   # USERS=${APACHE_USER} GROUPS=${APACHE_GROUP}
@@ -2748,10 +2762,14 @@ apache_uninstall() {
 ## Todo: NGINX Installation
 nginx_install() {
 
+  if [ "${OPT_WEBSERVER}" != "nginx" ]; then
+    echo "***"
+    return
+  fi
+
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" config www_nginx_SET="${NGINX_MAKE_SET}" www_nginx_UNSET="${NGINX_MAKE_UNSET}"  OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" www_nginx_SET="${NGINX_MAKE_SET}" www_nginx_UNSET="${NGINX_MAKE_UNSET}"  OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ### Post-Installation Tasks
 
@@ -2810,6 +2828,7 @@ majordomo_install() {
 
   if [ "${OPT_MAJORDOMO}" = "NO" ]; then
     echo "*** Error: Majordomo not enabled in options.conf"
+    return
   fi
 
   ## majordomo.sh script
@@ -2829,7 +2848,7 @@ majordomo_uninstall() {
 ## PureFTPD Installation
 pureftpd_install() {
 
-  if [ "${OPT_FTPD}" = "NO" ]; then
+  if [ "${OPT_FTPD}" != "pureftpd" ]; then
     echo "*** Error: FTPD not set in options.conf"
   fi
 
@@ -2849,6 +2868,8 @@ pureftpd_install() {
 
 # PureFTPD Upload Scan (ClamAV) Integration Installation
 pureftpd_clamav_install() {
+
+
   return
 }
 
@@ -2868,14 +2889,14 @@ pureftpd_uninstall() {
 ## ProFTPD Installation
 proftpd_install() {
 
-  if [ "${OPT_FTPD}" = "NO" ]; then
+  if [ "${OPT_FTPD}" != "proftpd" ]; then
     echo "*** Error: FTPD not set in options.conf"
+    return
   fi
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" config ftp_proftpd_SET="${PROFTPD_MAKE_SET}" ftp_proftpd_UNSET="${PROFTPD_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" ftp_proftpd_SET="${PROFTPD_MAKE_SET}" ftp_proftpd_UNSET="${PROFTPD_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   if [ "${OPT_CLAMAV_WITH_PROFTPD}" = "YES" ]; then
     proftpd_clamav_install
@@ -2889,8 +2910,13 @@ proftpd_install() {
 # ProFTPD Upload Scan (ClamAV) Integration Installation
 proftpd_clamav_install() {
 
-  if [ "${OPT_FTPD}" = "NO" ]; then
+  if [ "${OPT_FTPD}" != "proftpd" ]; then
     echo "*** Error: FTPD not set in options.conf"
+    return
+  fi
+
+  if [ "${OPT_CLAMAV_WITH_PROFTPD}" != "YES" ]; then
+    return
   fi
 
   ### Main Installation
@@ -2926,8 +2952,7 @@ clamav_install() {
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_CLAMAV}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_CLAMAV}" config security_clamav_SET="${CLAMAV_MAKE_SET}" security_clamav_UNSET="${CLAMAV_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_CLAMAV}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_CLAMAV}" security_clamav_SET="${CLAMAV_MAKE_SET}" security_clamav_UNSET="${CLAMAV_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ## Verify:
   if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then
@@ -3002,8 +3027,7 @@ roundcube_install() {
 
   ### Main Installation
   make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" config mail_roundcube_SET="${ROUNDCUBE_MAKE_SET}" mail_roundcube_UNSET="${ROUNDCUBE_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}"
-  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" reinstall clean
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" mail_roundcube_SET="${ROUNDCUBE_MAKE_SET}" mail_roundcube_UNSET="${ROUNDCUBE_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
 
   ### Post-Installation Tasks
 
@@ -3435,16 +3459,17 @@ secure_php_ini() {
 
 ## Ensure Webapps php.ini (copied from CB2)
 verify_webapps_php_ini() {
+
   # ${PHP_INI_WEBAPPS} = /usr/local/etc/php/50-webapps.ini
   # ${WWW_TMP_DIR} = /usr/local/www/tmp
 
-  # if [ "${PHP1_MODE_OPT}" = "mod_php" ]; then
-  #     WEBAPPS_INI=/usr/local/lib/php.conf.d/50-webapps.ini
-  #     mkdir -p /usr/local/lib/php.conf.d
-  # else
-  #     WEBAPPS_INI=/usr/local/php${PHP1_SHORTRELEASE}/lib/php.conf.d/50-webapps.ini
-  #     mkdir -p /usr/local/php${PHP1_SHORTRELEASE}/lib/php.conf.d
-  # fi
+  if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
+      WEBAPPS_INI=/usr/local/lib/php.conf.d/50-webapps.ini
+      mkdir -p /usr/local/lib/php.conf.d
+  else
+      PHP_INI_WEBAPPS=/usr/local/php${OPT_PHP1_VERSION}/lib/php.conf.d/50-webapps.ini
+      mkdir -p /usr/local/php${PHP1_SHORTRELEASE}/lib/php.conf.d
+  fi
 
   ## Copy custom/ file (not implemented)
   if [ -e "${PHP_CUSTOM_PHP_CONF_D_INI_PATH}/50-webapps.ini" ]; then
@@ -3486,7 +3511,7 @@ apache_rewrite_confs() {
     APACHE_HOST_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
 
     ## Set this for now since PB only supports 1 instance of PHP.
-    #PHP1_MODE_OPT="php-fpm"
+    #OPT_PHP1_MODE="php-fpm"
     #PHP1_MODE="FPM"
     #PHP1_VERSION="56"
 
@@ -3785,7 +3810,7 @@ rewrite_confs() {
     ${PERL} -pi -e "s#Alias /webmail \"/usr/local/www/roundcube/\"#Alias /webmail \"/usr/local/www/${WEBMAILLINK}/\"#" ${APACHE_EXTRA_PATH}/httpd-alias.conf
 
     doPhpConf
-    # if [ "${CLOUDLINUX_OPT}" = "no" ] || [ "${PHP1_MODE_OPT}" != "lsphp" ]; then
+    # if [ "${CLOUDLINUX_OPT}" = "no" ] || [ "${OPT_PHP1_MODE}" != "lsphp" ]; then
       doModLsapi 0
     # fi
 
@@ -4216,15 +4241,15 @@ rewrite_php_confs() {
     echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> "${PHP_HANDLERS_HTTPD}"
 
 
-    if [ "${PHP1_MODE_OPT}" = "mod_php" ]; then
+    if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
       echo "AddHandler application/x-httpd-php .inc .php .php5 .php${PHP1_SHORTRELEASE} .phtml" >> "${PHP_HANDLERS_HTTPD}"
     fi
 
-    # if [ "${PHP2_MODE_OPT}" = "mod_php" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+    # if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
     #   echo "AddHandler application/x-httpd-php .php${PHP2_SHORTRELEASE}" >> "${PHP_HANDLERS_HTTPD}"
     # fi
 
-    if [ "${PHP1_MODE_OPT}" = "mod_php" ] || [ "${PHP2_MODE_OPT}" = "mod_php" ]; then
+    if [ "${OPT_PHP1_MODE}" = "mod_php" ] || [ "${OPT_PHP2_MODE}" = "mod_php" ]; then
       echo "AddHandler application/x-httpd-php-source .phps" >> "${PHP_HANDLERS_HTTPD}"
     fi
 
@@ -4237,7 +4262,7 @@ rewrite_php_confs() {
     eval $(echo "HAVE_FPM${php_shortrelease}=no")
   done
 
-  if [ "${PHP1_MODE_OPT}" = "php-fpm" ]; then
+  if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
 
       "${INITDDIR}/php-fpm${PHP1_SHORTRELEASE}" restart
 
@@ -4245,7 +4270,7 @@ rewrite_php_confs() {
     eval `echo "HAVE_FPM${PHP1_SHORTRELEASE}=yes"`
   fi
 
-  if [ "${PHP2_MODE_OPT}" = "php-fpm" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+  if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
         ${INITDDIR}/php-fpm${PHP2_SHORTRELEASE} restart
      # set_service php-fpm${PHP2_SHORTRELEASE} ON
     # eval `echo "HAVE_FPM${PHP2_SHORTRELEASE}=yes"`
@@ -4312,17 +4337,19 @@ rewrite_php_confs() {
         echo ";Handler for php-scripts"
       ) > "${SUPHP_CONF_FILE}"
 
-      if [ "${PHP1_MODE_OPT}" = "suphp" ]; then
+      if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
         echo "x-httpd-php${PHP1_SHORTRELEASE}=\"php:/usr/local/php${PHP1_SHORTRELEASE}/bin/php-cgi${PHP1_SHORTRELEASE}\"" >> "${SUPHP_CONF_FILE}"
       fi
 
-      if [ "${PHP2_MODE_OPT}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+      if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
         echo "x-httpd-php${PHP2_SHORTRELEASE}=\"php:/usr/local/php${PHP2_SHORTRELEASE}/bin/php-cgi${PHP2_SHORTRELEASE}\"" >> "${SUPHP_CONF_FILE}"
       fi
 
-      echo "" >> "${SUPHP_CONF_FILE}"
-      echo ";Handler for CGI-scripts" >> "${SUPHP_CONF_FILE}"
-      echo "x-suphp-cgi=\"execute:!self\"" >> "${SUPHP_CONF_FILE}"
+      {
+        echo ""
+        echo ";Handler for CGI-scripts"
+        echo "x-suphp-cgi=\"execute:!self\""
+      } >> "${SUPHP_CONF_FILE}"
 
       # Writing data to ${APACHE_EXTRA_PATH}/httpd-suphp.conf
       echo "Writing data to ${SUPHP_HTTPD}"
@@ -4331,11 +4358,11 @@ rewrite_php_confs() {
       echo "<IfModule mod_suphp.c>" >> "${SUPHP_HTTPD}"
       echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> "${SUPHP_HTTPD}"
 
-      if [ "${PHP1_MODE_OPT}" = "suphp" ]; then
+      if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
         echo "AddHandler x-httpd-php${PHP1_SHORTRELEASE} .inc .php .php3 .php4 .php5 .php${PHP1_SHORTRELEASE} .phtml" >> "${SUPHP_HTTPD}"
       fi
 
-      # if [ "${PHP2_MODE_OPT}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+      # if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
       #   echo "AddHandler x-httpd-php${PHP2_SHORTRELEASE} .php${PHP2_SHORTRELEASE}" >> ${SUPHP_HTTPD}
       # fi
 
@@ -4350,11 +4377,11 @@ rewrite_php_confs() {
         echo "suPHP_ConfigPath /usr/local/php${PHP2_SHORTRELEASE}/lib/" >> "${SUPHP_HTTPD}"
       fi
 
-      if [ "${PHP1_MODE_OPT}" = "suphp" ]; then
+      if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
         echo "suPHP_AddHandler x-httpd-php${PHP1_SHORTRELEASE}" >> ${SUPHP_HTTPD}
       fi
 
-      # if [ "${PHP2_MODE_OPT}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
+      # if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${PHP2_RELEASE_OPT}" != "no" ]; then
       #   echo "suPHP_AddHandler x-httpd-php${PHP2_SHORTRELEASE}" >> ${SUPHP_HTTPD}
       # fi
 
@@ -4415,9 +4442,14 @@ validate_options() {
 
   ## Port/Package Options
   case ${PHP1_VERSION} in
-    55|56|70) OPT_PHP1_VERSION=${OPT_PHP1_VERSION} ;;
+    55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION} ;;
     *) echo "*** Error: Invalid PHP1_VERSION value set in options.conf"; exit ;;
   esac
+
+  # case ${PHP2_VERSION} in
+  #   55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION} ;;
+  #   *) echo "*** Error: Invalid PHP2_VERSION value set in options.conf"; exit ;;
+  # esac
 
   case $(lc ${PHP1_MODE}) in
     fpm|phpfpm|php-fpm) OPT_PHP1_MODE="fpm" ;;
@@ -4425,6 +4457,13 @@ validate_options() {
     modphp|mod_php|mod|mod-php) OPT_PHP1_MODE="modphp" ;;
     *) echo "*** Error: Invalid PHP1_MODE value set in options.conf"; exit ;;
   esac
+
+  # case $(lc ${PHP2_MODE}) in
+  #   fpm|phpfpm|php-fpm) OPT_PHP1_MODE="fpm" ;;
+  #   suphp) OPT_PHP1_MODE="suphp" ;;
+  #   modphp|mod_php|mod|mod-php) OPT_PHP1_MODE="modphp" ;;
+  #   *) echo "*** Error: Invalid PHP2_MODE value set in options.conf"; exit ;;
+  # esac
 
   ## additional checks for PHP, then:
   ## OPT_PHP_ENABLE="YES"
@@ -4437,7 +4476,7 @@ validate_options() {
   esac
 
   case $(lc ${WEBSERVER}) in
-    apache|apache24) OPT_WEBSERVER="apache24"
+    apache|apache24) OPT_WEBSERVER="apache"
     case $(lc ${APACHE_MPM}) in
       event|prefork|worker) OPT_APACHE_MPM="${OPT_APACHE_MPM}" ;;
       auto) OPT_APACHE_MPM="event" ;;
@@ -4731,7 +4770,6 @@ upgrade() {
 ## Upgrade an application or service
 upgrade_app() {
   case $2 in
-    "") show_menu_upgrade ;;
     apache) apache_upgrade ;;
     awstats) awstats_upgrade ;;
     blockcracking) blockcracking_upgrade ;;
@@ -4779,6 +4817,41 @@ show_menu_setup() {
 
 ## Show Configuration Values
 show_config() {
+
+  {
+    echo "PHP1 Version: ${OPT_PHP1_VERSION}"
+    echo "PHP1 Mode: ${OPT_PHP1_MODE}"
+    echo "PHP ini Type: ${OPT_PHP_INI_TYPE}"
+    echo "Web Server: ${OPT_WEBSERVER}"
+    echo "Apache MPM: ${OPT_APACHE_MPM}"
+    echo "SQL Server: ${OPT_SQL_DB}"
+    echo "FTP Server: ${OPT_FTPD}"
+    echo "Exim: ${OPT_EXIM}"
+    echo "Dovecot: ${OPT_DOVECOT}"
+    echo "ClamAV: ${OPT_CLAMAV}"
+    echo "Exim w/ClamAV: ${OPT_CLAMAV_WITH_EXIM}"
+    echo "Webapps Inbox Prefix: ${OPT_WEBAPPS_INBOX_PREFIX}"
+    echo "Spam Inbox Prefix: ${OPT_SPAM_INBOX_PREFIX}"
+    echo "BlockCracking: ${OPT_BLOCKCRACKING}"
+    echo "Easy Spam Fighter: ${OPT_EASY_SPAM_FIGHTER}"
+    echo "SpamAssassin: ${OPT_SPAMASSASSIN}"
+    echo "SpamAssassin Utilities: ${OPT_SAUTILS}"
+    echo "ProFTPd Upload Scan: ${OPT_PROFTPD_UPLOADSCAN}"
+    echo "PureFTPd Upload Scan: ${OPT_PUREFTPD_UPLOADSCAN}"
+    echo "Awstats: ${OPT_AWSTATS}"
+    echo "Webalizer: ${OPT_WEBALIZER}"
+    echo "Majordomo: ${OPT_MAJORDOMO}"
+    echo "phpMyAdmin: ${OPT_PHPMYADMIN}"
+    echo "Suhosin: ${OPT_SUHOSIN}"
+    echo "Suhosin Upload Scan: ${OPT_PHP_SUHOSIN_UPLOADSCAN}"
+    echo "ModSecurity: ${OPT_MODSECURITY}"
+    echo "RoundCube: ${OPT_ROUNDCUBE}"
+    echo "PigeonHole: ${OPT_PIGEONHOLE}"
+    echo "PB Symlink: ${OPT_PB_SYMLINK}"
+    echo "Install CCache: ${OPT_INSTALL_CCACHE}"
+    echo "Install Synth: ${OPT_INSTALL_SYNTH}"
+  } | column -t -s:
+
   return
 }
 
@@ -4827,9 +4900,9 @@ show_install() {
 
   printf "Available packages to install:\n"
 
-  for file in ${available_packages}; do
-    printf "%s\n" "${file}"
-  done | column -t -s,
+  # for file in ${available_packages}; do
+  #   printf "%s\n" "${file}"
+  # done | column -t -s,
 
   # echo "Available packages to install:"
   # echo "apache Apache 2.4"
@@ -4913,13 +4986,13 @@ show_menu() {
   # echo "  -q, --quiet"
   # echo "  -v, --verbose"
   # echo ""
-  echo "Available commands"
+  echo "Available commands:"
   echo "  config      Display the current configuration option values"
   echo "  debug       Displays debugging information"
   echo "  help        Displays help information"
   # echo "  info      Displays information about an application or service"
   echo "  install     Install an application or service"
-  echo "  options     Show configured PortsBuild options"
+  # echo "  options     Show configured PortsBuild options"
   echo "  outdated    Show outdated applications or services on the system"
   echo "  rewrite     Rewrite (update) a configuration file for an application or service"
   echo "  setup       Setup PortsBuild and DirectAdmin (first-time installations)"
@@ -4953,20 +5026,18 @@ validate_options
 
 ## ./portsbuild selection screen
 case "$1" in
-  #"") show_logo; show_version; show_menu; ;;
   # create_options)  ;;
   # set)  ;;
   # check_options) ;;
-  "d"|"debug") show_debug ;;          ## show debugging info
-  "i"|"install") install_app ;;      ## install an application
-  "o"|"outdated") show_outdated ;;    ##
-  "setup") global_setup "$@" ;;       ## first time setup
+  "d"|"debug") show_debug ;;            ## show debugging info
+  "i"|"install") install_app ;;         ## install an application
+  "o"|"outdated") show_outdated ;;      ##
+  "setup") global_setup "$@" ;;         ## first time setup
   "upd"|"update") update ;;             ## update PB script
-  "upg"|"upgrade") upgrade "$@" ;;          ## let portsbuild upgrade an app/service (e.g. php via pkg)
-  "verify") verify ;;                 ## verify system state
-  "version") show_version ;;          ## show portsbuild version
-  "v"|"versions") show_app_versions ;;    ## app/service versions via pkg
-
+  "upg"|"upgrade") upgrade "$@" ;;      ## let portsbuild upgrade an app/service (e.g. php via pkg)
+  "check"|"verify") verify ;;           ## verify system state
+  "version") show_version ;;            ## show portsbuild version
+  "v"|"versions") show_app_versions ;;  ## app/service versions via pkg
   *) show_main_menu ;;
 esac
 
