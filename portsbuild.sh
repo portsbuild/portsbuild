@@ -261,6 +261,8 @@ PHP1_VERSION=56
 PHP1_MODE=fpm
 # PHP2_VERSION=70
 # PHP2_MODE=fpm
+PHP1_RELEASE_SET="55 56 70"
+PHP1_SHORTRELEASE_SET="$(echo "${PHP1_RELEASE_SET}" | tr -d '.')"
 
 PHP_ETC_PATH=/usr/local/etc/php
 # PHP_DIR=${PHP_ETC_PATH}
@@ -409,6 +411,7 @@ PORT_SUHOSIN=security/suhosin
 ## Ports: Mail & Related Services
 PORT_EXIM=mail/exim
 PORT_SPAMASSASSIN=mail/spamassassin
+PORT_SPAMASSASSIN_UTILITIES=mail/sa-utils
 PORT_DOVECOT2=mail/dovecot2
 PORT_PIGEONHOLE=mail/dovecot2-pigeonhole
 PORT_CLAMAV=security/clamav
@@ -1730,8 +1733,8 @@ verify_webapps_logrotate() {
 ## Exim Installation
 exim_install() {
 
-  if [ "${OPT_EXIM}" != "NO" ]; then
-    # echo
+  if [ "${OPT_EXIM}" != "YES" ]; then
+    echo "*** Notice: EXIM is disabled in options.conf"
     return
   fi
 
@@ -1877,6 +1880,26 @@ spamassassin_install() {
   sysrc spamd_flags="-c -m 15"
 
   ## Start SpamAssassin
+  ${SERVICE} spamd start
+
+  ## Update rules via 'sa-update' (or using sa-utils):
+  # sa-update
+}
+
+################################################################
+
+## SpamAssassin Utilities Installation Tasks
+spamassassin_utilities_install() {
+
+  ### Main Installation
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN_UTILITIES}" rmconfig
+  make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN_UTILITIES}" mail_sa-utils_SET="${SPAMASSASSIN_UTILITIES_MAKE_SET}" mail_sa-utils_UNSET="${SPAMASSASSIN_UTILITIES_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+
+  ## SpamAssassin Post-Installation Tasks
+  # sysrc spamd_enable="YES"
+  # sysrc spamd_flags="-c -m 15"
+
+  ## Start SpamAssassin
   # ${SERVICE} spamd start
 
   ## Update rules via 'sa-update' (or using sa-utils):
@@ -1900,12 +1923,12 @@ blockcracking_install() {
 
     ## used to include: -${BLOCKCRACKING_VER}
 
-    if [ -e ${PB_PATH}/files/exim.blockcracking.tar.gz ]; then
+    if [ -e "${PB_PATH}/files/exim.blockcracking.tar.gz" ]; then
       ## Path was: ${EXIM_PATH}/exim.blockcracking
       mkdir -p ${EXIM_BC_PATH}
 
       echo "Extracting exim.blockcracking.tar.gz"
-      tar xvf ${PB_PATH}/files/exim.blockcracking.tar.gz -C ${EXIM_BC_PATH}
+      tar xvf "${PB_PATH}/files/exim.blockcracking.tar.gz" -C ${EXIM_BC_PATH}
 
       BC_DP_SRC=${EXIM_BC_PATH}/script.denied_paths.default.txt
 
@@ -1974,15 +1997,15 @@ easyspamfighter_install() {
     # getFile easy_spam_fighter/exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz easy_spam_figther exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz
 
     ## Todo: grab latest version
-    ${WGET_WITH_OPTIONS} -O ${PB_PATH}/files/esf.tar.gz ${PB_MIRROR}/files/esf.tar.gz
+    ${WGET_WITH_OPTIONS} -O "${PB_PATH}/files/esf.tar.gz" ${PB_MIRROR}/files/esf.tar.gz
 
-    if [ -e ${PB_PATH}/files/esf.tar.gz ]; then
+    if [ -e "${PB_PATH}/files/esf.tar.gz" ]; then
 
       ## path was: ${EXIM_PATH}/exim.easy_spam_fighter
       mkdir -p ${EXIM_ESF_PATH}
 
       echo "Extracting Easy Spam Fighter"
-      tar xvf ${PB_PATH}/files/esf.tar.gz -C ${EXIM_ESF_PATH}
+      tar xvf "${PB_PATH}/files/esf.tar.gz" -C ${EXIM_ESF_PATH}
 
       echo "Restarting Exim"
 
@@ -2046,8 +2069,8 @@ dovecot_install() {
   fi
 
   ## Copy default configuration files:
-  cp -rf ${PB_PATH}/configure/dovecot/conf ${DOVECOT_PATH}/conf
-  cp -rf ${PB_PATH}/configure/dovecot/conf.d ${DOVECOT_PATH}/conf.d
+  cp -rf "${PB_PATH}/configure/dovecot/conf" ${DOVECOT_PATH}/conf
+  cp -rf "${PB_PATH}/configure/dovecot/conf.d" ${DOVECOT_PATH}/conf.d
 
   ## Setup config:
   if [ -e "${PB_PATH}/configure/dovecot/dovecot.conf" ]; then
@@ -2464,7 +2487,9 @@ php_install() {
         make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
         ;;
     fastcgi) ;;
-    suphp) ;;
+    suphp)
+        # /usr/ports/www/suphp
+        ;;
   esac
 
   ### Main Installation
@@ -2480,36 +2505,36 @@ php_install() {
   fi
 
   ## e.g. PHP1_VER="56"
-  PHP1_PATH="/usr/local/php${OPTPHP1_VERSION}"
+  PHP1_PATH="/usr/local/php${OPT_PHP1_VERSION}"
 
   ## Create directories for DA compat:
-  mkdir -p ${PHP1_PATH}
-  mkdir -p ${PHP1_PATH}/bin
-  mkdir -p ${PHP1_PATH}/etc
-  mkdir -p ${PHP1_PATH}/include
-  mkdir -p ${PHP1_PATH}/lib
-  mkdir -p ${PHP1_PATH}/php
-  mkdir -p ${PHP1_PATH}/sbin
-  mkdir -p ${PHP1_PATH}/sockets
-  mkdir -p ${PHP1_PATH}/var/log/
-  mkdir -p ${PHP1_PATH}/var/run
-  # mkdir -p ${PHP_PATH}/lib/php.conf.d/
-  mkdir -p ${PHP1_PATH}/lib/php/
+  mkdir -p "${PHP1_PATH}"
+  mkdir -p "${PHP1_PATH}/bin"
+  mkdir -p "${PHP1_PATH}/etc"
+  mkdir -p "${PHP1_PATH}/include"
+  mkdir -p "${PHP1_PATH}/lib"
+  mkdir -p "${PHP1_PATH}/php"
+  mkdir -p "${PHP1_PATH}/sbin"
+  mkdir -p "${PHP1_PATH}/sockets"
+  mkdir -p "${PHP1_PATH}/var/log/"
+  mkdir -p "${PHP1_PATH}/var/run"
+  # mkdir -p "${PHP_PATH}/lib/php.conf.d/"
+  mkdir -p "${PHP1_PATH}/lib/php/"
 
   ## Symlink for compat
-  ln -s /usr/local/bin/php ${PHP1_PATH}/bin/php
-  ln -s /usr/local/bin/php-cgi ${PHP1_PATH}/bin/php-cgi
-  ln -s /usr/local/bin/php-config ${PHP1_PATH}/bin/php-config
-  ln -s /usr/local/bin/phpize ${PHP1_PATH}/bin/phpize
-  ln -s /usr/local/sbin/php-fpm ${PHP1_PATH}/sbin/php-fpm
-  ln -s /var/log/php-fpm.log ${PHP1_PATH}/var/log/php-fpm.log
-  ln -s /usr/local/include/php ${PHP1_PATH}/include
+  ln -s /usr/local/bin/php "${PHP1_PATH}/bin/php"
+  ln -s /usr/local/bin/php-cgi "${PHP1_PATH}/bin/php-cgi"
+  ln -s /usr/local/bin/php-config "${PHP1_PATH}/bin/php-config"
+  ln -s /usr/local/bin/phpize "${PHP1_PATH}/bin/phpize"
+  ln -s /usr/local/sbin/php-fpm "${PHP1_PATH}/sbin/php-fpm"
+  ln -s /var/log/php-fpm.log "${PHP1_PATH}/var/log/php-fpm.log"
+  ln -s /usr/local/include/php "${PHP1_PATH}/include"
 
   ## php.conf.d: directory for additional PHP ini files loaded by FPM:
-  ln -s /usr/local/etc/php ${PHP1_PATH}/lib/php.conf.d
-  ln -s /usr/local/etc/php.ini ${PHP1_PATH}/lib/php.ini
-  ln -s /usr/local/etc/php-fpm.conf ${PHP1_PATH}/etc/php-fpm.conf
-  ln -s /usr/local/lib/php/build ${PHP1_PATH}/lib/php/build
+  ln -s /usr/local/etc/php "${PHP1_PATH}/lib/php.conf.d"
+  ln -s /usr/local/etc/php.ini "${PHP1_PATH}/lib/php.ini"
+  ln -s /usr/local/etc/php-fpm.conf "${PHP1_PATH}/etc/php-fpm.conf"
+  ln -s /usr/local/lib/php/build "${PHP1_PATH}/lib/php/build"
 
   ## Verify: extension_dir "YYYYMMDD" is different across PHP versions:
   ## This call returns e.g. "/usr/local/lib/php/20131226"
@@ -2552,7 +2577,7 @@ php_install() {
 
 ## Upgrade PHP and related components
 php_upgrade() {
-  pkg upgrade "$(pkg query %o | grep php${OPT_PHP1_VERSION})"
+  pkg upgrade "$(pkg query %o | grep "php${OPT_PHP1_VERSION}")"
 
   #pkg query -i -x "%o %v" '(php)'
 }
@@ -2955,7 +2980,7 @@ pureftpd_install() {
   setVal pureftp 1 ${DA_CONF_TEMPLATE_FILE}
   setVal pureftp 1 ${DA_CONF_FILE}
 
-  #${SERVICE} directadmin restart
+  # ${SERVICE} directadmin restart
   directadmin_restart
 
   ## Update services.status
@@ -3034,7 +3059,7 @@ proftpd_install() {
     /usr/local/bin/prxs -c -i -d mod_clamav.c
 
     {
-      echo -n ''
+      #echo -n ''
       echo '<IfModule mod_dso.c>'
       echo '  LoadModule mod_clamav.c'
       echo '</IfModule>'
@@ -3599,11 +3624,11 @@ verify_webapps_php_ini() {
   # ${WWW_TMP_DIR} = /usr/local/www/tmp
 
   if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
-      WEBAPPS_INI=/usr/local/lib/php.conf.d/50-webapps.ini
+      PHP_INI_WEBAPPS=/usr/local/lib/php.conf.d/50-webapps.ini
       mkdir -p /usr/local/lib/php.conf.d
   else
       PHP_INI_WEBAPPS=/usr/local/php${OPT_PHP1_VERSION}/lib/php.conf.d/50-webapps.ini
-      mkdir -p /usr/local/php${PHP1_SHORTRELEASE}/lib/php.conf.d
+      mkdir -p "/usr/local/php${OPT_PHP1_VERSION}/lib/php.conf.d"
   fi
 
   ## Copy custom/ file (not implemented)
@@ -3616,7 +3641,7 @@ verify_webapps_php_ini() {
       echo "session.save_path=${WWW_TMP_DIR}"
       echo "upload_tmp_dir=${WWW_TMP_DIR}"
       echo "disable_functions=exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname"
-    } >> ${PHP_INI_WEBAPPS}
+    } >> "${PHP_INI_WEBAPPS}"
   fi
 }
 
@@ -3657,30 +3682,30 @@ apache_rewrite_confs() {
     else
       echo '' > ${APACHE_HOST_CONF}
 
-      # if [ "${HAVE_FPM_CGI}" = "YES" ]; then
-      #   echo 'SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1' >> ${APACHE_HOST_CONF}
-      # fi
+      if [ "${HAVE_FPM_CGI}" = "YES" ]; then
+        echo 'SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1' >> ${APACHE_HOST_CONF}
+      fi
 
       echo "<Directory ${WWW_DIR}>" >> ${APACHE_HOST_CONF}
 
       if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
         {
-          echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">';
-          echo "AddHandler \"proxy:unix:/usr/local/php${PHP1_VERSION}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${PHP1_VERSION} .phtml";
-          echo "</FilesMatch>";
+          echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
+          echo "  AddHandler \"proxy:unix:/usr/local/php${PHP1_VERSION}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${PHP1_VERSION} .phtml"
+          echo "</FilesMatch>"
         } >> ${APACHE_HOST_CONF}
       fi
 
       {
-        echo "  Options +SymLinksIfOwnerMatch +IncludesNoExec";
-        echo "  AllowOverride AuthConfig FileInfo Indexes Limit Options=Includes,IncludesNOEXEC,Indexes,ExecCGI,MultiViews,SymLinksIfOwnerMatch,None";
-        echo "";
-        echo "  Order Allow,Deny";
-        echo "  Allow from all";
-        echo "  <IfModule mod_suphp.c>";
-        echo "      suPHP_Engine On";
-        echo "      suPHP_UserGroup ${WEBAPPS_USER} ${WEBAPPS_GROUP}";
-        echo "  </IfModule>";
+        echo "  Options +SymLinksIfOwnerMatch +IncludesNoExec"
+        echo "  AllowOverride AuthConfig FileInfo Indexes Limit Options=Includes,IncludesNOEXEC,Indexes,ExecCGI,MultiViews,SymLinksIfOwnerMatch,None"
+        echo ""
+        echo "  Order Allow,Deny"
+        echo "  Allow from all"
+        echo "  <IfModule mod_suphp.c>"
+        echo "    suPHP_Engine On"
+        echo "    suPHP_UserGroup ${WEBAPPS_USER} ${WEBAPPS_GROUP}"
+        echo "  </IfModule>"
       } >> ${APACHE_HOST_CONF}
 
       ## Unsupported:
@@ -3700,31 +3725,35 @@ apache_rewrite_confs() {
         SUEXEC_PER_DIR=$(/usr/local/sbin/suexec -V 2>&1 | grep -c 'AP_PER_DIR')
       fi
 
-      # if [ "${OPT_PHP1_MODE}" = "fastcgi" ]; then
-      #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
-      #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP1_VERSION}.sh .php" >> ${APACHE_HOST_CONF}
-      #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
-      #     echo '    SuexecUserGroup webapps webapps' >> ${APACHE_HOST_CONF}
-      #   fi
-      #   echo '      <FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">' >> ${APACHE_HOST_CONF}
-      #   echo '          Options +ExecCGI' >> ${APACHE_HOST_CONF}
-      #   echo '          AddHandler fcgid-script .php' >> ${APACHE_HOST_CONF}
-      #   echo '      </FilesMatch>' >> ${APACHE_HOST_CONF}
-      #   echo '  </IfModule>' >> ${APACHE_HOST_CONF}
-      # fi
+      if [ "${OPT_PHP1_MODE}" = "fastcgi" ]; then
+        echo "  <IfModule mod_fcgid.c>" >> ${APACHE_HOST_CONF}
+        echo "    FcgidWrapper /usr/local/safe-bin/fcgid${PHP1_VERSION}.sh .php" >> ${APACHE_HOST_CONF}
+        if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
+          echo "  SuexecUserGroup webapps webapps" >> ${APACHE_HOST_CONF}
+        fi
+        {
+          echo '    <FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
+          echo "      Options +ExecCGI"
+          echo "      AddHandler fcgid-script .php"
+          echo "    </FilesMatch>"
+          echo "  </IfModule>"
+        } >> ${APACHE_HOST_CONF}
+      fi
 
-      # if [ "${PHP2_MODE}" = "fastcgi" ] && [ "${PHP2_RELEASE}" != "no" ]; then
-      #   echo '  <IfModule mod_fcgid.c>' >> ${APACHE_HOST_CONF}
-      #   echo "      FcgidWrapper /usr/local/safe-bin/fcgid${PHP2_SHORTRELEASE}.sh .php${PHP2_SHORTRELEASE}" >> ${APACHE_HOST_CONF}
-      #   if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
-      #   echo '      SuexecUserGroup webapps webapps' >> ${APACHE_HOST_CONF}
-      #   fi
-      #   echo "   <FilesMatch \"\.php${PHP2_SHORTRELEASE}\$\">" >> ${APACHE_HOST_CONF}
-      #   echo '          Options +ExecCGI' >> ${APACHE_HOST_CONF}
-      #   echo "          AddHandler fcgid-script .php${PHP2_SHORTRELEASE}" >> ${APACHE_HOST_CONF}
-      #   echo '      </FilesMatch>' >> ${APACHE_HOST_CONF}
-      #   echo '  </IfModule>' >> ${APACHE_HOST_CONF}
-      # fi
+      if [ "${OPT_PHP2_MODE}" = "fastcgi" ] && [ "${OPT_PHP2_RELEASE}" != "no" ]; then
+        echo "  <IfModule mod_fcgid.c>" >> ${APACHE_HOST_CONF}
+        echo "    FcgidWrapper /usr/local/safe-bin/fcgid${PHP2_SHORTRELEASE}.sh .php${PHP2_SHORTRELEASE}" >> ${APACHE_HOST_CONF}
+        if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
+          echo "  SuexecUserGroup webapps webapps" >> ${APACHE_HOST_CONF}
+        fi
+        {
+          echo "  <FilesMatch \"\.php${OPT_PHP2_VERSION}\$\">"
+          echo "      Options +ExecCGI"
+          echo "      AddHandler fcgid-script .php${OPT_PHP2_VERSION}"
+          echo "    </FilesMatch>"
+          echo "  </IfModule>"
+          } >> ${APACHE_HOST_CONF}
+      fi
 
       echo "</Directory>" >> ${APACHE_HOST_CONF}
     fi
@@ -3812,7 +3841,7 @@ rewrite_confs() {
     ## Generate SSL Key & Certificate if they don't exist
     if [ ! -e "${APACHE_SSL_KEY}" ] || [ ! -e "${APACHE_SSL_CRT}" ]; then
       ## Generate the SSL certificate and key:
-      ${OPENSSL_BIN} req -x509 -newkey rsa:2048 -keyout ${APACHE_SSL_KEY} -out ${APACHE_SSL_CRT} -days 9999 -nodes ${OPENSSL_EXTRA}
+      ${OPENSSL_BIN} req -x509 -newkey rsa:2048 -keyout ${APACHE_SSL_KEY} -out ${APACHE_SSL_CRT} -days 9999 -nodes "${OPENSSL_EXTRA}"
       ## /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout "${APACHE_SSL_KEY}" -out "${APACHE_SSL_CRT}" -days 9999 -nodes -config ./${APCERTCONF}
 
       chmod 600 "${APACHE_SSL_CRT}"
@@ -3896,16 +3925,16 @@ rewrite_confs() {
     fi
 
     ## fcgid
-    # if [ "${HAVE_FCGID}" = "YES" ]; then
-    #   if [ -e ${PHPMODULES} ]; then
-    #     if ! grep -m1 -c 'fcgid_module' ${PHPMODULES}; then
-    #       ${PERL} -pi -e 's|^LoadModule  fcgid_module|#LoadModule  fcgid_module|' /etc/httpd/conf/httpd.conf
-    #       echo "LoadModule fcgid_module ${APACHE_LIB_PATH}/mod_fcgid.so" >> ${PHPMODULES}
-    #     fi
-    #     if ! grep -m1 -c 'httpd-fcgid.conf' ${PHPMODULES}; then
-    #       echo "Include ${APACHE_EXTRA_PATH}/httpd-fcgid.conf" >> ${PHPMODULES}
-    #     fi
-    #   fi
+    if [ "${HAVE_FCGID}" = "YES" ]; then
+      if [ -e ${PHPMODULES} ]; then
+        if ! grep -m1 -c 'fcgid_module' ${PHPMODULES}; then
+          ${PERL} -pi -e 's|^LoadModule  fcgid_module|#LoadModule  fcgid_module|' ${APACHE_CONF}
+          echo "LoadModule fcgid_module ${APACHE_LIB_PATH}/mod_fcgid.so" >> ${PHPMODULES}
+        fi
+        if ! grep -m1 -c 'httpd-fcgid.conf' ${PHPMODULES}; then
+          echo "Include ${APACHE_EXTRA_PATH}/httpd-fcgid.conf" >> ${PHPMODULES}
+        fi
+      fi
 
     ## PB: Doesn't exist on FreeBSD
     #   if [ ! -d /usr/local/safe-bin ]; then
@@ -3925,7 +3954,7 @@ rewrite_confs() {
     #       chmod 555 /usr/local/safe-bin/fcgid${php_shortrelease}.sh
     #     fi
     #   done
-    # fi
+    fi
 
     if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
       if [ -e "${PHPMODULES}" ]; then
@@ -3965,10 +3994,9 @@ rewrite_confs() {
     fi
   fi
 
-  ## Nginx:
-
+  ## Todo: Nginx:
   if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    #copy the new configs
+    # Copy the new configs
     cp -rf ${NGINXCONFDIR}/* "${NGINX_CONF}"
 
     for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
@@ -3976,20 +4004,21 @@ rewrite_confs() {
     done
 
     do_rewrite_nginx_webapps
-    verify _server_ca
+    verify_server_ca
     ensure_dhparam "${NGINX_CONF}/ssl.crt/dhparams.pem"
 
-    if [ "${MODSECURITY_OPT}" = "YES" ]; then
+    ## Todo:
+    if [ "${OPT_MODSECURITY}" = "YES" ]; then
       doModSecurityRules norestart
     fi
 
-    #rewrite ips.conf
+    # Rewrite ips.conf
     echo "action=rewrite&value=nginx" >> "${TASK_QUEUE}"
     echo "action=rewrite&value=ips" >> "${TASK_QUEUE}"
 
     run_dataskq
 
-    #add all the Include lines if they do not exist
+    # Add all the Include lines if they do not exist
     if [ "$(grep -m1 -c 'Include' "${NGINXCONF}/directadmin-vhosts.conf")" = "0" ] || [ ! -e "${NGINXCONF}/directadmin-vhosts.conf" ]; then
       doVhosts
     fi
@@ -4013,7 +4042,7 @@ rewrite_confs() {
     fi
 
     if [ "${NGINXCUSTOMCONFDIR}" != "0" ]; then
-      cp -rf ${NGINXCUSTOMCONFDIR}/* "${NGINXCONF}/"
+      cp -rf "${NGINXCUSTOMCONFDIR}/*" "${NGINXCONF}/"
     fi
 
     chmod 710 "${NGINXCONF}"
@@ -4032,10 +4061,10 @@ rewrite_confs() {
     tokenize_ports
 
     # Disable UserDir access if userdir_access=no is set in the options.conf file
-    if [ "${USERDIR_ACCESS_OPT}" = "no" ]; then
-      ${PERL} -pi -e 's| include /etc/nginx/nginx-userdir.conf;| #include /etc/nginx/nginx-userdir.conf;|' /etc/nginx/nginx-vhosts.conf
+    if [ "${OPT_USERDIR_ACCESS}" = "no" ]; then
+      ${PERL} -pi -e 's| include /usr/local/etc/nginx/nginx-userdir.conf;| #include /usr/local/etc/nginx/nginx-userdir.conf;|' "${NGINXCONF}/nginx-vhosts.conf"
     else
-      ${PERL} -pi -e 's| #include /etc/nginx/nginx-userdir.conf;| include /etc/nginx/nginx-userdir.conf;|' /etc/nginx/nginx-vhosts.conf
+      ${PERL} -pi -e 's| #include /usr/local/etc/nginx/nginx-userdir.conf;| include /usr/local/etc/nginx/nginx-userdir.conf;|' "${NGINXCONF}/nginx-vhosts.conf"
     fi
 
     doPhpConf
@@ -4043,7 +4072,7 @@ rewrite_confs() {
     echo "Restarting nginx."
     # /usr/sbin/nginx -s stop >/dev/null 2>&1
     # control_service nginx start
-    service nginx restart
+    ${SERVICE} nginx restart
   fi
 
   if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
@@ -4056,7 +4085,6 @@ rewrite_confs() {
   verify_webapps_tmp
 
   directadmin_restart
-
 
 }
 ################################################################################################################################
@@ -4116,10 +4144,10 @@ suhosin_install() {
   pkgi "${PORT_SUHOSIN}"
 
   ## Add support for scanning uploads using ClamAV
-  if [ "${OPT_PHP_SUHOSIN_UPLOADSCAN}" = "YES" ] && [ ! -e /usr/local/bin/clamdscan ]; then
-    if [ "${CLAMAV_OPT}" = "no" ]; then
-      echo "Cannot install suhosin with PHP upload scan using ClamAV, because /usr/local/bin/clamdscan does not exist on the system and clamav=no is set in the options.conf file."
-      exit
+  if [ "${OPT_PHP_SUHOSIN_UPLOADSCAN}" = "YES" ] && [ ! -e "${CLAMDSCAN_BIN}" ]; then
+    if [ "${OPT_CLAMAV}" = "NO" ]; then
+      echo "*** Error: Cannot install suhosin with PHP upload scan using ClamAV, because ${CLAMDSCAN_BIN} does not exist on the system and CLAMAV=NO is set in the options.conf file."
+      return #exit
     fi
 
     clamav_install
@@ -4133,8 +4161,8 @@ tokenize_IP() {
   TOKENFILE_APACHE=${APACHE_EXTRA_PATH}/httpd-vhosts.conf
 
   TOKENFILE_NGINX=${NGINXCONF}/nginx.conf
-  if [ -e ${TOKENFILE_NGINX} ]; then
-    if grep -q -m1 'nginx-vhosts\.conf' ${TOKENFILE_NGINX}; then
+  if [ -e "${TOKENFILE_NGINX}" ]; then
+    if grep -q -m1 'nginx-vhosts\.conf' "${TOKENFILE_NGINX}"; then
       TOKENFILE_NGINX=${NGINXCONF}/nginx-vhosts.conf
     fi
   fi
@@ -4144,7 +4172,7 @@ tokenize_IP() {
   HOSTNAME=$(hostname)
   IP="$(grep -r -l -m1 '^status=server$' /usr/local/directadmin/data/admin/ips | cut -d/ -f8)"
   if [ "${IP}" = "" ]; then
-    IP="$(grep -m1 ${HOSTNAME} /etc/hosts | awk '{print $1}')"
+    IP="$(grep -m1 "${HOSTNAME}" /etc/hosts | awk '{print $1}')"
     if [ "${IP}" = "" ]; then
       echo "Unable to detect your server IP in /etc/hosts. Please enter it: "
       read IP
@@ -4155,7 +4183,7 @@ tokenize_IP() {
     exit 0 # was: do_exit 0
   fi
 
-  if [ "$(echo ${IP} | grep -m1 -c ':')" -gt 0 ]; then
+  if [ "$(echo "${IP}" | grep -m1 -c ':')" -gt 0 ]; then
     IP="[${IP}]"
   fi
 
@@ -4174,7 +4202,7 @@ tokenize_IP() {
 
   if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     if [ -e "${TOKENFILE_NGINX}" ]; then
-      if [ "$(grep -m1 -c '|IP|' ${TOKENFILE_NGINX})" -gt "0" ]; then
+      if [ "$(grep -m1 -c '|IP|' "${TOKENFILE_NGINX}")" -gt "0" ]; then
         if [ "${LAN_IP}" != "" ]; then
           echo "Using lan_ip=$LAN_IP as a secondary server IP";
           STR="perl -pi -e 's/\|IP\|:\|PORT_80\|;/\|IP\|:\|PORT_80\|;\n\tlisten\t\t$LAN_IP:\|PORT_80\|;/' ${TOKENFILE_NGINX}"
@@ -4191,7 +4219,7 @@ tokenize_IP() {
     fi
 
     if [ -e "${TOKENFILE_NGINX_USERDIR}" ]; then
-      if [ "$(grep -m1 -c '|IP|' ${TOKENFILE_NGINX_USERDIR})" -gt "0" ]; then
+      if [ "$(grep -m1 -c '|IP|' "${TOKENFILE_NGINX_USERDIR}")" -gt "0" ]; then
         if [ "${LAN_IP}" != "" ]; then
           STR="perl -pi -e 's/\|IP\|:\|PORT_80\|;/\|IP\|:\|PORT_80\|;\n\tlisten\t\t$LAN_IP:\|PORT_80\|;/' ${TOKENFILE_NGINX_USERDIR}"
           eval "${STR}"
@@ -4211,6 +4239,7 @@ tokenize_IP() {
 
 ## Tokenize Ports (copied from CB2)
 tokenize_ports() {
+
   TOKENFILE_APACHE="${APACHE_EXTRA_PATH}/httpd-vhosts.conf"
 
   TOKENFILE_NGINX=${NGINXCONF}/nginx.conf
@@ -4221,130 +4250,134 @@ tokenize_ports() {
   fi
   TOKENFILE_NGINX_USERDIR=${NGINXCONF}/nginx-userdir.conf
 
+  ## Apache:
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "litespeed" ]; then
     if [ -e ${TOKENFILE_APACHE} ]; then
       if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_APACHE})" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_APACHE}"
+        STR="${PERL} -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_APACHE}"
         eval "${STR}"
       else
-        perl -pi -e "s/:${PORT_8080}\>/:${PORT_80}\>/" ${TOKENFILE_APACHE}
-        perl -pi -e "s/^Listen ${PORT_8080}$/Listen ${PORT_80}/" ${TOKENFILE_APACHE}
+        ${PERL} -pi -e "s/:${PORT_8080}\>/:${PORT_80}\>/" ${TOKENFILE_APACHE}
+        ${PERL} -pi -e "s/^Listen ${PORT_8080}$/Listen ${PORT_80}/" ${TOKENFILE_APACHE}
       fi
       if [ "$(grep -m1 -c '|PORT_443|' ${TOKENFILE_APACHE})" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_APACHE}"
-        eval "${STR}"
+        STR="${PERL} -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_APACHE}"
+        ${PERL} "${STR}"
       else
-        perl -pi -e "s/:${PORT_8081}\>/:${PORT_443}\>/" ${TOKENFILE_APACHE}
-        perl -pi -e "s/^Listen ${PORT_8081}$/Listen ${PORT_443}/" ${TOKENFILE_APACHE}
+        ${PERL} -pi -e "s/:${PORT_8081}\>/:${PORT_443}\>/" ${TOKENFILE_APACHE}
+        ${PERL} -pi -e "s/^Listen ${PORT_8081}$/Listen ${PORT_443}/" ${TOKENFILE_APACHE}
       fi
 
       SSLFILE=${APACHE_EXTRA_PATH}/httpd-ssl.conf
-      STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${SSLFILE}"
+      STR="${PERL} -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${SSLFILE}"
       eval "${STR}"
-      perl -pi -e "s/:${PORT_8081}\>/:${PORT_443}\>/" ${SSLFILE}
-      perl -pi -e "s/^Listen ${PORT_8081}$/Listen ${PORT_443}/" ${SSLFILE}
+      ${PERL} -pi -e "s/:${PORT_8081}\>/:${PORT_443}\>/" ${SSLFILE}
+      ${PERL} -pi -e "s/^Listen ${PORT_8081}$/Listen ${PORT_443}/" ${SSLFILE}
 
-      perl -pi -e "s/:${PORT_8080}\>/:${PORT_80}\>/" ${HTTPD_CONF}
-      perl -pi -e "s/^Listen ${PORT_8080}$/Listen ${PORT_80}/" ${HTTPD_CONF}
+      ${PERL} -pi -e "s/:${PORT_8080}\>/:${PORT_80}\>/" "${HTTPD_CONF}"
+      ${PERL} -pi -e "s/^Listen ${PORT_8080}$/Listen ${PORT_80}/" "${HTTPD_CONF}"
     fi
   fi
 
+  ## Nginx:
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
     if [ -e "${TOKENFILE_NGINX}" ]; then
-      if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_NGINX})" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX}"
+      if [ "$(grep -m1 -c '|PORT_80|' "${TOKENFILE_NGINX}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX}"
         eval "${STR}"
       fi
-      if [ "$(grep -m1 -c '|PORT_443|' ${TOKENFILE_NGINX})" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX}"
+      if [ "$(grep -m1 -c '|PORT_443|' "${TOKENFILE_NGINX}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX}"
         eval "${STR}"
       fi
     fi
 
     if [ -e "${TOKENFILE_NGINX_USERDIR}" ]; then
-      if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_NGINX_USERDIR})" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX_USERDIR}"
+      if [ "$(grep -m1 -c '|PORT_80|' "${TOKENFILE_NGINX_USERDIR}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX_USERDIR}"
         eval "${STR}"
       fi
-      if [ "$(grep -m1 -c '|PORT_443|' ${TOKENFILE_NGINX_USERDIR})" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX_USERDIR}"
+      if [ "$(grep -m1 -c '|PORT_443|' "${TOKENFILE_NGINX_USERDIR}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX_USERDIR}"
         eval "${STR}"
       fi
     fi
   fi
 
+  ## Nginx+Apache:
   if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     if [ -e "${TOKENFILE_NGINX}" ]; then
-      if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_NGINX})" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX}"
+      if [ "$(grep -m1 -c '|PORT_80|' "${TOKENFILE_NGINX}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX}"
         eval "${STR}"
       fi
 
-      if [ "$(grep -m1 -c '|PORT_443|' ${TOKENFILE_NGINX})" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX}"
+      if [ "$(grep -m1 -c '|PORT_443|' "${TOKENFILE_NGINX}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX}"
         eval "${STR}"
       fi
 
-      if [ "`grep -m1 -c '|PORT_8080|' ${TOKENFILE_NGINX}`" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_8080\|/${PORT_8080}/\" ${TOKENFILE_NGINX}"
+      if [ "$(grep -m1 -c '|PORT_8080|' "${TOKENFILE_NGINX}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_8080\|/${PORT_8080}/\" ${TOKENFILE_NGINX}"
         eval "${STR}"
       fi
 
-      if [ "`grep -m1 -c '|PORT_8081|' ${TOKENFILE_NGINX}`" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_8081\|/${PORT_8081}/\" ${TOKENFILE_NGINX}"
-        eval "${STR}"
-      fi
-    fi
-
-    if [ -e ${TOKENFILE_NGINX_USERDIR} ]; then
-      if [ "`grep -m1 -c '|PORT_80|' ${TOKENFILE_NGINX_USERDIR}`" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX_USERDIR}"
-        eval "${STR}"
-      fi
-
-      if [ "`grep -m1 -c '|PORT_443|' ${TOKENFILE_NGINX_USERDIR}`" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX_USERDIR}"
-        eval "${STR}"
-      fi
-
-      if [ "`grep -m1 -c '|PORT_8080|' ${TOKENFILE_NGINX_USERDIR}`" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_8080\|/${PORT_8080}/\" ${TOKENFILE_NGINX_USERDIR}"
-        eval "${STR}"
-      fi
-
-      if [ "`grep -m1 -c '|PORT_8081|' ${TOKENFILE_NGINX_USERDIR}`" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_8081\|/${PORT_8081}/\" ${TOKENFILE_NGINX_USERDIR}"
+      if [ "$(grep -m1 -c '|PORT_8081|' "${TOKENFILE_NGINX}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_8081\|/${PORT_8081}/\" ${TOKENFILE_NGINX}"
         eval "${STR}"
       fi
     fi
 
+    if [ -e "${TOKENFILE_NGINX_USERDIR}" ]; then
+      if [ "$(grep -m1 -c '|PORT_80|' "${TOKENFILE_NGINX_USERDIR}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+
+      if [ "$(grep -m1 -c '|PORT_443|' "${TOKENFILE_NGINX_USERDIR}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+
+      if [ "$(grep -m1 -c '|PORT_8080|' "${TOKENFILE_NGINX_USERDIR}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_8080\|/${PORT_8080}/\" ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+
+      if [ "$(grep -m1 -c '|PORT_8081|' "${TOKENFILE_NGINX_USERDIR}")" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_8081\|/${PORT_8081}/\" ${TOKENFILE_NGINX_USERDIR}"
+        eval "${STR}"
+      fi
+    fi
+
+    ## Apache:
     if [ -e ${TOKENFILE_APACHE} ]; then
-      if [ "`grep -m1 -c '|PORT_80|' ${TOKENFILE_APACHE}`" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_80\|/${PORT_8080}/\" ${TOKENFILE_APACHE}"
+      if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_APACHE})" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_80\|/${PORT_8080}/\" ${TOKENFILE_APACHE}"
         eval "${STR}"
       else
-        perl -pi -e "s/:${PORT_80}\>/:${PORT_8080}\>/" ${TOKENFILE_APACHE}
+        ${PERL} -pi -e "s/:${PORT_80}\>/:${PORT_8080}\>/" ${TOKENFILE_APACHE}
       fi
 
-      if [ "`grep -m1 -c '|PORT_443|' ${TOKENFILE_APACHE}`" -gt "0" ]; then
-        STR="perl -pi -e \"s/\|PORT_443\|/${PORT_8081}/\" ${TOKENFILE_APACHE}"
+      if [ "$(grep -m1 -c '|PORT_443|' ${TOKENFILE_APACHE})" -gt "0" ]; then
+        STR="${PERL} -pi -e \"s/\|PORT_443\|/${PORT_8081}/\" ${TOKENFILE_APACHE}"
         eval "${STR}"
       else
-        perl -pi -e "s/:${PORT_443}\>/:${PORT_8081}\>/" ${TOKENFILE_APACHE}
+        ${PERL} -pi -e "s/:${PORT_443}\>/:${PORT_8081}\>/" ${TOKENFILE_APACHE}
       fi
 
-      if [ "`grep -m1 -c "^Listen ${PORT_80}$" ${HTTPD_CONF}`" -gt 0 ]; then
-        STR="perl -pi -e \"s/^Listen ${PORT_80}$/Listen ${PORT_8080}/\" ${HTTPD_CONF}"
+      if [ "$(grep -m1 -c "^Listen ${PORT_80}$" "${HTTPD_CONF}")" -gt 0 ]; then
+        STR="${PERL} -pi -e \"s/^Listen ${PORT_80}$/Listen ${PORT_8080}/\" ${HTTPD_CONF}"
         eval "${STR}"
       else
-        perl -pi -e "s/:${PORT_80}\>/:${PORT_8080}\>/" ${HTTPD_CONF}
+        ${PERL} -pi -e "s/:${PORT_80}\>/:${PORT_8080}\>/" "${HTTPD_CONF}"
       fi
 
       SSLFILE=${APACHE_EXTRA_PATH}/httpd-ssl.conf
-      STR="perl -pi -e \"s/\|PORT_443\|/${PORT_8081}/\" ${SSLFILE}"
+      STR="${PERL} -pi -e \"s/\|PORT_443\|/${PORT_8081}/\" ${SSLFILE}"
       eval "${STR}"
-      perl -pi -e "s/:${PORT_443}\>/:${PORT_8081}\>/" ${SSLFILE}
-      perl -pi -e "s/^Listen ${PORT_443}$/Listen ${PORT_8081}/" ${SSLFILE}
+      ${PERL} -pi -e "s/:${PORT_443}\>/:${PORT_8081}\>/" ${SSLFILE}
+      ${PERL} -pi -e "s/^Listen ${PORT_443}$/Listen ${PORT_8081}/" ${SSLFILE}
     fi
   fi
 }
@@ -4607,6 +4640,9 @@ validate_options() {
     *) echo "*** Error: Invalid PHP1_VERSION value set in options.conf"; exit ;;
   esac
 
+  OPT_PHP2_MODE=NO
+  OPT_PHP2_VERSION=NO
+  OPT_PHP2_RELEASE=NO
   # case ${PHP2_VERSION} in
   #   55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION} ;;
   #   *) echo "*** Error: Invalid PHP2_VERSION value set in options.conf"; exit ;;
@@ -4867,19 +4903,19 @@ install_app() {
     "ipfw") ipfw_setup ;;
     "libspf2"|"libspf") pkgi ${PORT_LIBSPF2} ;;
     "mariadb55")
-      /usr/sbin/pkg -y ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
+      pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
       sql_post_install ;;
     "mariadb100")
-      /usr/sbin/pkg -y ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
+      pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
       sql_post_install ;;
     "mysql55")
-      /usr/sbin/pkg -y ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
+      pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
       sql_post_install ;;
     "mysql56")
-      /usr/sbin/pkg -y ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
+      pkgi ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
       sql_post_install ;;
     "mysql57")
-      /usr/sbin/pkg -y ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
+      pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
       sql_post_install ;;
     "nginx") nginx_install ;;
     "php"|"php55"|"php56"|"php70") php_install ;;
