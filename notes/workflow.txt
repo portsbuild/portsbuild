@@ -9,11 +9,11 @@
 #   Download DirectAdmin license + binaries
 #   Generate setup.txt
 #
+#   Install MariaDB/MySQL
 #   Install Exim
 #   Install Dovecot
 #   Install ClamAV + misc. integrations
 #   Install Majordomo
-#   Install MariaDB/MySQL
 #   Install php-fpm
 #   Install Apache
 #   Install PMA
