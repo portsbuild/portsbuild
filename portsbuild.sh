@@ -2969,13 +2969,13 @@ nginx_install() {
   ### Post-Installation Tasks
 
   ## Update directadmin.conf with new paths
-  setVal nginxconf /usr/local/etc/nginx/directadmin-vhosts.conf ${DA_CONF_FILE}
+  setVal nginxconf ${NGINX_PATH}/directadmin-vhosts.conf ${DA_CONF_FILE}
   setVal nginxlogdir /var/log/nginx/domains ${DA_CONF_FILE}
-  setVal nginxips /usr/local/etc/nginx/directadmin-ips.conf ${DA_CONF_FILE}
+  setVal nginxips ${NGINX_PATH}/directadmin-ips.conf ${DA_CONF_FILE}
   setVal nginx_pid /var/run/nginx.pid ${DA_CONF_FILE}
-  setVal nginx_cert /usr/local/etc/nginx/ssl/server.crt ${DA_CONF_FILE}
-  setVal nginx_key /usr/local/etc/nginx/ssl/server.key ${DA_CONF_FILE}
-  setVal nginx_ca /usr/local/etc/nginx/ssl/server.ca ${DA_CONF_FILE}
+  setVal nginx_cert ${NGINX_PATH}/ssl/server.crt ${DA_CONF_FILE}
+  setVal nginx_key ${NGINX_PATH}/ssl/server.key ${DA_CONF_FILE}
+  setVal nginx_ca ${NGINX_PATH}/ssl/server.ca ${DA_CONF_FILE}
 
   ## Update /etc/rc.conf
   sysrc nginx_enable="YES"
@@ -3933,7 +3933,7 @@ do_rewrite_httpd_alias() {
       add_alias_redirect ${HA} pma phpMyAdmin
     fi
 
-    #For let's encrypt challenges
+    ## For Let's Encrypt challenges
     LETSENCRYPT=$(getDA_Opt letsencrypt 0)
     if [ "${LETSENCRYPT}" = "1" ]; then
       add_alias_redirect ${HA} .well-known .well-known
@@ -3943,7 +3943,8 @@ do_rewrite_httpd_alias() {
       # CB2: http://forum.directadmin.com/showthread.php?t=48203&p=247343#post247343
       echo "Adding custom webapps from ${WEBAPPS_LIST}"
 
-      cat "${WEBAPPS_LIST}" | while read l; do
+      ## Verify:
+      while read l < "${WEBAPPS_LIST}"; do
         app=$(echo "$l" | cut -d= -f1)
         app_path=$(echo "$l" | cut -d= -f2)
 
@@ -3997,7 +3998,7 @@ add_nginx_alias() {
       printf "\t\troot /usr/local/www/;\n"
       printf "\t\tindex index.php index.html index.htm;\n"
       printf "\t\tlocation ~ ^/%s/(.+\.php)\$ {\n" "${A}"
-      printf "\t\t\tinclude /usr/local/etc/nginx/webapps_settings.conf;\n"
+      printf "\t\t\tinclude ${NGINX_PATH}/webapps_settings.conf;\n"
       printf "\t\t}\n"
       printf "\t\tlocation ~* ^/%s/(.+\\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))\$ {\n" "${A}"
       printf "\t\t\troot /usr/local/www/;\n"
@@ -4035,11 +4036,11 @@ add_nginx_alias() {
 ## Rewrite Nginx Webapps (copied from CB2: do_rewrite_nginx_webapps)
 do_rewrite_nginx_webapps() {
   if [ -e "${PB_PATH}/custom/nginx/conf/webapps.conf" ] && [ "${OPT_WEBSERVER}" = "nginx" ]; then
-    cp -pf "${PB_PATH}/custom/nginx/conf/webapps.conf" /usr/local/etc/nginx/webapps.conf
+    cp -pf "${PB_PATH}/custom/nginx/conf/webapps.conf" ${NGINX_PATH}/webapps.conf
   elif [ -e "${PB_PATH}/custom/nginx_reverse/conf/webapps.conf" ] && [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    cp -pf "${PB_PATH}/custom/nginx_reverse/conf/webapps.conf" /usr/local/etc/nginx/webapps.conf
+    cp -pf "${PB_PATH}/custom/nginx_reverse/conf/webapps.conf" ${NGINX_PATH}/webapps.conf
   else
-    NW=/usr/local/etc/nginx/webapps.conf
+    NW=${NGINX_PATH}/webapps.conf
 
     : > ${NW}
 
@@ -4080,12 +4081,12 @@ do_rewrite_nginx_webapps() {
   fi
 
   if [ -e "${PB_PATH}/custom/nginx/conf/webapps.hostname.conf" ] && [ "${OPT_WEBSERVER}" = "nginx" ]; then
-    cp -pf "${PB_PATH}/custom/nginx/conf/webapps.hostname.conf" /usr/local/etc/nginx/webapps.hostname.conf
+    cp -pf "${PB_PATH}/custom/nginx/conf/webapps.hostname.conf" ${NGINX_PATH}/webapps.hostname.conf
   elif [ -e "${PB_PATH}/custom/nginx_reverse/conf/webapps.conf" ] && [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    cp -pf "${PB_PATH}/custom/nginx_reverse/conf/webapps.hostname.conf" /usr/local/etc/nginx/webapps.hostname.conf
+    cp -pf "${PB_PATH}/custom/nginx_reverse/conf/webapps.hostname.conf" ${NGINX_PATH}/webapps.hostname.conf
   else
     ## CB2: In nginx-vhosts.conf we don't need to have "real" alias specified, because they already exist when acessing http://IP or http://hostname
-    NW_HOSTNAME=/usr/local/etc/nginx/webapps.hostname.conf
+    NW_HOSTNAME=${NGINX_PATH}/webapps.hostname.conf
     : > ${NW_HOSTNAME}
 
     if [ "${OPT_PHPMYADMIN}" = "YES" ]; then
@@ -4109,21 +4110,21 @@ do_rewrite_nginx_webapps() {
     } >> ${NW_HOSTNAME}
   fi
 
-  cp -pf /usr/local/etc/nginx/webapps.conf /usr/local/etc/nginx/webapps.ssl.conf
-  ${PERL} -pi -e "s|:${PORT_8080}|:${PORT_8081}|" /usr/local/etc/nginx/webapps.ssl.conf
-  ${PERL} -pi -e 's|http:|https:|' /usr/local/etc/nginx/webapps.ssl.conf
+  cp -pf ${NGINX_PATH}/webapps.conf ${NGINX_PATH}/webapps.ssl.conf
+  ${PERL} -pi -e "s|:${PORT_8080}|:${PORT_8081}|" ${NGINX_PATH}/webapps.ssl.conf
+  ${PERL} -pi -e 's|http:|https:|' ${NGINX_PATH}/webapps.ssl.conf
 
   if [ "${HAVE_FPM_CGI}" = "YES" ]; then
     ## CB2: update the webapps_settings.conf
     ##      swap "fastcgi_pass unix:/usr/local/php54/sockets/webapps.sock;" if needed
     ##      might be a better way to do this, other checks. Close enough for now.
 
-    PHP_REPLACE_STRING="$(grep -m1 '^fastcgi_pass unix:/usr/local/php../sockets/webapps.sock;' /usr/local/etc/nginx/webapps_settings.conf | cut -d/ -f4)"
+    PHP_REPLACE_STRING="$(grep -m1 '^fastcgi_pass unix:/usr/local/php../sockets/webapps.sock;' ${NGINX_PATH}/webapps_settings.conf | cut -d/ -f4)"
     if [ "${PHP_REPLACE_STRING}" = "" ]; then
       PHP_REPLACE_STRING=php54
     fi
     if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
-      ${PERL} -pi -e "s#${PHP_REPLACE_STRING}#php${OPT_PHP1_VERSION}#" /usr/local/etc/nginx/webapps_settings.conf
+      ${PERL} -pi -e "s#${PHP_REPLACE_STRING}#php${OPT_PHP1_VERSION}#" ${NGINX_PATH}/webapps_settings.conf
     fi
   fi
 }
@@ -4461,9 +4462,9 @@ rewrite_confs() {
 
     # Disable UserDir access if userdir_access=no is set in the options.conf file
     if [ "${OPT_USERDIR_ACCESS}" = "no" ]; then
-      ${PERL} -pi -e 's| include /usr/local/etc/nginx/nginx-userdir.conf;| #include /usr/local/etc/nginx/nginx-userdir.conf;|' "${NGINXCONF}/nginx-vhosts.conf"
+      ${PERL} -pi -e 's| include ${NGINX_PATH}/nginx-userdir.conf;| #include ${NGINX_PATH}/nginx-userdir.conf;|' "${NGINXCONF}/nginx-vhosts.conf"
     else
-      ${PERL} -pi -e 's| #include /usr/local/etc/nginx/nginx-userdir.conf;| include /usr/local/etc/nginx/nginx-userdir.conf;|' "${NGINXCONF}/nginx-vhosts.conf"
+      ${PERL} -pi -e 's| #include ${NGINX_PATH}/nginx-userdir.conf;| include ${NGINX_PATH}/nginx-userdir.conf;|' "${NGINXCONF}/nginx-vhosts.conf"
     fi
 
     doPhpConf
