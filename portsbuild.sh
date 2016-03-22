@@ -387,7 +387,6 @@ PORT_PHP56=lang/php56
 PORT_PHP56_EXT=lang/php56-extensions
 PORT_PHP70=lang/php70
 PORT_PHP70_EXT=lang/php70-extensions
-
 PORT_MOD_PHP55=www/mod_php55
 PORT_MOD_PHP56=www/mod_php56
 PORT_MOD_PHP70=www/mod_php70
@@ -995,7 +994,7 @@ global_setup() {
   if [ "${OPT_PROFTPD_UPLOADSCAN}" = "YES" ]; then ( printf ", ProFTPD w/ Upload Scanning" ); fi
   if [ "${OPT_PUREFTPD_UPLOADSCAN}" = "YES" ]; then ( printf ", PureFTPD w/ Upload Scanning" ); fi
   if [ "${OPT_SUHOSIN}" = "YES" ]; then ( printf ", Suhosin" ); fi
-  if [ "${OPT_PHP_SUHOSIN_UPLOADSCAN}" = "YES" ]; then ( printf ", Suhosin w/ Upload Scanning" ); fi
+  if [ "${OPT_SUHOSIN_UPLOADSCAN}" = "YES" ]; then ( printf ", Suhosin w/ Upload Scanning" ); fi
   if [ "${OPT_MODSECURITY}" = "YES" ]; then ( printf ", ModSecurity" ); fi
 
   # echo "PHP ini Type: ${OPT_PHP_INI_TYPE}"
@@ -1124,7 +1123,7 @@ global_setup() {
 
     ${SERVICE} sshd start
 
-    ## Install & configure services and applications
+    ## Install and configure services & applications
     if [ "${OPT_NAMED}" = "YES" ]; then ( bind_setup ); fi
     if [ "${OPT_EXIM}" = "YES" ]; then ( exim_install); fi
     if [ "${OPT_MAJORDOMO}" = "YES" ]; then ( majordomo_install); fi
@@ -1137,10 +1136,8 @@ global_setup() {
     if [ "${OPT_SPAMASSASSIN}" = "YES" ]; then ( spamassassin_install ); fi
     if [ "${OPT_CLAMAV}" = "YES" ]; then ( clamav_install ); fi
     if [ "${OPT_FTPD}" != "NO" ]; then ( install_app "${OPT_FTPD}" ); fi
-
-    #blockcracking_install
-    #easyspamfighter_install
-
+    if [ "${OPT_BLOCKCRACKING}" = "YES" ]; then ( blockcracking_install ); fi
+    if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ]; then ( easyspamfighter_install ); fi
 
     ## Go for the main attraction
     directadmin_install
@@ -1152,7 +1149,7 @@ global_setup() {
 
     if [ ! -e "${CB_CONF}" ]; then
       if [ ! -e "${PB_PATH}/custombuild/options.conf" ]; then
-        ${WGET_WITH_OPTIONS} -O ${CB_CONF} "${PB_MIRROR}/custombuild/options.conf"
+        ${WGET} -O ${CB_CONF} "${PB_MIRROR}/custombuild/options.conf"
       else
         cp "${PB_PATH}/custombuild/options.conf" ${CB_CONF}
       fi
@@ -1313,6 +1310,7 @@ update_rc() {
 bind_setup() {
 
   if [ "${OPT_NAMED}" != "YES" ]; then
+    echo "*** Notice: Skipping named (BIND) DNS setup."
     return
   fi
 
@@ -1330,12 +1328,12 @@ bind_setup() {
       if [ -e "${PB_PATH}/configure/named/named.100.conf" ]; then
         cp "${PB_PATH}/configure/named/named.100.conf" /etc/namedb/named.conf
       else
-        ${WGET} -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.100.conf
+        ${WGET} -O /var/named/etc/namedb/named.conf ${PB_MIRROR}/configure/named/named.100.conf
       fi
     fi
 
     if [ ! -e /usr/local/etc/namedb/rndc.key ]; then
-      echo "Generating rndc.key for the first time"
+      echo "*** Notice: Generating the rndc.key for the first time"
       /usr/local/sbin/rndc-confgen -a -s "${DA_SERVER_IP}"
     fi
   elif [ "$OS_MAJ" -eq 9 ]; then
@@ -1350,33 +1348,15 @@ bind_setup() {
       if [ -e "${PB_PATH}/configure/named/named.93.conf" ]; then
         cp "${PB_PATH}/configure/named/named.93.conf" /etc/namedb/named.conf
       else
-        ${WGET} -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
+        ${WGET} -O /etc/namedb/named.conf ${PB_MIRROR}/configure/named/named.93.conf
       fi
     fi
 
     if [ ! -e /etc/namedb/rndc.key ]; then
-      echo "Generating rndc.key for the first time"
+      echo "*** Notice: Generating the rndc.key for the first time"
       /usr/sbin/rndc-confgen -a -s "${DA_SERVER_IP}"
     fi
   fi
-
-  ## File target paths:
-  ## 10.2: /var/named/etc/namedb/named.conf
-  ## 9.3: /etc/namedb/named.conf
-
-  # if [ "${OS_MAJ}" -eq 10 ]; then
-  #   ## FreeBSD 10.2 with BIND 9.9.5 from ports
-  #   ${WGET} -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.100.conf
-  # elif [ "${OS_MAJ}" -eq 9 ]; then
-  #   ## FreeBSD 9.3 with BIND 9.9.5 from base
-  #   ${WGET} -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
-  # fi
-
-  ## Generate BIND's rndc.key ("/usr/local/etc/namedb/rndc.key")
-  # if [ ! -e /usr/local/etc/namedb/rndc.key ] || [ ! -e /etc/namedb/rndc.key ]; then
-  #   echo "Generating rndc.key for the first time"
-  #   rndc-confgen -a -s "${DA_SERVER_IP}"
-  # fi
 
   echo "Updating /etc/rc.conf with named_enable=YES"
   sysrc named_enable="YES"
@@ -1418,9 +1398,9 @@ directadmin_install() {
   ## Get DirectAdmin binary:
   if [ ! -e "${DA_PATH}/update.tar.gz" ]; then
     if [ "${DA_LAN}" -eq 0 ]; then
-      ${WGET_WITH_OPTIONS} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address="${DA_SERVER_IP}" "${HTTP}://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+      ${WGET} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address="${DA_SERVER_IP}" "${HTTP}://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
     elif [ "${DA_LAN}" -eq 1 ]; then
-      ${WGET_WITH_OPTIONS} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "${HTTP}://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+      ${WGET} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "${HTTP}://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
     fi
   fi
 
@@ -1436,7 +1416,6 @@ directadmin_install() {
   fi
 
   ## Extract update.tar.gz into /usr/local/directadmin:
-  # cd "${DA_PATH}" || exit
   tar xvf ${DA_PATH}/update.tar.gz -C "${DA_PATH}"
 
   ## See if the binary exists:
@@ -1450,7 +1429,7 @@ directadmin_install() {
     if [ -e "${PB_PATH}/directadmin/scripts/custom/addip" ]; then
       cp "${PB_PATH}/directadmin/scripts/custom/addip" ${DA_PATH}/scripts/custom/addip
     else
-      echo "downloading missing file"
+      echo "Downloading missing file"
       ## download file
     fi
   fi
@@ -1459,7 +1438,7 @@ directadmin_install() {
   echo "addip=${DA_PATH}/scripts/custom/addip" >> "${DA_CONF_TEMPLATE_FILE}"
 
   ## The following lines were in DA's install/setup do_checks():
-  ## Check for a separate /home partition (for quota support).
+  ## Check for a separate /home partition (for quota support)
   HOME_YES=$(grep -c /home < /etc/fstab)
   if [ "$HOME_YES" -lt "1" ]; then
     echo "quota_partition=/" >> ${DA_CONF_TEMPLATE_FILE}
@@ -1552,6 +1531,7 @@ directadmin_install() {
   chmod 711 /home
 
   ## PB: Create User and Reseller Welcome message (need to download/copy these files):
+  ## 2016-03-22: Needed?
   # touch ${DA_PATH}/data/users/admin/u_welcome.txt
   # touch ${DA_PATH}/data/admin/r_welcome.txt
 
@@ -1560,6 +1540,7 @@ directadmin_install() {
 
   SSHROOT=$(grep -c 'AllowUsers root' < /etc/ssh/sshd_config)
   if [ "${SSHROOT}" = 0 ]; then
+    echo "*** Notice: Adding the 'root' user to the sshd configuration's AllowUsers list."
     {
       echo "AllowUsers root"
       echo "AllowUsers ${DA_ADMIN_USERNAME}"
@@ -1573,14 +1554,14 @@ directadmin_install() {
 
   ## Download DirectAdmin License file (untested)
   if [ ! -e "${DA_LICENSE_FILE}" ]; then
-    ${WGET_WITH_OPTIONS} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
+    ${WGET} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
     if [ $? -ne 0 ]; then
       echo "*** Error: Unable to download the DirectAdmin license file."
       da_myip
-      echo "Trying license relay server..."
+      echo "Trying the license relay server..."
 
-      ${WGET_WITH_OPTIONS} "${HTTP}://license.directadmin.com/licenseupdate.php?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
+      ${WGET} "${HTTP}://license.directadmin.com/licenseupdate.php?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
       if [ $? -ne 0 ]; then
         echo "*** Error: Unable to download the DirectAdmin license file from relay server as well."
@@ -1619,7 +1600,7 @@ directadmin_install() {
 
 ## Copied from DA/scripts/getLicense.sh
 da_myip() {
-  IP=$(${WGET_WITH_OPTIONS} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
+  IP=$(${WGET} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
 
   if [ "${IP}" = "" ]; then
     echo "*** Error: Cannot determine the server's IP address via myip.directadmin.com"
@@ -1951,7 +1932,7 @@ blockcracking_install() {
 
     echo "Downloading BlockCracking"
 
-    ${WGET_WITH_OPTIONS} -O ${PB_PATH}/files/exim.blockcracking.tar.gz ${PB_MIRROR}/files/exim.blockcracking.tar.gz
+    ${WGET} -O ${PB_PATH}/files/exim.blockcracking.tar.gz ${PB_MIRROR}/files/exim.blockcracking.tar.gz
 
     ## used to include: -${BLOCKCRACKING_VER}
 
@@ -2029,7 +2010,7 @@ easyspamfighter_install() {
     # getFile easy_spam_fighter/exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz easy_spam_figther exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz
 
     ## Todo: grab latest version
-    ${WGET_WITH_OPTIONS} -O "${PB_PATH}/files/esf.tar.gz" ${PB_MIRROR}/files/esf.tar.gz
+    ${WGET} -O "${PB_PATH}/files/esf.tar.gz" ${PB_MIRROR}/files/esf.tar.gz
 
     if [ -e "${PB_PATH}/files/esf.tar.gz" ]; then
 
@@ -2788,7 +2769,7 @@ phpmyadmin_install() {
   ## Auth log patch for BFM compat (not done):
   ## Currently outputs to /var/log/auth.log
   if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    ${WGET_WITH_OPTIONS} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+    ${WGET} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
   fi
 
   if [ -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
@@ -3230,8 +3211,8 @@ clamav_install() {
 
   ## Verify:
   if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then
-    ${WGET_WITH_OPTIONS} -O /usr/local/etc/exim/exim.clamav.load.conf ${PB_MIRROR}/exim/exim.clamav.load.conf
-    ${WGET_WITH_OPTIONS} -O /usr/local/etc/exim/exim.clamav.conf ${PB_MIRROR}/exim/exim.clamav.conf
+    ${WGET} -O /usr/local/etc/exim/exim.clamav.load.conf ${PB_MIRROR}/exim/exim.clamav.load.conf
+    ${WGET} -O /usr/local/etc/exim/exim.clamav.conf ${PB_MIRROR}/exim/exim.clamav.conf
   fi
 
   ## Verify:
@@ -3531,7 +3512,7 @@ roundcube_install() {
 
       ## Download a fresh copy of mime.types from Apache's repo
       if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
-        ${WGET_WITH_OPTIONS} -O "${ROUNDCUBE_PATH}/config/mime.types" http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
+        ${WGET} -O "${ROUNDCUBE_PATH}/config/mime.types" http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
       fi
 
       echo "\$config['mime_types'] = '${ROUNDCUBE_PATH}/config/mime.types';" >> ${ROUNDCUBE_CONF}
@@ -4526,7 +4507,7 @@ suhosin_install() {
   pkgi "${PORT_SUHOSIN}"
 
   ## Add support for scanning uploads using ClamAV
-  if [ "${OPT_PHP_SUHOSIN_UPLOADSCAN}" = "YES" ] && [ ! -e "${CLAMDSCAN_BIN}" ]; then
+  if [ "${OPT_SUHOSIN_UPLOADSCAN}" = "YES" ] && [ ! -e "${CLAMDSCAN_BIN}" ]; then
     if [ "${OPT_CLAMAV}" = "NO" ]; then
       echo "*** Error: Cannot install suhosin with PHP upload scan using ClamAV, because ${CLAMDSCAN_BIN} does not exist on the system and CLAMAV=NO is set in the options.conf file."
       return #exit
@@ -4945,7 +4926,7 @@ bfm_setup() {
   setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF_FILE}
 
   if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    ${WGET_WITH_OPTIONS} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+    ${WGET} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
   fi
 
   #pure_pw=/usr/bin/pure-pw
@@ -5190,9 +5171,9 @@ validate_options() {
   fi
 
   if [ "$(uc "${PHP_SUHOSIN_UPLOADSCAN}")" = "YES" ]; then
-    OPT_PHP_SUHOSIN_UPLOADSCAN="YES"
+    OPT_SUHOSIN_UPLOADSCAN="YES"
   else
-    OPT_PHP_SUHOSIN_UPLOADSCAN="NO"
+    OPT_SUHOSIN_UPLOADSCAN="NO"
   fi
 
   if [ "$(uc "${MODSECURITY}")" = "YES" ]; then
@@ -5444,7 +5425,7 @@ show_config() {
     echo "Majordomo: ${OPT_MAJORDOMO}"
     echo "phpMyAdmin: ${OPT_PHPMYADMIN}"
     echo "Suhosin: ${OPT_SUHOSIN}"
-    echo "Suhosin Upload Scan: ${OPT_PHP_SUHOSIN_UPLOADSCAN}"
+    echo "Suhosin Upload Scan: ${OPT_SUHOSIN_UPLOADSCAN}"
     echo "ModSecurity: ${OPT_MODSECURITY}"
     echo "RoundCube: ${OPT_ROUNDCUBE}"
     echo "PigeonHole: ${OPT_PIGEONHOLE}"

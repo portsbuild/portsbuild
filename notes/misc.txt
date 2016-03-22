@@ -1,0 +1,17 @@
+  ## File target paths:
+  ## 10.2: /var/named/etc/namedb/named.conf
+  ## 9.3: /etc/namedb/named.conf
+
+  # if [ "${OS_MAJ}" -eq 10 ]; then
+  #   ## FreeBSD 10.2 with BIND 9.9.5 from ports
+  #   ${WGET} -O /var/named/etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.100.conf
+  # elif [ "${OS_MAJ}" -eq 9 ]; then
+  #   ## FreeBSD 9.3 with BIND 9.9.5 from base
+  #   ${WGET} -O /etc/namedb/named.conf https://raw.githubusercontent.com/portsbuild/portsbuild/master/conf/named.93.conf
+  # fi
+
+  ## Generate BIND's rndc.key ("/usr/local/etc/namedb/rndc.key")
+  # if [ ! -e /usr/local/etc/namedb/rndc.key ] || [ ! -e /etc/namedb/rndc.key ]; then
+  #   echo "Generating rndc.key for the first time"
+  #   rndc-confgen -a -s "${DA_SERVER_IP}"
+  # fi
