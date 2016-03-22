@@ -325,6 +325,7 @@ MYSQLIMPORT_BIN=/usr/local/bin/mysqlimport
 MYSQLSECURE_BIN=/usr/local/bin/mysql_secure_installation
 MYSQLSHOW_BIN=/usr/local/bin/mysqlshow
 MYSQLUPGRADE_BIN=/usr/local/bin/mysql_upgrade
+
 MYSQL=${MYSQL_BIN}
 MYSQLADMIN=${MYSQLADMIN_BIN}
 MYSQLCHECK=${MYSQLCHECK_BIN}
@@ -340,17 +341,6 @@ NEWSYSLOG_FILE=/usr/local/etc/newsyslog.d/directadmin.conf
 NEWSYSLOG_DAYS=10
 
 INITDDIR=/usr/local/etc/rc.d
-
-## User Option Defaults:
-# WEBSERVER=apache
-# APACHE_MPM=event
-# SQL_DB=mariadb100
-# CLAMAV=YES
-# SPAMASSASSIN=YES
-# SPAMASSASSIN_UTILITIES=YES
-# PHPMYADMIN=YES
-# ROUNDCUBE=YES
-
 
 ################################################################################################################################
 
@@ -543,13 +533,6 @@ PUREFTPD_MAKE_UNSET=""
 # # recreate them # exit;
 # fi
 
-## Verify if /usr/ports exists:
-if [ ! -d "${PORTS_BASE}/" ]; then
-  # echo "*** Warning: FreeBSD ports directory (/usr/ports) not initialized."
-  FOUND_PORTS=0
-else
-  FOUND_PORTS=1
-fi
 
 ## See if IPV6 is enabled in DirectAdmin:
 IPV6_ENABLED=0
@@ -1002,26 +985,27 @@ global_setup() {
   if [ "${OPT_FTPD}" != "NO" ]; then ( printf ", %s" "${OPT_FTPD}" ); fi
   printf "\n"
 
-  # echo "Following features will be enabled: "
-  # if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then ( printf "Exim w/ClamAV" ); fi
+  printf "The following features will be enabled: \n"
+  if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then ( printf "Exim w/ClamAV" ); fi
+  if [ "${OPT_BLOCKCRACKING}" = "YES" ]; then ( printf ", BlockCracking" ); fi
+  if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ]; then ( printf ", Easy Spam Fighter" ); fi
+  if [ "${OPT_SPAMASSASSIN_UTILITIES}" = "YES" ]; then ( printf ", SpamAssassin Utilities" ); fi
+  if [ "${OPT_AWSTATS}" = "YES" ]; then ( printf ", Awstats" ); fi
+  if [ "${OPT_WEBALIZER}" = "YES" ]; then ( printf ", Webalizer" ); fi
+  if [ "${OPT_PROFTPD_UPLOADSCAN}" = "YES" ]; then ( printf ", ProFTPD w/ Upload Scanning" ); fi
+  if [ "${OPT_PUREFTPD_UPLOADSCAN}" = "YES" ]; then ( printf ", PureFTPD w/ Upload Scanning" ); fi
+  if [ "${OPT_SUHOSIN}" = "YES" ]; then ( printf ", Suhosin" ); fi
+  if [ "${OPT_PHP_SUHOSIN_UPLOADSCAN}" = "YES" ]; then ( printf ", Suhosin w/ Upload Scanning" ); fi
+  if [ "${OPT_MODSECURITY}" = "YES" ]; then ( printf ", ModSecurity" ); fi
 
   # echo "PHP ini Type: ${OPT_PHP_INI_TYPE}"
   # echo "Webapps Inbox Prefix: ${OPT_WEBAPPS_INBOX_PREFIX}"
   # echo "Spam Inbox Prefix: ${OPT_SPAM_INBOX_PREFIX}"
-  # echo "BlockCracking: ${OPT_BLOCKCRACKING}"
-  # echo "Easy Spam Fighter: ${OPT_EASY_SPAM_FIGHTER}"
-  # echo "SpamAssassin Utilities: ${OPT_SPAMASSASSIN_UTILITIES}"
-  # echo "ProFTPd Upload Scan: ${OPT_PROFTPD_UPLOADSCAN}"
-  # echo "PureFTPd Upload Scan: ${OPT_PUREFTPD_UPLOADSCAN}"
-  # echo "Awstats: ${OPT_AWSTATS}"
-  # echo "Webalizer: ${OPT_WEBALIZER}"
   # echo "Majordomo: ${OPT_MAJORDOMO}"
-  # echo "Suhosin: ${OPT_SUHOSIN}"
-  # echo "Suhosin Upload Scan: ${OPT_PHP_SUHOSIN_UPLOADSCAN}"
-  # echo "ModSecurity: ${OPT_MODSECURITY}"
   # echo "Install CCache: ${OPT_INSTALL_CCACHE}"
   # echo "Install Synth: ${OPT_INSTALL_SYNTH}"
 
+  printf "\n"
 
   ask_user "Do you want to continue?"
 
@@ -1033,7 +1017,7 @@ global_setup() {
 
     pkg_update
 
-    if [ "${FOUND_PORTS}" -eq 0 ]; then
+    if [ ! -d "${PORTS_BASE}/" ]; then
       echo "Setting up /usr/ports for the first time"
       ${PORTSNAP} fetch extract
     fi
@@ -2433,7 +2417,7 @@ sql_post_install() {
   fi
 
   ## From CB2 (skipped, 5.1 is outdated):
-  # if [ -e /usr/local/mysql/bin/mysqlcheck ] && [ "${MYSQL_OPT}" = "5.1" ] && [ "${MYSQL_INST_OPT}" != "mariadb" ]; then
+  # if [ -e /usr/local/mysql/bin/mysqlcheck ] && [ "${OPT_MYSQL}" = "5.1" ] && [ "${OPT_MYSQL_INST}" != "mariadb" ]; then
   #   /usr/local/mysql/bin/mysqlcheck --defaults-extra-file=${DA_MY_CNF} --fix-db-names --fix-table-names -A
   # fi
 
@@ -2495,7 +2479,6 @@ sql_post_install() {
 
   ## Todo: comment out thread_concurrency in my.cnf to prevent deprecation warnings
   ## thread_concurrency = 8
-
 
   DA_MYSQL_PATH=/usr/local/mysql/bin
   if [ ! -e ${DA_MYSQL_PATH}/mysql ]; then
@@ -5545,36 +5528,32 @@ show_install() {
 
 #  ( printf "Package Version Origin\n" ; pkg query -i -x "%n %v %o" '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
 
-  available_packages="\
-  apache,Apache 2.4 \
-  awstats,Awstats \
-  bfm,Brute Force Monitor \
-  bc,Blockcracking \
-  directadmin,DirectAdmin \
-  dkim,DKIM \
-  esf,Easy Spam Fighter \
-  exim,Exim \
-  ioncube,Ioncube \
-  ipfw,IPFW Firewall setup \
-  libspf2,libspf \
-  mariadb,MariaDB \
-  mysql,MySQL \
-  nginx,Nginx \
-  php,PHP \
-  pma,phpMyAdmin \
-  proftpd,ProFTPd \
-  pureftpd,PureFTPd \
-  roundcube,RoundCube \
-  spamassassin,SpamAssassin \
-  suhosin,Suhosin \
-  webalizer,Webalizer \
-  "
-
   printf "Available packages to install:\n"
+  {
+    echo "apache:Apache 2.4"
+    echo "awstats:Awstats"
+    echo "bfm:Brute Force Monitor"
+    echo "bc:Blockcracking"
+    echo "directadmin:DirectAdmin"
+    echo "dkim:DKIM"
+    echo "esf:Easy Spam Fighter"
+    echo "exim:Exim"
+    echo "ioncube:Ioncube"
+    echo "ipfw:IPFW Firewall setup"
+    echo "libspf2:libspf"
+    echo "mariadb:MariaDB"
+    echo "mysql:MySQL"
+    echo "nginx:Nginx"
+    echo "php:PHP"
+    echo "pma:phpMyAdmin"
+    echo "proftpd:ProFTPd"
+    echo "pureftpd:PureFTPd"
+    echo "roundcube:RoundCube"
+    echo "spamassassin:SpamAssassin"
+    echo "suhosin:Suhosin"
+    echo "webalizer,Webalizer"
+  } | column -t -s:
 
-  # for file in ${available_packages}; do
-  #   printf "%s\n" "${file}"
-  # done | column -t -s,
 
   # echo "Available packages to install:"
   # echo "apache Apache 2.4"
@@ -5643,7 +5622,7 @@ show_versions() {
 
 ################################################################
 
-## Show outdated versions of packages
+## Show outdated versions of (select) packages
 show_outdated() {
   printf "List of installed packages that are out of date:\n"
   ( printf "Package Outdated\n" ; pkg version -l '<' -x '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
