@@ -53,7 +53,7 @@
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160316
+PB_BUILD_DATE=20160323
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -984,7 +984,7 @@ global_setup() {
   if [ "${OPT_FTPD}" != "NO" ]; then ( printf ", %s" "${OPT_FTPD}" ); fi
   printf "\n"
 
-  printf "The following features will be enabled: \n"
+  printf "The following features will be enabled: \n  "
   if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then ( printf "Exim w/ClamAV" ); fi
   if [ "${OPT_BLOCKCRACKING}" = "YES" ]; then ( printf ", BlockCracking" ); fi
   if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ]; then ( printf ", Easy Spam Fighter" ); fi
@@ -1681,6 +1681,10 @@ freebsd_set_newsyslog() {
   NSL_L=$1
   NSL_V=$2
 
+  if [ ! -e ${NEWSYSLOG_FILE} ]; then
+    touch ${NEWSYSLOG_FILE}
+  fi
+
   if [ ! ${NEWSYSLOG_DAYS} -gt 0 ]; then
     NEWSYSLOG_DAYS=10
   fi
@@ -1858,16 +1862,15 @@ exim_install() {
     #hoststat       /usr/libexec/sendmail/sendmail
     #purgestat      /usr/libexec/sendmail/sendmail
 
-    fi
+  fi
 
-    {
-      printf "%s\t%s\n" "sendmail" "/usr/local/sbin/exim"
-      printf "%s\t%s\n" "send-mail" "/usr/local/sbin/exim"
-      printf "%s\t%s\n" "mailq" "/usr/local/sbin/exim -bp"
-      printf "%s\t%s\n" "newaliases" "/usr/bin/true"
-      printf "%s\t%s\n" "rmail" "/usr/local/sbin/exim -i -oee"
-    } > /etc/mail/mailer.conf
-
+  {
+    printf "%s\t%s\n" "sendmail" "/usr/local/sbin/exim"
+    printf "%s\t%s\n" "send-mail" "/usr/local/sbin/exim"
+    printf "%s\t%s\n" "mailq" "/usr/local/sbin/exim -bp"
+    printf "%s\t%s\n" "newaliases" "/usr/bin/true"
+    printf "%s\t%s\n" "rmail" "/usr/local/sbin/exim -i -oee"
+  } > /etc/mail/mailer.conf
 
 }
 
@@ -1889,7 +1892,7 @@ spamassassin_install() {
   sysrc spamd_flags="-c -m 15"
 
   ## Start SpamAssassin
-  ${SERVICE} spamd start
+  ${SERVICE} sa-spamd start
 
   ## Update rules via 'sa-update' (or using sa-utils):
   # sa-update
@@ -1913,7 +1916,7 @@ spamassassin_utilities_install() {
   # sysrc spamd_flags="-c -m 15"
 
   ## Start SpamAssassin
-  # ${SERVICE} spamd start
+  # ${SERVICE} sa-spamd start
 
   ## Update rules via 'sa-update' (or using sa-utils):
   # sa-update
@@ -1932,7 +1935,7 @@ blockcracking_install() {
 
     echo "Downloading BlockCracking"
 
-    ${WGET} -O ${PB_PATH}/files/exim.blockcracking.tar.gz ${PB_MIRROR}/files/exim.blockcracking.tar.gz
+    ${WGET} -O "${PB_PATH}/files/exim.blockcracking.tar.gz" "${PB_MIRROR}/files/exim.blockcracking.tar.gz"
 
     ## used to include: -${BLOCKCRACKING_VER}
 
@@ -2481,9 +2484,7 @@ sql_post_install() {
 
   echo "Restarting ${OPT_SQL_DB}"
   ${SERVICE} mysql-server restart
-
 }
-
 
 ################################################################################################################################
 
@@ -2529,7 +2530,7 @@ php_install() {
 
   if [ "${PHP_MAKE_SET}" = "" ] && [ "${PHP_MAKE_UNSET}" = "" ] ; then
     case ${OPT_PHP1_MODE} in
-      fpm) pkgi ${PORT_PHP} ${PHP_EXT_LIST}
+      fpm) pkgi ${PORT_PHP} "${PHP_EXT_LIST}"
         ;;
     esac
   else
@@ -3138,7 +3139,7 @@ proftpd_install() {
     pkgi ${PORT_PROFTPD_CLAMAV}
 
     ## Verify:
-    if ! grep -m1 -q '^Include ${PROFTPD_CLAMAV_CONF}' /usr/local/etc/proftpd.conf; then
+    if ! grep -m1 -q "^Include ${PROFTPD_CLAMAV_CONF}" /usr/local/etc/proftpd.conf; then
       perl -pi -e 's#</Global>#</Global>\n\nInclude ${PROFTPD_CLAMAV_CONF}#' /usr/local/etc/proftpd.conf
     fi
 
@@ -3211,8 +3212,8 @@ clamav_install() {
 
   ## Verify:
   if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then
-    ${WGET} -O /usr/local/etc/exim/exim.clamav.load.conf ${PB_MIRROR}/exim/exim.clamav.load.conf
-    ${WGET} -O /usr/local/etc/exim/exim.clamav.conf ${PB_MIRROR}/exim/exim.clamav.conf
+    ${WGET} -O /usr/local/etc/exim/exim.clamav.load.conf "${PB_MIRROR}/exim/exim.clamav.load.conf"
+    ${WGET} -O /usr/local/etc/exim/exim.clamav.conf "${PB_MIRROR}/exim/exim.clamav.conf"
   fi
 
   ## Verify:
@@ -3740,7 +3741,7 @@ verify_webapps_php_ini() {
   ## Copy custom/ file (not implemented)
   if [ -e "${PHP_CUSTOM_PHP_CONF_D_INI_PATH}/50-webapps.ini" ]; then
     echo "Using custom ${PHP_CUSTOM_PHP_CONF_D_INI_PATH}/50-webapps.ini for ${PHP_INI_WEBAPPS}"
-    cp -f "${PHP_CUSTOM_PHP_CONF_D_INI_PATH}/50-webapps.ini" ${PHP_INI_WEBAPPS}
+    cp -f "${PHP_CUSTOM_PHP_CONF_D_INI_PATH}/50-webapps.ini" "${PHP_INI_WEBAPPS}"
   else
     {
       echo "[PATH=${WWW_DIR}]"
@@ -3959,10 +3960,10 @@ add_nginx_alias() {
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
     {
       printf "\tlocation /%s {\n" "${A}"
-      printf "\t\troot /usr/local/www/;\n"
+      printf "\t\troot %s;\n" "${WWW_DIR}"
       printf "\t\tindex index.php index.html index.htm;\n"
       printf "\t\tlocation ~ ^/%s/(.+\.php)\$ {\n" "${A}"
-      printf "\t\t\tinclude ${NGINX_PATH}/webapps_settings.conf;\n"
+      printf "\t\t\tinclude %s/webapps_settings.conf;\n" "${NGINX_PATH}"
       printf "\t\t}\n"
       printf "\t\tlocation ~* ^/%s/(.+\\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))\$ {\n" "${A}"
       printf "\t\t\troot /usr/local/www/;\n"
@@ -3972,7 +3973,7 @@ add_nginx_alias() {
   elif [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     {
       printf "\tlocation /%s {\n" "${A}"
-      printf "\t\troot /usr/local/www/;\n"
+      printf "\t\troot %s/;\n" "${WWW_DIR}"
       printf "\t\tindex index.php index.html index.htm;\n"
       printf "\t\tlocation ~ ^/%s/ {\n" "${A}"
       printf "\t\t\taccess_log off;\n"
@@ -3986,7 +3987,7 @@ add_nginx_alias() {
       printf "\t\t}\n"
       printf "\t\tlocation ~ ^/%s/nginx_static_files/ {\n" "${A}"
       printf "\t\t\taccess_log  /var/log/nginx/access_log_proxy;\n"
-      printf "\t\t\talias       /usr/local/www/;\n"
+      printf "\t\t\talias       %s/;\n" "${WWW_DIR}"
       printf "\t\t\tinternal;\n"
       printf "\t\t}\n"
       printf "\t}\n"
@@ -4093,7 +4094,6 @@ do_rewrite_nginx_webapps() {
   fi
 }
 
-
 ################################################################################################################################
 
 ## Verify: Todo:
@@ -4173,14 +4173,14 @@ rewrite_confs() {
     if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE_FILE})" -eq "0" ]; then
       echo "apache_ver=2.0" >> ${DA_CONF_TEMPLATE_FILE}
     elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_TEMPLATE_FILE})" -ne "0" ]; then
-      ${PERL} -pi -e 's/`grep apache_ver= ${DA_CONF_TEMPLATE_FILE}`/apache_ver=2.0/' ${DA_CONF_TEMPLATE_FILE}
+      ${PERL} -pi -e "s/`grep apache_ver= ${DA_CONF_TEMPLATE_FILE}`/apache_ver=2.0/" ${DA_CONF_TEMPLATE_FILE}
     fi
 
     if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_FILE})" -eq "0" ]; then
       echo "apache_ver=2.0" >> ${DA_CONF_FILE}
       echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
     elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_FILE})" -ne "0" ]; then
-      ${PERL} -pi -e 's/`grep apache_ver= ${DA_CONF_FILE}`/apache_ver=2.0/' ${DA_CONF_FILE}
+      ${PERL} -pi -e "s/`grep apache_ver= ${DA_CONF_FILE}`/apache_ver=2.0/" ${DA_CONF_FILE}
       echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
     fi
 
@@ -4361,7 +4361,7 @@ rewrite_confs() {
   ## Todo: Nginx:
   if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     # Copy the new configs
-    cp -rf ${NGINXCONFDIR}/* "${NGINX_CONF}"
+    cp -rf "${NGINXCONFDIR}/*" "${NGINX_CONF}"
 
     for php_shortrelease in $(echo ${OPT_PHP1_VERSION_SET}); do
       ${PERL} -pi -e "s|/usr/local/php${php_shortrelease}/sockets/webapps.sock|/usr/local/php${OPT_PHP1_VERSION}/sockets/webapps.sock|" ${NGINXCONF}/nginx.conf
@@ -4426,9 +4426,9 @@ rewrite_confs() {
 
     # Disable UserDir access if userdir_access=no is set in the options.conf file
     if [ "${OPT_USERDIR_ACCESS}" = "no" ]; then
-      ${PERL} -pi -e 's| include ${NGINX_PATH}/nginx-userdir.conf;| #include ${NGINX_PATH}/nginx-userdir.conf;|' "${NGINXCONF}/nginx-vhosts.conf"
+      ${PERL} -pi -e "s| include ${NGINX_PATH}/nginx-userdir.conf;| #include ${NGINX_PATH}/nginx-userdir.conf;|" "${NGINXCONF}/nginx-vhosts.conf"
     else
-      ${PERL} -pi -e 's| #include ${NGINX_PATH}/nginx-userdir.conf;| include ${NGINX_PATH}/nginx-userdir.conf;|' "${NGINXCONF}/nginx-vhosts.conf"
+      ${PERL} -pi -e "s| #include ${NGINX_PATH}/nginx-userdir.conf;| include ${NGINX_PATH}/nginx-userdir.conf;|" "${NGINXCONF}/nginx-vhosts.conf"
     fi
 
     doPhpConf
@@ -4497,7 +4497,6 @@ rewrite_vhosts() {
     done
   fi
 }
-
 
 ################################################################################################################################
 
@@ -4797,13 +4796,13 @@ rewrite_php_confs() {
     ## PB: ${SERVICE} "php-fpm${OPT_PHP1_VERSION}" restart
     ${SERVICE} php-fpm restart
     set_service php-fpm${OPT_PHP1_VERSION} ON
-    eval $(echo "HAVE_FPM${OPT_PHP1_VERSION}=yes")
+    eval $(echo "HAVE_FPM${OPT_PHP1_VERSION}=YES")
   fi
 
   if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
      ${INITDDIR}/php-fpm${OPT_PHP2_VERSION} restart
      # set_service php-fpm${OPT_PHP2_VERSION} ON
-    # eval `echo "HAVE_FPM${OPT_PHP2_VERSION}=yes"`
+    # eval `echo "HAVE_FPM${OPT_PHP2_VERSION}=YES"`
   fi
 
   for php_shortrelease in $(echo ${OPT_PHP1_VERSION_SET}); do
@@ -4980,7 +4979,7 @@ validate_options() {
         *) echo "*** Error: Invalid PHP ini Type set in options.conf"; exit ;;
       esac
       ;;
-    "no"|"none")
+    "no"|"NO"|"none")
       OPT_PHP1_VERSION="NO"
       OPT_PHP1_MODE="NO"
       HAVE_FPM_CGI="NO"
@@ -5035,27 +5034,27 @@ validate_options() {
   esac
 
   ## Verify: Copied from CB2:
-  if [ "${OPT_FTPD}" = "pureftpd" ]; then
-    if [ -s "${DA_CONF_FILE}" ]; then
-      UNIFIED_FTP=$(${DA_BIN} c | grep -m1 unified_ftp_password_file | cut -d= -f2)
-      if [ "$UNIFIED_FTP" != "1" ]; then
-        echo "unified_ftp_password_file is not set to 1. You must convert before you can use PureFTPD."
-        echo "Please read this guide: http://www.directadmin.com/features.php?id=1134"
-        echo ""
-        echo "Simulation:"
-        echo "     cd /usr/local/directadmin"
-        echo "     echo 'action=convert&value=unifiedftp&simulate=yes' >> data/task.queue"
-        echo "     ./dataskq d1"
-        echo ""
-        echo "Conversion:"
-        echo "     cd /usr/local/directadmin"
-        echo "     echo 'unified_ftp_password_file=1' >> conf/directadmin.conf"
-        echo "     echo 'action=convert&value=unifiedftp' >> data/task.queue"
-        echo "     ./dataskq d1"
-        exit 1
-      fi
-    fi
-  fi
+  # if [ "${OPT_FTPD}" = "pureftpd" ]; then
+  #   if [ -s "${DA_CONF_FILE}" ]; then
+  #     UNIFIED_FTP="$(${DA_BIN} c | grep -m1 unified_ftp_password_file | cut -d= -f2)"
+  #     if [ "${UNIFIED_FTP}" != "1" ]; then
+  #       echo "unified_ftp_password_file is not set to 1. You must convert before you can use PureFTPD."
+  #       echo "Please read this guide: http://www.directadmin.com/features.php?id=1134"
+  #       echo ""
+  #       echo "Simulation:"
+  #       echo "     cd /usr/local/directadmin"
+  #       echo "     echo 'action=convert&value=unifiedftp&simulate=yes' >> data/task.queue"
+  #       echo "     ./dataskq d1"
+  #       echo ""
+  #       echo "Conversion:"
+  #       echo "     cd /usr/local/directadmin"
+  #       echo "     echo 'unified_ftp_password_file=1' >> conf/directadmin.conf"
+  #       echo "     echo 'action=convert&value=unifiedftp' >> data/task.queue"
+  #       echo "     ./dataskq d1"
+  #       exit 1
+  #     fi
+  #   fi
+  # fi
 
   case "$(uc ${EXIM})" in
     "YES"|"NO") OPT_EXIM="${EXIM}" ;;
@@ -5448,7 +5447,7 @@ show_debug() {
   show_version
   # printf "PortsBuild Version/Build: %s / %s\n" ${PB_VER} ${PB_BUILD_DATE}
   printf "===[OS]========================\n"
-  printf "Detected: %s\n" "${OS} ${OS_VER} $MACHTYPE"
+  printf "Detected: %s\n" "${OS} ${OS_VER} ${MACHTYPE}"
   printf "Actual: %s\n" "$(uname -v)"
   printf "===[SSL]=======================\n"
   printf "OpenSSL binary path: %s\n" ${OPENSSL_BIN}
@@ -5533,7 +5532,7 @@ show_install() {
     echo "roundcube:RoundCube"
     echo "spamassassin:SpamAssassin"
     echo "suhosin:Suhosin"
-    echo "webalizer,Webalizer"
+    echo "webalizer:Webalizer"
   } | column -t -s:
 
 
