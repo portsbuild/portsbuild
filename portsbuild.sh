@@ -1123,6 +1123,9 @@ global_setup() {
 
     ${SERVICE} sshd start
 
+    ## Go for the main attraction (need setup.txt)
+    directadmin_install
+
     ## Install and configure services & applications
     if [ "${OPT_NAMED}" = "YES" ]; then ( bind_setup ); fi
     if [ "${OPT_EXIM}" = "YES" ]; then ( exim_install); fi
@@ -1138,9 +1141,6 @@ global_setup() {
     if [ "${OPT_FTPD}" != "NO" ]; then ( install_app "${OPT_FTPD}" ); fi
     if [ "${OPT_BLOCKCRACKING}" = "YES" ]; then ( blockcracking_install ); fi
     if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ]; then ( easyspamfighter_install ); fi
-
-    ## Go for the main attraction
-    directadmin_install
 
     ## Create a spoof CustomBuild2 options.conf for DirectAdmin compatibility.
     if [ ! -d "${CB_PATH}" ]; then
@@ -1427,21 +1427,22 @@ directadmin_install() {
   ## PB: Update addip and startips scripts with improved versions
   if [ ! -e ${DA_PATH}/scripts/custom/addip ]; then
     if [ -e "${PB_PATH}/directadmin/scripts/custom/addip" ]; then
-      cp "${PB_PATH}/directadmin/scripts/custom/addip" ${DA_PATH}/scripts/custom/addip
+      cp "${PB_PATH}/directadmin/scripts/custom/addip" "${DA_PATH}/scripts/custom/addip"
     else
+      ## Todo:
       echo "Downloading missing file"
       ## download file
     fi
   fi
 
-  echo "addip=${DA_PATH}/scripts/custom/addip" >> "${DA_CONF_FILE}"
-  echo "addip=${DA_PATH}/scripts/custom/addip" >> "${DA_CONF_TEMPLATE_FILE}"
+  setVal addip "${DA_PATH}/scripts/custom/addip" "${DA_CONF_FILE}"
+  setVal addip "${DA_PATH}/scripts/custom/addip" "${DA_CONF_TEMPLATE_FILE}"
 
   ## The following lines were in DA's install/setup do_checks():
   ## Check for a separate /home partition (for quota support)
   HOME_YES=$(grep -c /home < /etc/fstab)
   if [ "$HOME_YES" -lt "1" ]; then
-    echo "quota_partition=/" >> ${DA_CONF_TEMPLATE_FILE}
+    setVal quota_partition "/" "${DA_CONF_TEMPLATE_FILE}"
   fi
 
   ## Detect the ethernet interfaces that are available on the system (or use the one supplied by the user)
@@ -1451,7 +1452,7 @@ directadmin_install() {
     if [ "$ETH_DEV" != "" ]; then
       COUNT=$(grep -c ethernet_dev < $DA_CONF_TEMPLATE_FILE)
       if [ "$COUNT" -eq 0 ]; then
-        echo "ethernet_dev=${ETH_DEV}" >> ${DA_CONF_TEMPLATE_FILE}
+        setVal ethernet_dev "${ETH_DEV}" "${DA_CONF_TEMPLATE_FILE}"
       fi
     fi
   fi
@@ -1681,8 +1682,9 @@ freebsd_set_newsyslog() {
   NSL_L=$1
   NSL_V=$2
 
-  if [ ! -e ${NEWSYSLOG_FILE} ]; then
-    touch ${NEWSYSLOG_FILE}
+  if [ ! -e "${NEWSYSLOG_FILE}" ]; then
+    mkdir -p /usr/local/etc/newsyslog.d
+    touch "${NEWSYSLOG_FILE}"
   fi
 
   if [ ! ${NEWSYSLOG_DAYS} -gt 0 ]; then
@@ -1743,6 +1745,8 @@ exim_install() {
     return
   fi
 
+  echo "Starting Exim installation"
+
   ### Main Installation (verify: exim_user/exim_group arguments)
   if [ "${EXIM_MAKE_SET}" = "" ] && [ "${EXIM_MAKE_UNSET}" = "" ] ; then
     pkgi ${PORT_EXIM}
@@ -1786,12 +1790,13 @@ exim_install() {
     whitelist_hosts_ip \
     whitelist_senders \
     skip_av_domains \
-    skip_rbl_domains \
-  "
+    skip_rbl_domains"
 
   ## Verify: IFS= modified
   for file in ${virtual_files}; do
-    touch "${VIRTUAL_PATH}/${file}"
+    if [ ! -e "${VIRTUAL_PATH}/${file}" ]; then
+      touch "${VIRTUAL_PATH}/${file}"
+    fi
     chmod 600 "${VIRTUAL_PATH}/${file}"
   done
 
@@ -1807,23 +1812,28 @@ exim_install() {
   chown -R ${EXIM_USER}:${EXIM_GROUP} /var/spool/exim
 
   ## Symlink for compat:
-  ln -s ${EXIM_CONF} /etc/exim.conf
+  if [ ! -e /etc/exim.conf ]; then
+    ln -s ${EXIM_CONF} /etc/exim.conf
+  fi
 
   ## Generate Self-Signed SSL Certificates
   ## See: http://help.directadmin.com/item.php?id=245
   ${OPENSSL_BIN} req -x509 -newkey rsa:2048 -keyout ${EXIM_SSL_KEY} -out ${EXIM_SSL_CRT} -days 9000 -nodes "${OPENSSL_EXTRA}"
 
-  ## Symlink for DA compat:
-  ln -s ${EXIM_SSL_KEY} /etc/exim.key
-  ln -s ${EXIM_SSL_CRT} /etc/exim.cert
+  ## Symlink Exim SSL key and cert for DA compat:
+  if [ -e ${EXIM_SSL_KEY} ]; then
+    ln -s ${EXIM_SSL_KEY} /etc/exim.key
+    chown ${EXIM_USER}:${EXIM_GROUP} ${EXIM_SSL_KEY}
+    chmod 644 ${EXIM_SSL_KEY}
+  fi
 
-  ## Set permissions:
-  chown ${EXIM_USER}:${EXIM_GROUP} ${EXIM_SSL_KEY}
-  chmod 644 ${EXIM_SSL_KEY}
-  chmod 644 ${EXIM_SSL_CRT}
+  if [ -e ${EXIM_SSL_CRT} ]; then
+    ln -s ${EXIM_SSL_CRT} /etc/exim.cert
+    chmod 644 ${EXIM_SSL_CRT}
+  fi
 
   ## Reference: Verify Exim config:
-  ${EXIM_BIN} -C ${EXIM_CONF} -bV
+  ${EXIM_BIN} -C "${EXIM_CONF}" -bV
 
   ## Update /etc/rc.conf
   echo "Enabling Exim startup (updating /etc/rc.conf)"
@@ -1852,7 +1862,6 @@ exim_install() {
 
     # cp "${PB_PATH}/configure/etc/mailer.93.conf" /etc/mail/mailer.conf
     # cp "${PB_PATH}/configure/etc/mailer.100.conf" /etc/mail/mailer.conf
-
   # else
     ## Update /etc/mail/mailer.conf:
     #sendmail       /usr/libexec/sendmail/sendmail
@@ -1861,15 +1870,14 @@ exim_install() {
     #newaliases     /usr/libexec/sendmail/sendmail
     #hoststat       /usr/libexec/sendmail/sendmail
     #purgestat      /usr/libexec/sendmail/sendmail
-
   fi
 
   {
     printf "%s\t%s\n" "sendmail" "/usr/local/sbin/exim"
     printf "%s\t%s\n" "send-mail" "/usr/local/sbin/exim"
-    printf "%s\t%s\n" "mailq" "/usr/local/sbin/exim -bp"
+    printf "%s\t\t%s\n" "mailq" "/usr/local/sbin/exim -bp"
     printf "%s\t%s\n" "newaliases" "/usr/bin/true"
-    printf "%s\t%s\n" "rmail" "/usr/local/sbin/exim -i -oee"
+    printf "%s\t\t%s\n" "rmail" "/usr/local/sbin/exim -i -oee"
   } > /etc/mail/mailer.conf
 
 }
@@ -1878,6 +1886,19 @@ exim_install() {
 
 ## SpamAssassin Installation Tasks
 spamassassin_install() {
+
+  echo "Installing SpamAssassin optional modules"
+
+  pkgi security/p5-Digest-SHA1
+  pkgi net/p5-Geo-IP
+  pkgi net/p5-Net-CIDR-Lite
+  pkgi mail/razor-agents
+  pkgi net/p5-IO-Socket-INET6
+  pkgi www/p5-LWP-UserAgent-WithCache
+  # pkgi www/p5-LWP-UserAgent-Determined
+  pkgi net/p5-Net-Patricia
+
+  echo "Starting SpamAssassin installation"
 
   ### Main Installation
   if [ "${SPAMASSASSIN_MAKE_SET}" = "" ] && [ "${SPAMASSASSIN_MAKE_UNSET}" = "" ] ; then
@@ -1902,6 +1923,8 @@ spamassassin_install() {
 
 ## SpamAssassin Utilities Installation Tasks
 spamassassin_utilities_install() {
+
+  echo "Starting SpamAssassin Utilities installation"
 
   ### Main Installation
   if [ "${SPAMASSASSIN_UTILITIES_MAKE_SET}" = "" ] && [ "${SPAMASSASSIN_UTILITIES_MAKE_UNSET}" = "" ] ; then
@@ -2045,6 +2068,8 @@ easyspamfighter_install() {
 ## Dovecot2 Installation Tasks
 dovecot_install() {
 
+  echo "Starting Dovecot installation"
+
   ### Main Installation
   if [ "${DOVECOT2_MAKE_SET}" = "" ] && [ "${DOVECOT2_MAKE_UNSET}" = "" ] ; then
     pkgi ${PORT_DOVECOT2}
@@ -2121,7 +2146,7 @@ dovecot_install() {
     echo "mail_plugins = \$mail_plugins quota" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
   fi
 
-  if [ -e ${DOVECOT_PATH}/conf/lmtp.conf ]; then
+  if [ -e "${DOVECOT_PATH}/conf/lmtp.conf" ]; then
     ${PERL} -pi -e "s|HOSTNAME|$(hostname)|" ${DOVECOT_PATH}/conf/lmtp.conf
   fi
 
@@ -2129,7 +2154,6 @@ dovecot_install() {
   chown root:wheel /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
   chmod 600 /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
 
-  #${PERL} -pi -e 's#transport = dovecot_lmtp_udp#transport = virtual_localdelivery#' ${EXIM_CONF}
   ${PERL} -pi -e 's/driver = shadow/driver = passwd/' ${DOVECOT_CONF}
   ${PERL} -pi -e 's/passdb shadow/passdb passwd/' ${DOVECOT_CONF}
 
@@ -2173,8 +2197,6 @@ dovecot_install() {
   echo "ssl_protocols = !SSLv2 !SSLv3" >> "${DOVECOT_PATH}/conf/ssl.conf"
   echo "ssl_cipher_list = ALL:!ADH:RC4+RSA:+HIGH:+MEDIUM:-LOW:-SSLv2:-EXP" >> "${DOVECOT_PATH}/conf/ssl.conf"
 
-  verify_dovecot_logrotate
-
   freebsd_set_newsyslog /var/log/dovecot-lmtp-errors.log root:wheel
   freebsd_set_newsyslog /var/log/dovecot-lmtp.log root:wheel
 
@@ -2205,6 +2227,8 @@ webalizer_install() {
     echo "***"
     return
   fi
+
+  echo "Starting Webalizer installation"
 
   ### Main Installation
   if [ "${WEBALIZER_MAKE_SET}" = "" ] && [ "${WEBALIZER_MAKE_UNSET}" = "" ] ; then
@@ -2240,6 +2264,8 @@ awstats_install() {
     echo "***"
     return
   fi
+
+  echo "Starting AwStats installation"
 
   ### Main Installation
   if [ "${AWSTATS_MAKE_SET}" = "" ] && [ "${AWSTATS_MAKE_UNSET}" = "" ] ; then
@@ -2368,6 +2394,8 @@ sql_post_install() {
     echo "Aborting post-installation tasks."
     exit 1
   fi
+
+  echo "Starting SQL database post-installation tasks"
 
   ## Todo: Check for mysql.conf values
   # if [ "$MYSQL_USER" = "" ] || [ "$MYSQL_PASSWORD" = "" ]; then
@@ -2528,6 +2556,8 @@ php_install() {
     *) ;;
   esac
 
+  echo "Starting PHP installation"
+
   if [ "${PHP_MAKE_SET}" = "" ] && [ "${PHP_MAKE_UNSET}" = "" ] ; then
     case ${OPT_PHP1_MODE} in
       fpm) pkgi ${PORT_PHP} "${PHP_EXT_LIST}"
@@ -2557,7 +2587,7 @@ php_install() {
   # make -DNO_DIALOG -C "${PORT_PHP_EXT}" reinstall clean
 
   ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
-  cp -f "${PB_PATH}/configure/fpm/conf/php-fpm.conf.${OPT_PHP1_VERSION}" /usr/local/etc/php-fpm.conf
+  cp -f "${PB_PATH}/configure/fpm/php-fpm.conf.${OPT_PHP1_VERSION}" /usr/local/etc/php-fpm.conf
 
   if [ "${OPT_PHP_INI_TYPE}" = "production" ]; then
     cp -f /usr/local/etc/php.ini-production /usr/local/etc/php.ini
@@ -2681,6 +2711,8 @@ phpmyadmin_install() {
     return
   fi
 
+  echo "Starting phpMyAdmin installation"
+
   ### Main Installation
   if [ "${PMA_MAKE_SET}" = "" ] && [ "${PMA_MAKE_UNSET}" = "" ] ; then
     pkgi ${PORT_PHPMYADMIN}
@@ -2708,7 +2740,6 @@ phpmyadmin_install() {
   #REALPATH=${WWW_DIR}/phpMyAdmin
   PMA_ALIAS_PATH="${WWW_DIR}/phpmyadmin"
 
-
   ## Scripted reference:
 
   ## If custom config exists:
@@ -2724,7 +2755,7 @@ phpmyadmin_install() {
   fi
 
   ## Copy sample config:
-  cp ${PMA_PATH}/config.sample.inc.php ${PMA_CONFIG}
+  cp "${PMA_PATH}/config.sample.inc.php" ${PMA_CONFIG}
 
   ## Update phpMyAdmin configuration file:
   ${PERL} -pi -e "s#\['host'\] = 'localhost'#\['host'\] = 'localhost'#" ${PMA_CONFIG}
@@ -2758,13 +2789,13 @@ phpmyadmin_install() {
 
   ## Verify:
   ## Disable/lockdown scripts directory (this might not even exist):
-  if [ -d ${PMA_PATH}/scripts ]; then
-    chmod 000 ${PMA_PATH}/scripts
+  if [ -d "${PMA_PATH}/scripts" ]; then
+    chmod 000 "${PMA_PATH}/scripts"
   fi
 
   ## Disable/lockdown setup directory (done):
-  if [ -d ${PMA_PATH}/setup ]; then
-    chmod 000 ${PMA_PATH}/setup
+  if [ -d "${PMA_PATH}/setup" ]; then
+    chmod 000 "${PMA_PATH}/setup"
   fi
 
   ## Auth log patch for BFM compat (not done):
@@ -2798,6 +2829,8 @@ apache_install() {
     return
   fi
 
+  echo "Starting Apache installation"
+
   ### Main Installation
   if [ "${APACHE24_MAKE_SET}" = "" ] && [ "${APACHE24_MAKE_UNSET}" = "" ] ; then
     pkgi ${PORT_APACHE24}
@@ -2813,7 +2846,7 @@ apache_install() {
 
   ## Symlink for backwards compatibility:
   ## 2016-03-05: no longer needed?
-  mkdir -p /etc/httpd/conf
+  mkdir -p /etc/httpd
   ln -s ${APACHE_PATH} /etc/httpd/conf
 
   ## CustomBuild2 looking for Apache modules in ${APACHE_LIB_PATH}*
@@ -2856,12 +2889,24 @@ apache_install() {
   ln -s ${APACHE_SSL_CA} ${APACHE_PATH}/ssl.crt/server.ca
 
   ## Symlink for DA compat:
-  ln -s /usr/local/sbin/httpd /usr/sbin/httpd
+  if [ ! -e /usr/sbin/httpd ]; then
+    ln -s /usr/local/sbin/httpd /usr/sbin/httpd
+  fi
+
+  ## PB: Verify:
+  ## Copy over configuration files to conf/:
+  if [ -d "${PB_PATH}/configure/ap2/conf/" ]; then
+    cp -rf "${PB_PATH}/configure/ap2/conf/" ${APACHE_PATH}/
+    cp -f "${PB_PATH}/configure/ap2/conf/httpd.conf" ${APACHE_PATH}/
+    cp -f "${PB_PATH}/configure/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRA_PATH}/httpd-mpm.conf
+  fi
 
   ## Copy over modified (custom) configuration files to conf/:
-  cp -rf "${PB_PATH}/custom/ap2/conf/" ${APACHE_PATH}/
-  cp -f "${PB_PATH}/custom/ap2/conf/httpd.conf" ${APACHE_PATH}/
-  cp -f "${PB_PATH}/custom/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRA_PATH}/httpd-mpm.conf
+  if [ -d "${PB_PATH}/custom/ap2/conf/" ]; then
+    cp -rf "${PB_PATH}/custom/ap2/conf/" ${APACHE_PATH}/
+    cp -f "${PB_PATH}/custom/ap2/conf/httpd.conf" ${APACHE_PATH}/
+    cp -f "${PB_PATH}/custom/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRA_PATH}/httpd-mpm.conf
+  fi
 
   ## This is already done (Apache default):
   ${PERL} -pi -e 's/^DefaultType/#DefaultType/' ${APACHE_PATH}/httpd.conf
@@ -2922,6 +2967,8 @@ nginx_install() {
     echo "***"
     return
   fi
+
+  echo "Starting Nginx installation"
 
   ### Main Installation
   if [ "${NGINX_MAKE_SET}" = "" ] && [ "${NGINX_MAKE_UNSET}" = "" ] ; then
@@ -2996,6 +3043,9 @@ majordomo_install() {
     return
   fi
 
+  echo "Starting Majordomo installation"
+
+
   ## Verify: majordomo.sh script
   ./scripts/majordomo.sh
 
@@ -3018,6 +3068,8 @@ pureftpd_install() {
     echo "*** Error: PureFTPD not set in options.conf"
     return
   fi
+
+  echo "Starting PureFTPD installation"
 
   ### Main Installation
   if [ "${PUREFTPD_MAKE_SET}" = "" ] && [ "${PUREFTPD_MAKE_UNSET}" = "" ] ; then
@@ -3104,6 +3156,8 @@ proftpd_install() {
     echo "*** Error: ProFTPD not set in options.conf"
     return
   fi
+
+  echo "Starting ProFTPD installation"
 
   ### Main Installation
   if [ "${PROFTPD_MAKE_SET}" = "" ] && [ "${PROFTPD_MAKE_UNSET}" = "" ] ; then
@@ -3202,6 +3256,8 @@ clamav_install() {
     return
   fi
 
+  echo "Starting ClamAV installation"
+
   ### Main Installation
   if [ "${CLAMAV_MAKE_SET}" = "" ] && [ "${CLAMAV_MAKE_UNSET}" = "" ] ; then
     pkgi ${PORT_CLAMAV}
@@ -3288,6 +3344,8 @@ roundcube_install() {
     return
   fi
 
+  echo "Starting RoundCube installation"
+
   ### Main Installation
   if [ "${ROUNDCUBE_MAKE_SET}" = "" ] && [ "${ROUNDCUBE_MAKE_UNSET}" = "" ] ; then
     pkgi ${PORT_ROUNDCUBE}
@@ -3304,7 +3362,7 @@ roundcube_install() {
   # _PATH = path to RC
 
   ## PB: Verify:
-  ## CB2: verify_webapps_logrotate
+  verify_webapps_logrotate
 
   ## Fetch MySQL Settings from directadmin/conf/my.cnf
   get_sql_settings
@@ -3748,7 +3806,7 @@ verify_webapps_php_ini() {
       echo "session.save_path=${WWW_TMP_DIR}"
       echo "upload_tmp_dir=${WWW_TMP_DIR}"
       echo "disable_functions=exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname"
-    } >> "${PHP_INI_WEBAPPS}"
+    } > "${PHP_INI_WEBAPPS}"
   fi
 }
 
@@ -3857,6 +3915,8 @@ apache_rewrite_confs() {
       echo "</Directory>" >> ${APACHE_HOST_CONF}
     fi
   fi
+
+  return
 }
 
 ################################################################################################################################
@@ -4173,14 +4233,14 @@ rewrite_confs() {
     if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE_FILE})" -eq "0" ]; then
       echo "apache_ver=2.0" >> ${DA_CONF_TEMPLATE_FILE}
     elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_TEMPLATE_FILE})" -ne "0" ]; then
-      ${PERL} -pi -e "s/`grep apache_ver= ${DA_CONF_TEMPLATE_FILE}`/apache_ver=2.0/" ${DA_CONF_TEMPLATE_FILE}
+      ${PERL} -pi -e "s/$(grep apache_ver= ${DA_CONF_TEMPLATE_FILE})/apache_ver=2.0/" ${DA_CONF_TEMPLATE_FILE}
     fi
 
     if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_FILE})" -eq "0" ]; then
       echo "apache_ver=2.0" >> ${DA_CONF_FILE}
       echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
     elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_FILE})" -ne "0" ]; then
-      ${PERL} -pi -e "s/`grep apache_ver= ${DA_CONF_FILE}`/apache_ver=2.0/" ${DA_CONF_FILE}
+      ${PERL} -pi -e "s/$(grep apache_ver= ${DA_CONF_FILE})/apache_ver=2.0/" ${DA_CONF_FILE}
       echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
     fi
 
@@ -4364,7 +4424,7 @@ rewrite_confs() {
     cp -rf "${NGINXCONFDIR}/*" "${NGINX_CONF}"
 
     for php_shortrelease in $(echo ${OPT_PHP1_VERSION_SET}); do
-      ${PERL} -pi -e "s|/usr/local/php${php_shortrelease}/sockets/webapps.sock|/usr/local/php${OPT_PHP1_VERSION}/sockets/webapps.sock|" ${NGINXCONF}/nginx.conf
+      ${PERL} -pi -e "s|/usr/local/php${php_shortrelease}/sockets/webapps.sock|/usr/local/php${OPT_PHP1_VERSION}/sockets/webapps.sock|" "${NGINXCONF}/nginx.conf"
     done
 
     do_rewrite_nginx_webapps
@@ -4502,6 +4562,12 @@ rewrite_vhosts() {
 
 ## Suhosin Installation
 suhosin_install() {
+
+  if [ "${OPT_SUHOSIN}" != "YES" ]; then
+    echo "*** Error: Suhosin is not enabled in options.conf"
+  fi
+
+  echo "Starting Suhosin installation"
 
   ## Main Installation
   pkgi "${PORT_SUHOSIN}"
