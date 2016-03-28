@@ -1686,6 +1686,9 @@ basic_system_security() {
   printf "Setting security.bsd.see_other_gids to 0\n"
   sysrc -f /etc/sysctl.conf security.bsd.see_other_gids=0
 
+# setVal enforce_difficult_passwords 1 ${DA_CONF_TEMPLATE_FILE}
+# setVal enforce_difficult_passwords 1 ${DA_CONF_FILE}
+
   return
 }
 
@@ -3106,6 +3109,18 @@ apache_install() {
 
   ### Post-Installation Tasks
 
+  ## Hide frontpage
+  if [ -e ${DA_CONF_TEMPLATE_FILE} ] && [ "$(grep -m1 -c frontpage_on ${DA_CONF_TEMPLATE_FILE})" = "0" ]; then
+    echo "frontpage_on=0" >> ${DA_CONF_TEMPLATE_FILE}
+  fi
+
+  if [ -e ${DA_CONF_FILE} ] && [ "$(grep -m1 -c frontpage_on ${DA_CONF_FILE})" = "0" ]; then
+    echo "frontpage_on=0" >> ${DA_CONF_FILE}
+    if [ -e /usr/local/directadmin/data ]; then
+      echo "action=directadmin&value=reload" >> ${DA_TASK_QUEUE}
+    fi
+  fi
+
   ## Symlink for backwards compatibility:
   ## 2016-03-05: no longer needed?
   mkdir -p /etc/httpd
@@ -3255,10 +3270,14 @@ nginx_install() {
 
   ### Post-Installation Tasks
 
+
+  # setVal nginx 1 ${DA_CONF_FILE}
+  # setVal apache 0 ${DA_CONF_FILE}
+
   ## Update directadmin.conf with new paths
   setVal nginxconf ${NGINX_PATH}/directadmin-vhosts.conf ${DA_CONF_FILE}
-  setVal nginxlogdir /var/log/nginx/domains ${DA_CONF_FILE}
   setVal nginxips ${NGINX_PATH}/directadmin-ips.conf ${DA_CONF_FILE}
+  setVal nginxlogdir /var/log/nginx/domains ${DA_CONF_FILE}
   setVal nginx_pid /var/run/nginx.pid ${DA_CONF_FILE}
   setVal nginx_cert ${NGINX_PATH}/ssl/server.crt ${DA_CONF_FILE}
   setVal nginx_key ${NGINX_PATH}/ssl/server.key ${DA_CONF_FILE}
