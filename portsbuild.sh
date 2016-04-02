@@ -53,13 +53,13 @@
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160326
+PB_BUILD_DATE=20160402
 
 IFS="$(printf '\n\t')"
 LANG=C
 
 if [ "$(id -u)" != "0" ]; then
-  echo "*** Error: Must run this script as the root user."
+  printf "*** Error: Must run this script as the root user.\n"
   exit 1
 fi
 
@@ -75,23 +75,20 @@ OS_HOST=$(hostname)
 
 if [ "${OS}" = "FreeBSD" ]; then
   if [ "${OS_B64}" -eq 1 ]; then
-    if [ "${OS_VER}" = "10.1" ] || [ "${OS_VER}" = "10.2" ] || [ "${OS_VER}" = "10.3" ] || [ "${OS_VER}" = "9.3" ]; then
-      # echo "FreeBSD $OS_VER x64 operating system detected."
-      echo ""
-    else
-      echo "Warning: Unsupported FreeBSD operating system detected."
-      echo "PortsBuild has been tested to work with FreeBSD versions 9.3, 10.1 and 10.2 amd64 only."
-      echo "You can press CTRL+C within 5 seconds to quit the PortsBuild script now, or proceed at your own risk."
+    if [ "${OS_VER}" != "10.1" ] && [ "${OS_VER}" != "10.2" ] && [ "${OS_VER}" != "10.3" ] && [ "${OS_VER}" != "9.3" ]; then
+      printf "Warning: Unsupported FreeBSD operating system detected.\n"
+      printf "PortsBuild has been tested to work with FreeBSD versions 9.3, 10.1 and 10.2 amd64 only.\n"
+      printf "You can press CTRL+C within 5 seconds to quit the PortsBuild script now, or proceed at your own risk.\n"
       sleep 5
     fi
   else
-    echo "Error: i386 (x86) systems are not supported."
-    echo "PortsBuild requires the 64-bit version (amd64) of FreeBSD."
+    printf "Error: i386 (x86) systems are not supported.\n"
+    printf "PortsBuild requires the 64-bit version (amd64) of FreeBSD.\n"
     exit 1
   fi
 else
-  echo "PortsBuild is for FreeBSD systems only. Please use CustomBuild for your Linux needs."
-  echo "Visit: http://forum.directadmin.com/showthread.php?t=44743"
+  printf "PortsBuild is for FreeBSD systems only. Please use CustomBuild for your Linux needs.\n"
+  printf "Visit: http://forum.directadmin.com/showthread.php?t=44743\n"
   exit 1
 fi
 
@@ -663,20 +660,28 @@ setOpt() {
 ## Set Value ($1) to ($2) in file ($3) (copied from CB2)
 ## (might deprecate this with sysrc as a replacement)
 setVal() {
+
+  printf "Setting %s to %s in %s\n" $1 $2 $3
+
   ## Check if file exists.
-  if [ ! -e $3 ]; then
-    echo "setVal(): File not found: $3"
+  if [ ! -e "${3}" ]; then
+    printf "setVal(): File not found: %s" ${3}
     return
   fi
 
   ## Can't put [brackets] around the statement else grep flips out.
-  if ! grep -m1 -q ${1}= ${3}; then
+  if ! grep -m1 -q "${1}=" "${3}"; then
+    printf "Option %s doesn't exist, adding it now.\n" ${1}
     ## It's not there, so add it.
-    echo "$1=$2" >> $3
+    echo "$1=$2" >> "${3}"
     return
   else
-    ## The value is already in the file $3, so use perl regex to replace it.
-    ${PERL} -pi -e "s/$(grep ${1}= ${3})/${1}=${2}/" "${3}"
+    printf "Option %s exists, updating it now.\n" ${1}
+    FIND_OPTION="$(grep "${1}=" "${3}")"
+    NEW_OPT_VALUE="${1}=${2}"
+    ## The value is already in the file $3, so use Perl regex to replace it.
+    ${PERL} -pi -e "s|${FIND_OPTION}|${NEW_OPT_VALUE}|" "${3}"
+    # ${PERL} -pi -e "s/`grep ${1}= ${3}`/${1}=${2}/" ${3}
   fi
 }
 
@@ -725,7 +730,7 @@ set_service() {
     if [ "${SERVICE_COUNT}" -eq 0 ]; then
       return
     else
-      perl -pi -e "s/^${1}=.*\n//" ${DA_SERVICES}
+      ${PERL} -pi -e "s/^${1}=.*\n//" ${DA_SERVICES}
     fi
     return
   fi
@@ -734,13 +739,13 @@ set_service() {
     if [ "${SERVICE_COUNT}" -eq 0 ]; then
       echo "$1=$2" >> ${DA_SERVICES}
     else
-      perl -pi -e "s/^$1=.*/$1=$2/" ${DA_SERVICES}
+      ${PERL} -pi -e "s/^$1=.*/$1=$2/" ${DA_SERVICES}
     fi
 
     return
   fi
 
-  echo "setService $1: unknown option: $2"
+  printf "setService %s: unknown option: %s\n" "$1" "$2"
 }
 
 ################################################################################################################################
@@ -809,7 +814,7 @@ ask_user() {
 
 ## pkg update
 pkg_update() {
-  echo "Updating FreeBSD packages index"
+  printf "Updating FreeBSD packages index\n"
   ${PKG} update
 }
 
@@ -824,7 +829,7 @@ pkgi() {
 
 ## Update /usr/ports
 ports_update() {
-  echo "Updating /usr/ports"
+  printf "Updating /usr/ports\n"
   ${PORTSNAP} fetch update
 }
 
@@ -855,7 +860,7 @@ make_install_clean() {
 
 ## Clean stale ports (deprecate soon)
 clean_stale_ports() {
-  echo "Cleaning stale ports"
+  printf "Cleaning stale ports\n"
   ${PORTMASTER} -s
 }
 
@@ -877,7 +882,7 @@ reinstall_all_ports() {
 update_hosts() {
   COUNT=$(grep 127.0.0.1 /etc/hosts | grep -c localhost)
   if [ "$COUNT" -eq 0 ]; then
-    echo "Updating /etc/hosts"
+    printf "Updating /etc/hosts\n"
     printf "127.0.0.1\t\tlocalhost" >> /etc/hosts
   fi
 }
@@ -903,7 +908,7 @@ getTimezone() {
     DATETIMEZONE="America/Toronto"
   fi
 
-  echo ${DATETIMEZONE}
+  printf "%s\n" ${DATETIMEZONE}
 }
 
 ################################################################################################################################
@@ -1013,28 +1018,28 @@ global_setup() {
   ## Let's go! ##
 
   if [ $? -eq 1 ]; then
-    echo "Bootstrapping and updating pkg"
+    printf "Bootstrapping and updating pkg\n"
     /usr/bin/env ASSUME_ALWAYS_YES=YES pkg bootstrap
 
     pkg_update
 
     if [ ! -d "${PORTS_BASE}/" ]; then
-      echo "Setting up /usr/ports for the first time"
+      printf "Setting up /usr/ports for the first time\n"
       ${PORTSNAP} fetch extract
     fi
 
     ports_update
 
     ## Install Dependencies (Todo: replace with $PORT_*)
-    echo "Installing required dependencies"
+    printf "Installing required dependencies\n"
     if [ "${OS_MAJ}" -eq 10 ]; then
-      /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx dns/bind99
+      /usr/sbin/pkg install -y ${PORT_GMAKE} ${PORT_PERL} ${PORT_WGET} devel/bison textproc/flex graphics/gd security/cyrus-sasl2 ${PORT_CMAKE} ${PORT_PYTHON} ${PORT_AUTOCONF} devel/libtool archivers/libarchive mail/mailx dns/bind99
     elif [ "${OS_MAJ}" -eq 9 ]; then
-      /usr/sbin/pkg install -y devel/gmake lang/perl5.20 ftp/wget devel/bison textproc/flex graphics/gd security/cyrus-sasl2 devel/cmake lang/python devel/autoconf devel/libtool archivers/libarchive mail/mailx
+      /usr/sbin/pkg install -y ${PORT_GMAKE} ${PORT_PERL} ${PORT_WGET} devel/bison textproc/flex graphics/gd security/cyrus-sasl2 ${PORT_CMAKE} ${PORT_PYTHON} ${PORT_AUTOCONF} devel/libtool archivers/libarchive mail/mailx
     fi
 
     ## Install Compat Libraries
-    echo "Installing misc/compats"
+    printf "Installing misc/compats\n"
     if [ "${OS_MAJ}" -eq 10 ]; then
       /usr/sbin/pkg install -y misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
     elif [ "${OS_MAJ}" -eq 9 ]; then
@@ -1043,30 +1048,31 @@ global_setup() {
 
     ## Check for /etc/rc.conf
     if [ ! -e /etc/rc.conf ]; then
-      echo "Creating /etc/rc.conf"
+      printf "Creating /etc/rc.conf\n"
       touch /etc/rc.conf
     fi
 
     ## Check for /etc/make.conf
     if [ ! -e /etc/make.conf ]; then
-      echo "Creating /etc/make.conf"
+      printf "Creating /etc/make.conf\n"
       touch /etc/make.conf
     fi
 
     if [ "${OPT_INSTALL_CCACHE}" = "YES" ]; then
-      echo "Installing devel/ccache"
+      printf "Installing devel/ccache\n"
       pkgi ${PORT_CCACHE}
 
       if [ $? = 0 ]; then
-        sysrc -f /etc/make.conf WITH_CCACHE_BUILD=yes
+        ## sysrc -f /etc/make.conf WITH_CCACHE_BUILD=yes
+        sysrc -f /etc/make.conf CCACHE_DIR=/var/db/ccache
       fi
     fi
 
-    echo "Installing ${PORT_PORTMASTER}"
+    printf "Installing %s\n" ${PORT_PORTMASTER}
     pkgi ${PORT_PORTMASTER}
 
     if [ "${OPT_INSTALL_SYNTH}" = "YES" ]; then
-      echo "Installing ports-mgmt/synth"
+      printf "Installing ports-mgmt/synth\n"
       /usr/sbin/pkg install -y lang/gcc6-aux devel/ncurses
 
       if [ ! -e /usr/local/bin/synth ]; then
@@ -1079,7 +1085,7 @@ global_setup() {
     fi
 
     ## Symlink Perl for DA compat
-    echo "Pre-Install Task: checking for /usr/bin/perl symlink"
+    printf "Pre-Install Task: checking for /usr/bin/perl symlink\n"
     if [ ! -e /usr/bin/perl ]; then
       if [ -e /usr/local/bin/perl ]; then
         ln -s /usr/local/bin/perl /usr/bin/perl
@@ -1092,14 +1098,14 @@ global_setup() {
     fi
 
     ## IPV6 settings suggested by DA
-    echo "Pre-Install Task: Setting ipv6_ipv4mapping=YES in /etc/rc.conf"
+    printf "Pre-Install Task: Setting ipv6_ipv4mapping=YES in /etc/rc.conf\n"
     sysrc ipv6_ipv4mapping="YES"
     sysrc -f /etc/sysctl.conf net.inet6.ip6.v6only=0
     ${SYSCTL} net.inet6.ip6.v6only=0
 
     ## Disable sendmail if Exim is enabled
     if [ "${OPT_EXIM}" = "YES" ] || [ "${OPT_DISABLE_SENDMAIL}" = "YES" ] ; then
-      echo "Disabling sendmail from running (updating /etc/rc.conf)"
+      printf "Disabling sendmail from running (updating /etc/rc.conf)\n"
       sysrc sendmail_enable="NONE"
       sysrc sendmail_submit_enable="NO"
       sysrc sendmail_outbound_enable="NO"
@@ -1113,14 +1119,14 @@ global_setup() {
     ## especially if you have multiple interfaces.
 
     ## Make sure sshd is enabled
-    echo "Enabling sshd in /etc/rc.conf"
+    printf "Enabling sshd in /etc/rc.conf\n"
     sysrc sshd_enable="YES"
 
-    echo "Starting sshd (if not already done so)"
+    printf "Starting sshd (if not already done so)\n"
     ${SERVICE} sshd start
 
     ## Go for the main attraction (need setup.txt)
-    echo "Installing DirectAdmin"
+    printf "Installing DirectAdmin\n"
     directadmin_install
 
     ## Install and configure services & applications
@@ -1157,12 +1163,12 @@ global_setup() {
 
     ## DirectAdmin Install
     ## This is where directadmin.conf gets created for the first time (copy of the template)
-    echo "Running ./directadmin i"
+    printf "Running ./directadmin i\n"
     cd ${DA_PATH} || exit
     ./directadmin i
 
     ## Set DirectAdmin Permissions
-    echo "Running ./directadmin p"
+    printf "Running ./directadmin p\n"
     cd ${DA_PATH} || exit
     ./directadmin p
 
@@ -1181,8 +1187,7 @@ global_setup() {
 
 ## Global Post-Install Tasks
 global_post_install() {
-  echo "All done!"
-  echo "Insert useful information about what just happened. :)"
+  printf "All done!\n"
   # exit 0
 }
 
@@ -1316,52 +1321,51 @@ bind_setup() {
     return
   fi
 
-  ## Todo: change to PB mirrors instead of using github repo for file storage
-  ## Todo: simplify this code
+  printf "Setting up named (BIND)\n"
+
   if [ "${OS_MAJ}" -eq 10 ]; then
-    if [ ! -e /usr/local/sbin/named ]; then
-      printf "*** Error: Cannot find the named binary.\n"
-      return
-    fi
-
-    if [ ! -e /usr/local/etc/namedb/named.conf ]; then
-      printf "*** Warning: Cannot find /usr/local/etc/namedb/named.conf.\n"
-
-      if [ -e "${PB_PATH}/configure/named/named.100.conf" ]; then
-        cp "${PB_PATH}/configure/named/named.100.conf" /etc/namedb/named.conf
-      else
-        ${WGET} -O /var/named/etc/namedb/named.conf ${PB_MIRROR}/configure/named/named.100.conf
-      fi
-    fi
-
-    if [ ! -e /usr/local/etc/namedb/rndc.key ]; then
-      printf "*** Notice: Generating the rndc.key for the first time\n"
-      /usr/local/sbin/rndc-confgen -a -s "${DA_SERVER_IP}"
-    fi
-
-    setVal namedconfig /usr/local/etc/namedb/named.conf ${DA_CONF_TEMPLATE_FILE}
-
+    ## FreeBSD 10.2: /usr/local/etc/namedb/
+    NAMED_BIN=/usr/local/sbin/named
+    NAMEDB_PATH=/usr/local/etc/namedb
+    RNDC_BIN=/usr/local/sbin/rndc-confgen
+    NAMEDB_CONF=/usr/local/etc/namedb/named.conf
+    RNDC_KEY=/usr/local/etc/namedb/rndc.key
   elif [ "$OS_MAJ" -eq 9 ]; then
-    if [ ! -e /usr/sbin/named ]; then
-      printf "*** Error: Cannot find the named binary.\n"
-      return
-    fi
+    ## FreeBSD 9.3: /etc/namedb/
+    NAMED_BIN=/usr/sbin/named
+    NAMEDB_PATH=/etc/namedb
+    RNDC_BIN=/sbin/rndc-confgen
+    NAMEDB_CONF=/etc/namedb/named.conf
+    RNDC_KEY=/etc/namedb/rndc.key
+  fi
 
-    if [ ! -e /var/named/etc/namedb/named.conf ]; then
-      printf "*** Warning: Cannot find /var/named/etc/namedb/named.conf.\n"
+  if [ ! -e "${NAMED_BIN}" ]; then
+    printf "*** Error: Cannot find the named binary.\n"
+    exit 1
+  fi
 
-      if [ -e "${PB_PATH}/configure/named/named.93.conf" ]; then
-        cp "${PB_PATH}/configure/named/named.93.conf" /etc/namedb/named.conf
-      else
-        ${WGET} -O /etc/namedb/named.conf ${PB_MIRROR}/configure/named/named.93.conf
-      fi
-    fi
+  if [ ! -d ${NAMEDB_PATH} ]; then
+    printf "Creating %s\n" ${NAMEDB_PATH}
+    mkdir -p ${NAMEDB_PATH}
+  fi
 
-    if [ ! -e /etc/namedb/rndc.key ]; then
-      printf "*** Notice: Generating the rndc.key for the first time\n"
-      /usr/sbin/rndc-confgen -a -s "${DA_SERVER_IP}"
+  if [ ! -e "${NAMEDB_CONF}" ]; then
+    printf "*** Warning: Cannot find %s.\n" ${NAMEDB_CONF}
+
+    if [ -e "${PB_PATH}/configure/named/named.${OS_MAJ}.conf" ]; then
+      cp "${PB_PATH}/configure/named/named.${OS_MAJ}.conf" ${NAMEDB_CONF}
+    else
+      ${WGET} -O ${NAMEDB_CONF} "${PB_MIRROR}/configure/named/named.${OS_MAJ}.conf"
     fi
   fi
+
+  if [ ! -e "${RNDC_KEY}" ]; then
+    printf "*** Notice: Generating the rndc.key for the first time\n"
+    ${RNDC_BIN} -a -s "${DA_SERVER_IP}"
+  fi
+
+  setVal namedconfig "${NAMEDB_CONF}" "${DA_CONF_TEMPLATE_FILE}"
+  setVal nameddir "${NAMEDB_PATH}" "${DA_CONF_TEMPLATE_FILE}"
 
   printf "Updating /etc/rc.conf with named_enable=YES\n"
   sysrc named_enable="YES"
@@ -1913,6 +1917,7 @@ exim_install() {
   echo "Starting Exim"
   ${SERVICE} exim start
 
+  echo "Updating mq_exim_bin paths in DirectAdmin template + configuration files"
   setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_TEMPLATE_FILE}
   setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_FILE}
 
@@ -2003,7 +2008,7 @@ spamassassin_uninstall() {
 
   spamassassin_utilities_uninstall
 
-  return
+  #return
 }
 
 ################################################################
@@ -3454,11 +3459,11 @@ pureftpd_uninstall() {
 proftpd_install() {
 
   if [ "${OPT_FTPD}" != "proftpd" ]; then
-    echo "*** Error: ProFTPD not set in options.conf"
+    printf "*** Error: ProFTPD not set in options.conf\n"
     return
   fi
 
-  echo "Starting ProFTPD installation"
+  printf "Starting ProFTPD installation\n"
 
   ### Main Installation
   if [ "${PROFTPD_MAKE_SET}" = "" ] && [ "${PROFTPD_MAKE_UNSET}" = "" ] ; then
@@ -3498,7 +3503,7 @@ proftpd_install() {
     fi
 
     if [ ! -e "${CLAMDSCAN_BIN}" ]; then
-      echo "*** Error: Cannot enable upload scanning in ProFTPD because there is no ClamAV (${CLAMDSCAN_BIN}) on the system."
+      printf "*** Error: Cannot enable upload scanning in ProFTPD because there is no ClamAV (%s) on the system.\n" ${CLAMDSCAN_BIN}
       exit 1
     fi
 
@@ -3537,7 +3542,7 @@ proftpd_install() {
 
   # /usr/local/libexec/proftpd --configtest
 
-  echo "Starting ProFTPD"
+  printf "Starting ProFTPD\n"
   ${SERVICE} proftpd restart
 
   return
@@ -3564,11 +3569,11 @@ proftpd_uninstall() {
 clamav_install() {
 
   if [ "${OPT_CLAMAV}" = "NO" ]; then
-    echo "*** Error: ClamAV not enabled in options.conf"
+    printf "*** Error: ClamAV not enabled in options.conf\n"
     return
   fi
 
-  echo "Starting ClamAV installation"
+  printf "Starting ClamAV installation\n"
 
   ### Main Installation
   if [ "${CLAMAV_MAKE_SET}" = "" ] && [ "${CLAMAV_MAKE_UNSET}" = "" ] ; then
@@ -3623,7 +3628,7 @@ clamav_install() {
   ${SERVICE} clamav-freshclam start
 
   if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then
-    echo "Restarting Exim"
+    printf "Restarting Exim\n"
     ${SERVICE} exim restart
   fi
 
@@ -3652,11 +3657,11 @@ clamav_uninstall() {
 roundcube_install() {
 
   if [ "${OPT_ROUNDCUBE}" = "NO" ]; then
-    echo "*** Error: RoundCube not enabled in options.conf"
+    printf "*** Error: RoundCube not enabled in options.conf\n"
     return
   fi
 
-  echo "Starting RoundCube installation"
+  printf "Starting RoundCube installation\n"
 
   ### Main Installation
   if [ "${ROUNDCUBE_MAKE_SET}" = "" ] && [ "${ROUNDCUBE_MAKE_UNSET}" = "" ] ; then
@@ -3692,7 +3697,7 @@ roundcube_install() {
   ROUNDCUBE_CONF_SAMPLE=${ROUNDCUBE_PATH}/config/config.inc.php.sample
 
   if [ ! -e "${ROUNDCUBE_PATH}" ]; then
-    echo "*** Error: RoundCube does not exist at: ${ROUNDCUBE_PATH}"
+    printf "*** Error: RoundCube does not exist at: %s\n" "${ROUNDCUBE_PATH}"
     exit 1
   fi
 
@@ -3727,7 +3732,7 @@ roundcube_install() {
   if ! ${MYSQLSHOW} --defaults-extra-file=${DA_MYSQL_CNF} --host=${MYSQL_HOST} | grep -m1 -q ' da_roundcube '; then
     ## Insert data to SQL DB and create RoundCube database and user
     if [ -d "${ROUNDCUBE_PATH}/SQL" ]; then
-      echo "Creating RoundCube SQL user and database."
+      printf "Creating RoundCube SQL user and database.\n"
       ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "CREATE DATABASE ${ROUNDCUBE_DB};" --host=${MYSQL_HOST} 2>&1
       ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
 
@@ -3747,9 +3752,9 @@ roundcube_install() {
       ## Import RoundCube's initial.sql file to initialize the necessary database tables
       ${MYSQL} --defaults-extra-file=${ROUNDCUBE_MY_CNF} -e "use ${ROUNDCUBE_DB}; source ${ROUNDCUBE_PATH}/SQL/mysql.initial.sql;" --host=${MYSQL_HOST} 2>&1
 
-      echo "Database created, ${ROUNDCUBE_DB_USER} password is ${ROUNDCUBE_DB_PASS}"
+      printf "Database created, ${ROUNDCUBE_DB_USER} password is %s\n" "${ROUNDCUBE_DB_PASS}"
     else
-      echo "*** Error: Cannot find the SQL directory in ${ROUNDCUBE_PATH}"
+      printf "*** Error: Cannot find the SQL directory in %s\n" "${ROUNDCUBE_PATH}"
       exit 1
     fi
   else ## Existing RoundCube database found
@@ -3792,13 +3797,13 @@ roundcube_install() {
 
   ## Install the proper config (e.g. stock or custom):
   if [ -d "${ROUNDCUBE_PATH}" ]; then
-    echo "Editing roundcube configuration..."
+    printf "Editing roundcube configuration...\n"
 
     cd ${ROUNDCUBE_PATH}/config || exit
 
     ## PB: Todo: RoundCube Custom Configuration
     if [ -e "${CUSTOM_ROUNDCUBE_CONFIG}" ]; then
-      echo "Installing custom RoundCube configuration file: ${CUSTOM_ROUNDCUBE_CONFIG}"
+      printf "Installing custom RoundCube configuration file: %s\n" "${CUSTOM_ROUNDCUBE_CONFIG}"
      cp -f "${CUSTOM_ROUNDCUBE_CONFIG}" ${ROUNDCUBE_CONF}
     fi
 
@@ -5414,13 +5419,13 @@ validate_options() {
           OPT_PHP1_RELEASE="YES"
           HAVE_CLI="YES"
           ;;
-        *) echo "*** Error: Invalid PHP1_MODE value set in options.conf"; exit;;
+        *) printf "*** Error: Invalid PHP1_MODE value set in options.conf\n"; exit;;
       esac
       case $(lc ${PHP_INI_TYPE}) in
         "production"|"development") OPT_PHP_INI_TYPE=${PHP_INI_TYPE} ;;
         "custom") OPT_PHP_INI_TYPE="custom" ;;
         "no"|"none") OPT_PHP_INI_TYPE="none" ;;
-        *) echo "*** Error: Invalid PHP ini Type set in options.conf"; exit ;;
+        *) printf "*** Error: Invalid PHP ini Type set in options.conf\n"; exit ;;
       esac
       ;;
     "no"|"NO"|"none")
@@ -5431,7 +5436,7 @@ validate_options() {
       HAVE_SUPHP_CGI="NO"
       HAVE_CLI="NO"
       ;;
-    *) echo "*** Error: Invalid PHP1_VERSION value set in options.conf"; exit ;;
+    *) printf "*** Error: Invalid PHP1_VERSION value set in options.conf\n"; exit ;;
   esac
 
   ## PHP2:
@@ -5458,24 +5463,24 @@ validate_options() {
     case $(lc ${APACHE_MPM}) in
       "event"|"prefork"|"worker") OPT_APACHE_MPM="${APACHE_MPM}" ;;
       "auto") OPT_APACHE_MPM="event" ;;
-      *) echo "*** Error: Invalid APACHE_MPM value set in options.conf"; exit ;;
+      *) printf "*** Error: Invalid APACHE_MPM value set in options.conf\n"; exit ;;
     esac ;;
     "nginx") OPT_WEBSERVER="nginx" ;;
     "no"|"none") OPT_WEBSERVER="NO" ;;
-    *) echo "*** Error: Invalid WEBSERVER value set in options.conf"; exit ;;
+    *) printf "*** Error: Invalid WEBSERVER value set in options.conf\n"; exit ;;
   esac
 
   case $(lc ${SQL_DB}) in
     "mysql55"|"mysql56"|"mysql57"|"mariadb55"|"mariadb100") OPT_SQL_DB="${SQL_DB}" ;;
     "no"|"none") OPT_SQL_DB="NO" ;;
-    *) echo "*** Error: Invalid SQL_DB value set in options.conf"; exit ;;
+    *) printf "*** Error: Invalid SQL_DB value set in options.conf\n"; exit ;;
   esac
 
   case $(lc ${FTPD}) in
     "pureftpd"|"pure-ftpd"|"pureftp") OPT_FTPD="pureftpd" ;;
     "proftpd"|"pro-ftpd"|"proftp") OPT_FTPD="proftpd" ;;
     "no"|"none") OPT_FTPD="NO" ;;
-    *) echo "*** Error: Invalid FTPD value set in options.conf"; exit ;;
+    *) printf "*** Error: Invalid FTPD value set in options.conf\n"; exit ;;
   esac
 
   ## Todo: Verify: Copied from CB2:
@@ -5506,7 +5511,7 @@ validate_options() {
 
   case "$(uc ${EXIM})" in
     "YES"|"NO") OPT_EXIM="${EXIM}" ;;
-    *) echo "*** Error: Invalid EXIM option set in options.conf"; exit ;;
+    *) printf "*** Error: Invalid EXIM option set in options.conf\n"; exit ;;
   esac
 
   ## Alternate method:
@@ -5515,6 +5520,12 @@ validate_options() {
   # if [ "$(uc ${EXIM})" = "NO" ]; then
   #   OPT_EXIM="NO"
   # fi
+
+  if [ "$(uc ${NAMED})" = "YES" ]; then
+    OPT_NAMED="YES"
+  elif [ "$(uc ${NAMED})" = "NO" ]; then
+    OPT_NAMED="NO"
+  fi
 
   if [ "$(uc ${DOVECOT})" = "YES" ]; then
     OPT_DOVECOT="YES"
@@ -5571,8 +5582,8 @@ validate_options() {
   fi
 
   if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ] && [ "${OPT_SPAMASSASSIN}" = "NO" ]; then
-    echo "*** Error: Easy Spam Fighter (ESF) requires SpamAssassin to be enabled."
-    echo "Set SPAMASSASSIN=YES in options.conf"
+    printf "*** Error: Easy Spam Fighter (ESF) requires SpamAssassin to be enabled.\n"
+    printf "Set SPAMASSASSIN=YES in options.conf\n"
     exit 1
   fi
 
@@ -5693,6 +5704,7 @@ install_app() {
     "apache"|"apache24") apache_install ;;
     "awstats") awstats_install ;;
     "bfm") bfm_setup ;;
+    "bind"|"named") bind_setup ;;
     "blockcracking"|"bc") blockcracking_install ;;
     "directadmin") directadmin_install ;;
     "dkim") pkgi ${PORT_LIBDKIM} ;;
@@ -5749,7 +5761,7 @@ uninstall_app() {
 
 ## Todo: Update PortsBuild Script
 update() {
-  echo "PortsBuild update script"
+  printf "PortsBuild update script\n"
   # wget -O portsbuild.sh ${PB_MIRROR}/portsbuild.sh
 
   ## Backup configuration file
@@ -5758,18 +5770,18 @@ update() {
   #fetch -o ./${PORTSBUILD_NAME}.tar.gz "${PB_MIRROR}/${PORTSBUILD_NAME}.tar.gz"
 
   if [ -s "${PORTSBUILD_NAME}.tar.gz" ]; then
-    echo "Extracting ${PORTSBUILD_NAME}.tar.gz..."
+    printf "Extracting %s.tar.gz...\n" ${PORTSBUILD_NAME}
 
     tar xvf "${PORTSBUILD_NAME}.tar.gz" --no-same-owner
 
     chmod 700 portsbuild.sh
   else
-    echo "Unable to extract ${PORTSBUILD_NAME}.tar.gz."
+    printf "Unable to extract %s.tar.gz\n" ${PORTSBUILD_NAME}
   fi
 
   ## Symlink pb->portsbuild.sh
   if [ "${OPT_PB_SYMLINK}" = "YES" ]; then
-    ln -s /usr/local/directadmin/portsbuild/portsbuild.sh /usr/local/bin/pb
+    ln -s /usr/local/portsbuild/portsbuild.sh /usr/local/bin/pb
   fi
 
   return
@@ -5826,8 +5838,7 @@ upgrade_app() {
 ## Show Menu for Upgrades
 show_menu_upgrade() {
 
-  echo ""
-  echo "Listing possible upgrades"
+  printf "Listing possible upgrades:\n"
   return
 }
 
@@ -5836,9 +5847,8 @@ show_menu_upgrade() {
 ## Show Setup Menu
 show_menu_setup() {
 
-  echo "To setup PortsBuild and DirectAdmin for the first time, run:"
-  echo "  ./portsbuild setup <USER_ID> <LICENSE_ID> <SERVER_FQDN> <ETH_DEV> <IP_ADDRESS> <IP_NETMASK>"
-  echo ""
+  printf "To setup PortsBuild and DirectAdmin for the first time, run:\n"
+  printf "  ./portsbuild setup <USER_ID> <LICENSE_ID> <SERVER_FQDN> <ETH_DEV> <IP_ADDRESS> <IP_NETMASK>\n\n"
   return
 }
 ################################################################################################################################
@@ -5938,13 +5948,13 @@ show_rewrite_menu() {
 
   printf "Rewrite Configuration Files\n"
   {
-    echo "apache: Rewrite Apache configuration files and virtual hosts"
-    echo "exim: Rewrite Exim configuration files"
-    echo "dovecot: Rewrite Dovecot configuration files"
-    echo "named: Rewrite Named (Bind) DNS files"
-    echo "nginx: Rewrite Nginx configuration files and virtual hosts"
-    echo "php: Rewrite PHP configuration files"
-    echo "virtual: Rewrite /etc/virtual directory"
+    printf "apache: Rewrite Apache configuration files and virtual hosts\n"
+    printf "exim: Rewrite Exim configuration files\n"
+    printf "dovecot: Rewrite Dovecot configuration files\n"
+    printf "named: Rewrite Named (Bind) DNS files\n"
+    printf "nginx: Rewrite Nginx configuration files and virtual hosts\n"
+    printf "php: Rewrite PHP configuration files\n"
+    printf "virtual: Rewrite /etc/virtual directory\n"
   } | column -t -s:
 
   return
@@ -6021,15 +6031,14 @@ show_install() {
 
 ## Show logo :)
 show_logo() {
-  echo "                ___\/_ "
-  echo "               /  //\  "
-  echo "       _______/  /___  "
-  echo "      /  __  / ___  /  "
-  echo "     /  /_/ / /__/ /   "
-  echo "    /  ____/______/    "
-  echo "   /  /                "
-  echo "  /__/                 "
-  echo ""
+  printf "                ___\\\/_\n"
+  printf "               /  /\/\\\  \n"
+  printf "       _______/  /___  \n"
+  printf "      /  __  / ___  /  \n"
+  printf "     /  /_/ / /__/ /   \n"
+  printf "    /  ____/______/    \n"
+  printf "   /  /                \n"
+  printf "  /__/                 \n\n"
 }
 
 ################################################################
@@ -6071,7 +6080,7 @@ show_audit() {
 show_about() {
   show_logo
   show_version
-  echo "Visit portsbuild.org or github.com/portsbuild/portsbuild"
+  printf "Visit portsbuild.org or github.com/portsbuild/portsbuild\n"
   return
 }
 
@@ -6089,10 +6098,8 @@ show_main_menu() {
 ## Show selection menu
 show_menu() {
 
-  echo ""
-  echo "  Usage: "
-  echo "    $0 command [options] [arguments]"
-  echo ""
+  printf "\n  Usage:\n"
+  printf "\t%s command [options] [arguments]\n\n" $0
 
   # Options:
   #   -h, --help                     Display this help message
@@ -6111,23 +6118,23 @@ show_menu() {
   # echo "    -v, --verbose"
   # echo ""
 
-  echo "  Available commands:"
+  printf "  Available commands:\n"
   {
-    echo "    config: Display the current configuration option values"
-    echo "    debug: Displays debugging information"
-    echo "    help: Displays help information"
-    # echo "  info Displays information about an application or service"
-    echo "    install: Install an application or service"
-    # echo "  options: Show configured PortsBuild options"
-    echo "    outdated: Show outdated applications or services on the system"
-    echo "    rewrite: Rewrite (update) a configuration file for an application or service"
-    echo "    setup: Setup PortsBuild and DirectAdmin (first-time installations)"
-    echo "    update: Updates the portsbuild script"
-    echo "    upgrade: Upgrades an application or service"
-    #echo "    verify: Verify something"
-    # echo "  "
-    echo "    versions: Show version information on all applications and services installed"
-    echo ""
+    printf "\tconfig: Display the current configuration option values\n"
+    printf "\tdebug: Displays debugging information\n"
+    printf "\thelp: Displays help information\n"
+    # printf "\tinfo Displays information about an application or service\n"
+    printf "\tinstall: Install an application or service\n"
+    # printf "\toptions: Show configured PortsBuild options\n"
+    printf "\toutdated: Show outdated applications or services on the system\n"
+    printf "\trewrite: Rewrite (update) a configuration file for an application or service\n"
+    printf "\tsetup: Setup PortsBuild and DirectAdmin (first-time installations)\n"
+    printf "\tupdate: Updates the portsbuild script\n"
+    printf "\tupgrade: Upgrades an application or service\n"
+    # printf "\tverify: Verify something\n"
+    # printf "\n"
+    printf "\tversions: Show version information on all applications and services installed\n"
+    printf "\n"
   } | column -t -s:
 
 # menu_command
