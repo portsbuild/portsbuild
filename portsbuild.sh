@@ -4488,7 +4488,7 @@ do_rewrite_nginx_webapps() {
 ## Create httpd Nginx (copied from CB2: create_httpd_nginx)
 create_httpd_nginx() {
   CONF_FILE="${APACHE_EXTRA_PATH}/httpd-nginx.conf"
-  echo -n "" > "${CONF_FILE}"
+  printf "" > "${CONF_FILE}"
 
   if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     # if [ ! -e /usr/local/libexec/apache24/mod_aclr2.so ]; then
@@ -4580,13 +4580,13 @@ rewrite_confs() {
 
     # Verify we have the correct apache_ver
     if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE_FILE})" -eq "0" ]; then
-      echo "apache_ver=2.0" >> ${DA_CONF_TEMPLATE_FILE}
+      printf "apache_ver=2.0\n" >> ${DA_CONF_TEMPLATE_FILE}
     elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_TEMPLATE_FILE})" -ne "0" ]; then
       ${PERL} -pi -e "s/$(grep apache_ver= ${DA_CONF_TEMPLATE_FILE})/apache_ver=2.0/" ${DA_CONF_TEMPLATE_FILE}
     fi
 
     if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_FILE})" -eq "0" ]; then
-      echo "apache_ver=2.0" >> ${DA_CONF_FILE}
+      printf "apache_ver=2.0\n" >> ${DA_CONF_FILE}
       echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
     elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_FILE})" -ne "0" ]; then
       ${PERL} -pi -e "s/$(grep apache_ver= ${DA_CONF_FILE})/apache_ver=2.0/" ${DA_CONF_FILE}
