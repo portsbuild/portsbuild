@@ -805,7 +805,7 @@ ask_user() {
     case $RESPONSE in
       [Yy]* ) return 1; break ;;
       [Nn]* ) return 0; break ;;
-      * ) echo "Please answer with Yes or No." ;;
+      * ) printf "Please answer with Yes or No.\n" ;;
     esac
   done
 }
@@ -1087,12 +1087,12 @@ global_setup() {
     ## Symlink Perl for DA compat
     printf "Pre-Install Task: checking for /usr/bin/perl symlink\n"
     if [ ! -e /usr/bin/perl ]; then
-      if [ -e /usr/local/bin/perl ]; then
-        ln -s /usr/local/bin/perl /usr/bin/perl
+      if [ -e ${PERL} ]; then
+        ln -s ${PERL} /usr/bin/perl
       else
         pkgi ${PORT_PERL}
         if [ $? -eq 0 ]; then
-            ln -s /usr/local/bin/perl /usr/bin/perl
+            ln -s ${PERL} /usr/bin/perl
         fi
       fi
     fi
@@ -1405,7 +1405,7 @@ directadmin_install() {
   fi
 
   ## 2016-03-07: Need to create a blank /etc/auth.conf file for DA compatibility
-  echo "Checking for /etc/auth.conf"
+  printf "Checking for /etc/auth.conf\n"
   if [ ! -e /etc/auth.conf ]; then
     /usr/bin/touch /etc/auth.conf
     /bin/chmod 644 /etc/auth.conf
@@ -1415,10 +1415,10 @@ directadmin_install() {
   if [ -e /etc/aliases ]; then
     COUNT=$(grep -c diradmin /etc/aliases)
     if [ "$COUNT" -eq 0 ]; then
-      echo "diradmin: :blackhole:" >> /etc/aliases
+      printf "diradmin: :blackhole:\n" >> /etc/aliases
     fi
     ## Update aliases database
-    echo "Updating /etc/aliases"
+    printf "Updating /etc/aliases\n"
     /usr/bin/newaliases
   fi
 
@@ -1478,7 +1478,7 @@ directadmin_install() {
   ## Check for a separate /home partition (for quota support)
   HOME_YES=$(grep -c /home /etc/fstab)
   if [ "$HOME_YES" -lt "1" ]; then
-    echo "Setting quota_partition=/ in DirectAdmin's Configuration Template File"
+    printf "Setting quota_partition=/ in DirectAdmin's Configuration Template File\n"
     setVal quota_partition "/" "${DA_CONF_TEMPLATE_FILE}"
   fi
 
@@ -1489,12 +1489,12 @@ directadmin_install() {
     if [ "$ETH_DEV" != "" ]; then
       COUNT=$(grep -c ethernet_dev ${DA_CONF_TEMPLATE_FILE})
       if [ "$COUNT" -eq 0 ]; then
-        echo "Setting ethernet_dev=${ETH_DEV} in DirectAdmin's Configuration Template File"
+        printf "Setting ethernet_dev=${ETH_DEV} in DirectAdmin's Configuration Template File\n"
         setVal ethernet_dev "${ETH_DEV}" "${DA_CONF_TEMPLATE_FILE}"
       fi
     fi
   else
-    echo "Setting ethernet_dev=${ETHERNET_DEV} in DirectAdmin's Configuration Template File"
+    printf "Setting ethernet_dev=%s in DirectAdmin's Configuration Template File\n" "${ETHERNET_DEV}"
     setVal ethernet_dev "${ETHERNET_DEV}" "${DA_CONF_TEMPLATE_FILE}"
   fi
 
@@ -1504,7 +1504,7 @@ directadmin_install() {
   fi
 
   # DB_ROOT_PASS=`perl -le'print map+(A..Z,a..z,0..9)[rand 62],0..7'`;
-  echo "Generating random passwords for SQL DB and DirectAdmin user"
+  printf "Generating random passwords for SQL DB and DirectAdmin user\n"
   DA_SQLDB_PASSWORD=$(random_pass)
   DA_ADMIN_PASSWORD=$(random_pass)
 
@@ -1594,7 +1594,7 @@ directadmin_install() {
 
   SSHROOT=$(grep -c 'AllowUsers root' /etc/ssh/sshd_config)
   if [ "${SSHROOT}" = 0 ]; then
-    echo "*** Notice: Adding the 'root' user to the sshd configuration's AllowUsers list."
+    printf "*** Notice: Adding the 'root' user to the sshd configuration's AllowUsers list.\n"
     {
       echo "AllowUsers root"
       echo "AllowUsers ${DA_ADMIN_USERNAME}"
@@ -1611,14 +1611,14 @@ directadmin_install() {
     ${WGET} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
     if [ $? -ne 0 ]; then
-      echo "*** Error: Unable to download the DirectAdmin license file."
+      printf "*** Error: Unable to download the DirectAdmin license file.\n"
       da_myip
-      echo "Trying the license relay server..."
+      printf "Trying the license relay server...\n"
 
       ${WGET} "${HTTP}://license.directadmin.com/licenseupdate.php?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
       if [ $? -ne 0 ]; then
-        echo "*** Error: Unable to download the DirectAdmin license file from relay server as well."
+        printf "*** Error: Unable to download the DirectAdmin license file from relay server as well.\n"
         da_myip
         exit 2
       fi
@@ -1657,11 +1657,11 @@ da_myip() {
   IP=$(${WGET} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
 
   if [ "${IP}" = "" ]; then
-    echo "*** Error: Cannot determine the server's IP address via myip.directadmin.com"
+    printf "*** Error: Cannot determine the server's IP address via myip.directadmin.com\n"
     return
   fi
 
-  echo "IP used to connect out: ${IP}"
+  printf "IP used to connect out: %s\n" "${IP}"
 }
 
 ################################################################
@@ -1717,7 +1717,7 @@ install_cron() {
     if [ -s "${DA_CRON_FILE}" ]; then
       cat "${DA_CRON_FILE}" >> /etc/crontab;
     else
-      echo "*** Error: Could not find ${DA_CRON_FILE} or it is empty."
+      printf "*** Error: Could not find %s or it is empty.\n" ${DA_CRON_FILE}
     fi
   fi
 }
@@ -1806,11 +1806,11 @@ verify_webapps_logrotate() {
 exim_install() {
 
   if [ "${OPT_EXIM}" != "YES" ]; then
-    echo "*** Notice: EXIM is disabled in options.conf"
+    printf "*** Notice: EXIM is disabled in options.conf\n"
     return
   fi
 
-  echo "Starting Exim installation"
+  printf "Starting Exim installation\n"
 
   ### Main Installation (verify: exim_user/exim_group arguments)
   if [ "${EXIM_MAKE_SET}" = "" ] && [ "${EXIM_MAKE_UNSET}" = "" ] ; then
@@ -1902,7 +1902,7 @@ exim_install() {
   ${EXIM_BIN} -C "${EXIM_CONF}" -bV
 
   ## Update /etc/rc.conf
-  echo "Enabling Exim startup (updating /etc/rc.conf)"
+  printf "Enabling Exim startup (updating /etc/rc.conf)\n"
   sysrc exim_enable="YES"
   sysrc exim_flags="-bd -q1h"
 
@@ -1910,21 +1910,21 @@ exim_install() {
     touch /etc/periodic.conf
   fi
 
-  echo "Updating /etc/periodic.conf"
+  printf "Updating /etc/periodic.conf\n"
   sysrc -f /etc/periodic.conf daily_status_include_submit_mailq="NO"
   sysrc -f /etc/periodic.conf daily_clean_hoststat_enable="NO"
 
-  echo "Starting Exim"
+  printf "Starting Exim\n"
   ${SERVICE} exim start
 
-  echo "Updating mq_exim_bin paths in DirectAdmin template + configuration files"
+  printf "Updating mq_exim_bin paths in DirectAdmin template + configuration files\n"
   setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_TEMPLATE_FILE}
   setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_FILE}
 
   ## Todo: Cleaner version
   ## Replace sendmail programs with Exim binaries.
   if [ ! -e /etc/mail/mailer.conf ]; then
-    echo "Creating /etc/mail/mailer.conf"
+    printf "Creating /etc/mail/mailer.conf\n"
     touch /etc/mail/mailer.conf
 
     # cp "${PB_PATH}/configure/etc/mailer.93.conf" /etc/mail/mailer.conf
@@ -2065,7 +2065,7 @@ blockcracking_install() {
 
   if [ -x ${EXIM_BIN} ]; then
 
-    echo "Downloading BlockCracking"
+    printf "Downloading BlockCracking\n"
 
     ${WGET} -O "${PB_PATH}/files/exim.blockcracking.tar.gz" "${PB_MIRROR}/files/exim.blockcracking.tar.gz"
 
@@ -2075,29 +2075,29 @@ blockcracking_install() {
       ## Path was: ${EXIM_PATH}/exim.blockcracking
       mkdir -p ${EXIM_BC_PATH}
 
-      echo "Extracting exim.blockcracking.tar.gz"
+      printf "Extracting exim.blockcracking.tar.gz\n"
       tar xvf "${PB_PATH}/files/exim.blockcracking.tar.gz" -C ${EXIM_BC_PATH}
 
       BC_DP_SRC=${EXIM_BC_PATH}/script.denied_paths.default.txt
 
       if [ -e ${EXIM_BC_PATH}/script.denied_paths.custom.txt ]; then
-        echo "Using custom BlockCracking script.denied_paths.custom.txt"
+        printf "Using custom BlockCracking script.denied_paths.custom.txt\n"
         BC_DP_SRC=${EXIM_BC_PATH}/script.denied_paths.custom.txt
       fi
 
       cp -fp ${BC_DP_SRC} ${EXIM_BC_PATH}/script.denied_paths.txt
 
-      echo "Restarting Exim"
+      printf "Restarting Exim\n"
 
       ${SERVICE} exim restart
 
-      echo "BlockCracking is now enabled."
+      printf "BlockCracking is now enabled.\n"
     else
       printf "\*** Error: Unable to find exim.blockcracking.tar.gz for extraction. Aborting.\n"
       exit 1
     fi
   else
-    echo "*** Error: Exim is not installed. Cannot continue as the binary was not found."
+    printf "*** Error: Exim is not installed. Cannot continue as the binary was not found.\n"
   fi
 
   return
@@ -2117,14 +2117,14 @@ easyspamfighter_install() {
     EXIM_SRS_SUPPORT="$(${EXIM_BIN} --version | grep -m1 -c SRS)"
 
     if [ "${EXIM_SPF_SUPPORT}" = "0" ]; then
-      echo "*** Error: Your version of Exim does not support SPF. This is needed for Easy Spam Fighter."
-      echo "Please reinstall Exim with SPF support."
+      printf "*** Error: Your version of Exim does not support SPF. This is needed for Easy Spam Fighter.\n"
+      printf "Please reinstall Exim with SPF support.\n"
       exit 1
     fi
 
     if [ "${EXIM_SRS_SUPPORT}" = "0" ]; then
-      echo "*** Error: Your version of Exim does not support SRS. This is needed for Easy Spam Fighter."
-      echo "Please reinstall Exim with SRS support."
+      printf "*** Error: Your version of Exim does not support SRS. This is needed for Easy Spam Fighter.\n"
+      printf "Please reinstall Exim with SRS support.\n"
       exit 1
     fi
 
@@ -2152,20 +2152,20 @@ easyspamfighter_install() {
       ## path was: ${EXIM_PATH}/exim.easy_spam_fighter
       mkdir -p ${EXIM_ESF_PATH}
 
-      echo "Extracting Easy Spam Fighter"
+      printf "Extracting Easy Spam Fighter\n"
       tar xvf "${PB_PATH}/files/esf.tar.gz" -C ${EXIM_ESF_PATH}
 
-      echo "Restarting Exim"
+      printf "Restarting Exim\n"
 
       ${SERVICE} exim restart
 
-      echo "Easy Spam Fighter is now enabled."
+      printf "Easy Spam Fighter is now enabled.\n"
     else
       printf "\*** Error: Unable to find esf.tar.gz for extraction. Aborting.\n"
       exit 1
     fi
   else
-    echo "*** Error: Exim is not installed. Cannot continue as the binary was not found."
+    printf "*** Error: Exim is not installed. Cannot continue as the binary was not found.\n"
     exit 1
   fi
 
@@ -2247,7 +2247,7 @@ dovecot_install() {
   # fi
 
 
-  echo "Starting Dovecot installation"
+  printf "Starting Dovecot installation\n"
 
   ### Main Installation
   if [ "${DOVECOT2_MAKE_SET}" = "" ] && [ "${DOVECOT2_MAKE_UNSET}" = "" ] ; then
@@ -2382,7 +2382,7 @@ dovecot_install() {
   ## Verify: Part of convertToDovecot()
   # set_service vm-pop3d delete
 
-  echo "Enabling Dovecot startup (upating /etc/rc.conf)"
+  printf "Enabling Dovecot startup (upating /etc/rc.conf)\n"
   sysrc dovecot_enable="YES"
 
   ${SERVICE} dovecot restart
@@ -2406,11 +2406,11 @@ dovecot_uninstall() {
 webalizer_install() {
 
   if [ "${OPT_WEBALIZER}" != "YES" ]; then
-    echo "***"
+    printf "***\n"
     return
   fi
 
-  echo "Starting Webalizer installation"
+  printf "Starting Webalizer installation\n"
 
   ### Main Installation
   if [ "${WEBALIZER_MAKE_SET}" = "" ] && [ "${WEBALIZER_MAKE_UNSET}" = "" ] ; then
@@ -2443,11 +2443,11 @@ webalizer_install() {
 awstats_install() {
 
   if [ "${OPT_AWSTATS}" != "YES" ]; then
-    echo "***"
+    printf "***\n"
     return
   fi
 
-  echo "Starting AwStats installation"
+  printf "Starting AwStats installation\n"
 
   ### Main Installation
   if [ "${AWSTATS_MAKE_SET}" = "" ] && [ "${AWSTATS_MAKE_UNSET}" = "" ] ; then
@@ -2550,7 +2550,7 @@ get_sql_settings() {
           MYSQL_ACCESS_HOST=$(grep -m1 -e '^ip=' "${DA_PATH}/scripts/setup.txt" | cut -d= -f2)
         fi
         if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
-          echo "Unable to detect your server IP in /etc/hosts. Please enter it: "
+          printf "Unable to detect your server IP in /etc/hosts. Please enter it: "
           read -r MYSQL_ACCESS_HOST
         fi
       fi
@@ -2572,12 +2572,12 @@ sql_post_install() {
   fi
 
   if [ ! -e "${MYSQL_BIN}" ]; then
-    echo "*** Error: MySQL binary not found at ${MYSQL_BIN}"
-    echo "Aborting post-installation tasks."
+    printf "*** Error: MySQL binary not found at %s\n" ${MYSQL_BIN}
+    printf "Aborting post-installation tasks.\n"
     exit 1
   fi
 
-  echo "Starting SQL database post-installation tasks"
+  printf "Starting SQL database post-installation tasks\n"
 
   ## Todo: Check for mysql.conf values
   # if [ "$MYSQL_USER" = "" ] || [ "$MYSQL_PASSWORD" = "" ]; then
@@ -2591,12 +2591,12 @@ sql_post_install() {
       mv /etc/my.cnf /etc/my.cnf.disabled
   fi
 
-  echo "Updating /etc/rc.conf"
+  printf "Updating /etc/rc.conf\n"
   sysrc mysql_enable="YES"
   sysrc mysql_dbdir="${SQL_DATA_PATH}"
   sysrc mysql_optfile="/usr/local/etc/my.cnf"
 
-  echo "Starting ${OPT_SQL_DB}"
+  printf "Starting %s\n" ${OPT_SQL_DB}
   ${SERVICE} mysql-server start
 
   ## Secure Installation (replace it with scripted method below)
@@ -2676,7 +2676,7 @@ sql_post_install() {
 
   DA_MYSQL_PATH=/usr/local/mysql/bin
   if [ ! -e ${DA_MYSQL_PATH}/mysql ]; then
-    echo "Symlinking the MySQL/MariaDB binaries for DirectAdmin compatibility:"
+    printf "Symlinking the MySQL/MariaDB binaries for DirectAdmin compatibility\n"
     mkdir -p /usr/local/mysql/bin
     ln -s ${MYSQL_BIN} ${DA_MYSQL_PATH}/mysql
     ln -s ${MYSQLDUMP_BIN} ${DA_MYSQL_PATH}/mysqldump
@@ -2689,10 +2689,10 @@ sql_post_install() {
     ln -s ${MYSQLCHECK_BIN} ${DA_MYSQL_PATH}/mysqlcheck
     ln -s ${MYSQLSECURE_BIN} ${DA_MYSQL_PATH}/mysql_secure_installation
   else
-    echo "*** Notice: MySQL/MariaDB binaries already symlinked in ${DA_MYSQL_PATH}"
+    printf "*** Notice: MySQL/MariaDB binaries already symlinked in %s\n" ${DA_MYSQL_PATH}
   fi
 
-  echo "Restarting ${OPT_SQL_DB}"
+  printf "Restarting %s\n" "${OPT_SQL_DB}"
   ${SERVICE} mysql-server restart
 }
 
@@ -2826,7 +2826,7 @@ php_install() {
     *) ;;
   esac
 
-  echo "Starting PHP installation"
+  printf "Starting PHP installation\n"
 
   if [ "${PHP_MAKE_SET}" = "" ] && [ "${PHP_MAKE_UNSET}" = "" ] ; then
     case ${OPT_PHP1_MODE} in
@@ -2850,7 +2850,7 @@ php_install() {
       suphp)
           # /usr/ports/www/suphp
           ;;
-      *) echo "*** Error: Wrong PHP version selected. (Script error?)"; exit ;;
+      *) printf "*** Error: Wrong PHP version selected. (Script error?)\n"; exit ;;
     esac
   fi
 
@@ -2913,7 +2913,7 @@ php_install() {
   # fi
 
   ## Scripted reference (from CB2):
-  echo "Making PHP installation compatible with php.ini file"
+  printf "Making PHP installation compatible with php.ini file\n"
   ${PERL} -pi -e 's/^register_long_arrays/;register_long_arrays/' ${PHP_INI}
   ${PERL} -pi -e 's/^magic_quotes_gpc/;magic_quotes_gpc/' ${PHP_INI}
   ${PERL} -pi -e 's/^safe_mode/;safe_mode/' ${PHP_INI}
@@ -2930,7 +2930,7 @@ php_install() {
 
   secure_php_ini ${PHP_INI}
 
-  echo "Enabling PHP-FPM startup (updating /etc/rc.conf)"
+  printf "Enabling PHP-FPM startup (updating /etc/rc.conf)\n"
   sysrc php_fpm_enable="YES"
 }
 
@@ -2977,11 +2977,11 @@ have_php_system() {
 phpmyadmin_install() {
 
   if [ "${OPT_PHPMYADMIN}" != "YES" ]; then
-    echo "***"
+    printf "***\n"
     return
   fi
 
-  echo "Starting phpMyAdmin installation"
+  printf "Starting phpMyAdmin installation\n"
 
   ### Main Installation
   if [ "${PMA_MAKE_SET}" = "" ] && [ "${PMA_MAKE_UNSET}" = "" ] ; then
@@ -3014,7 +3014,7 @@ phpmyadmin_install() {
 
   ## If custom config exists:
   if [ -e "${CUSTOM_PMA_CONFIG}" ]; then
-    echo "Installing custom phpMyAdmin configuration file: ${CUSTOM_PMA_CONFIG}"
+    printf "Installing custom phpMyAdmin configuration file: %s\n" "${CUSTOM_PMA_CONFIG}"
     cp -f "${CUSTOM_PMA_CONFIG}" ${PMA_CONFIG}
   else
     cp -f ${PMA_PATH}/config.sample.inc.php ${PMA_CONFIG}
@@ -3035,7 +3035,7 @@ phpmyadmin_install() {
 
   # Copy custom themes (not implemented):
   if [ -d "${CUSTOM_PMA_THEMES}" ]; then
-    echo "Installing custom phpMyAdmin themes: ${PMA_THEMES}"
+    printf "Installing custom phpMyAdmin themes: %s\n" "${PMA_THEMES}"
     cp -Rf "${CUSTOM_PMA_THEMES}" ${PMA_PATH}
   fi
 
@@ -3075,7 +3075,7 @@ phpmyadmin_install() {
   fi
 
   if [ -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    echo "Patching phpMyAdmin for BFM to log failed authentications"
+    printf "Patching phpMyAdmin for BFM to log failed authentications\n"
     cd ${PMA_PATH} || exit
     patch -p0 < "${PB_DIR}/patches/pma_auth_logging.patch"
   fi
@@ -3095,11 +3095,11 @@ phpmyadmin_upgrade() {
 apache_install() {
 
   if [ "${OPT_WEBSERVER}" != "apache" ]; then
-    echo "***"
+    printf "***\n"
     return
   fi
 
-  echo "Starting Apache installation"
+  printf "Starting Apache installation\n"
 
   ### Main Installation
   if [ "${APACHE24_MAKE_SET}" = "" ] && [ "${APACHE24_MAKE_UNSET}" = "" ] ; then
@@ -3259,11 +3259,11 @@ apache_uninstall() {
 nginx_install() {
 
   if [ "${OPT_WEBSERVER}" != "nginx" ]; then
-    echo "***"
+    printf "***\n"
     return
   fi
 
-  echo "Starting Nginx installation"
+  printf "Starting Nginx installation\n"
 
   ### Main Installation
   if [ "${NGINX_MAKE_SET}" = "" ] && [ "${NGINX_MAKE_UNSET}" = "" ] ; then
@@ -3338,11 +3338,11 @@ nginx_uninstall() {
 majordomo_install() {
 
   if [ "${OPT_MAJORDOMO}" = "NO" ]; then
-    echo "*** Error: Majordomo not enabled in options.conf"
+    printf "*** Error: Majordomo not enabled in options.conf\n"
     return
   fi
 
-  echo "Starting Majordomo installation"
+  printf "Starting Majordomo installation\n"
 
 
   ## Verify: majordomo.sh script
@@ -3364,11 +3364,11 @@ majordomo_uninstall() {
 pureftpd_install() {
 
   if [ "${OPT_FTPD}" != "pureftpd" ]; then
-    echo "*** Error: PureFTPD not set in options.conf"
+    printf "*** Error: PureFTPD not set in options.conf\n"
     return
   fi
 
-  echo "Starting PureFTPD installation"
+  printf "Starting PureFTPD installation\n"
 
   ### Main Installation
   if [ "${PUREFTPD_MAKE_SET}" = "" ] && [ "${PUREFTPD_MAKE_UNSET}" = "" ] ; then
@@ -3384,11 +3384,11 @@ pureftpd_install() {
     fi
 
     if [ ! -e ${CLAMDSCAN_BIN} ]; then
-      echo "*** Error: Cannot enable upload scanning in Pure-FTPD because there is no ClamAV (${CLAMDSCAN_BIN}) on the system."
+      printf "*** Error: Cannot enable upload scanning in Pure-FTPD because there is no ClamAV (%s) on the system.\n" "${CLAMDSCAN_BIN}"
       exit 1
     fi
 
-    echo "Enabling Pure-FTPD upload scanning script..."
+    printf "Enabling Pure-FTPD upload scanning script\n"
     cp -f "${PUREFTPD_UPLOADSCAN_SCRIPT}" ${PATH_TO_UPLOADSCAN}
     chmod 711 ${PATH_TO_UPLOADSCAN}
 
@@ -3429,7 +3429,7 @@ pureftpd_install() {
   ## Verify:
   /usr/local/bin/pure-pw mkdb /usr/local/etc/pureftpd.pdb -f /usr/local/etc/proftpd.passwd
 
-  echo "Restarting PureFTPD"
+  printf "Restarting PureFTPD\n"
   ${SERVICE} pureftpd restart
 
   return
@@ -3480,18 +3480,18 @@ proftpd_install() {
 
   ## Update directadmin.conf
   setVal pureftp 0 ${DA_CONF_TEMPLATE_FILE}
-  setVal pureftp 0 ${DA_CONF_FILE}
-
   setVal ftpconfig /usr/local/etc/proftpd.conf ${DA_CONF_TEMPLATE_FILE}
   setVal ftppasswd /usr/local/etc/proftpd.passwd ${DA_CONF_TEMPLATE_FILE}
-  # setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF_TEMPLATE_FILE}
+  setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF_TEMPLATE_FILE}
   setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf ${DA_CONF_TEMPLATE_FILE}
 
-  setVal ftpconfig /usr/local/etc/proftpd.conf ${DA_CONF_FILE}
-  setVal ftppasswd /usr/local/etc/proftpd.passwd ${DA_CONF_FILE}
-  # setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF_FILE}
-  setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf ${DA_CONF_FILE}
-
+  if [ -e "${DA_CONF_FILE}" ]; then
+    setVal pureftp 0 ${DA_CONF_FILE}
+    setVal ftpconfig /usr/local/etc/proftpd.conf ${DA_CONF_FILE}
+    setVal ftppasswd /usr/local/etc/proftpd.passwd ${DA_CONF_FILE}
+    setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF_FILE}
+    setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf ${DA_CONF_FILE}
+  fi
 
   ## Update services.status
   set_service pure-ftpd delete
@@ -3537,7 +3537,7 @@ proftpd_install() {
 
   else
     ## Truncate the configuration file
-    echo "" > ${PROFTPD_CLAMAV_CONF}
+    printf "" > ${PROFTPD_CLAMAV_CONF}
   fi
 
   # /usr/local/libexec/proftpd --configtest
@@ -4052,7 +4052,7 @@ webapps_install() {
   chmod -R 770 ${WWW_DIR}/webmail/tmp
   chown -R ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail
   chown -R ${APACHE_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail/tmp
-  echo "Deny from All" >> ${WWW_DIR}/webmail/tmp/.htaccess
+  printf "Deny from All\n" >> ${WWW_DIR}/webmail/tmp/.htaccess
 
   ### Main Installation
 
@@ -4259,10 +4259,10 @@ do_rewrite_httpd_alias() {
     HA="${APACHE_EXTRA_PATH}/httpd-alias.conf"
 
     ## Truncate file
-    echo -n "" > ${HA}
+    printf "" > ${HA}
 
     if [ "${OPT_USE_HOSTNAME_FOR_ALIAS}" = "YES" ]; then
-      echo "RewriteEngine On" >> ${HA}
+      printf "RewriteEngine On\n" >> ${HA}
     fi
 
     add_alias_redirect ${HA} config redirect.php
@@ -4294,7 +4294,7 @@ do_rewrite_httpd_alias() {
 
     if [ -s "${WEBAPPS_LIST}" ]; then
       # CB2: http://forum.directadmin.com/showthread.php?t=48203&p=247343#post247343
-      echo "Adding custom webapps from ${WEBAPPS_LIST}"
+      printf "Adding custom webapps from %s\n" "${WEBAPPS_LIST}"
 
       ## Verify:
       while read l < "${WEBAPPS_LIST}"; do
@@ -4517,19 +4517,19 @@ create_httpd_nginx() {
 ## Copied from CB2
 doApacheCheck() {
   if [ ! -e "${APACHE_EXTRA_PATH}/httpd-includes.conf" ]; then
-    echo -n "" > "${APACHE_EXTRA_PATH}/httpd-includes.conf"
+    printf "" > "${APACHE_EXTRA_PATH}/httpd-includes.conf"
   fi
 
   if [ ! -e "${SUPHP_HTTPD}" ]; then
-    echo -n "" > "${SUPHP_HTTPD}"
+    printf "" > "${SUPHP_HTTPD}"
   fi
 
   if [ ! -e "${APACHE_EXTRA_PATH}/httpd-php-handlers.conf" ]; then
-    echo -n "" > "${APACHE_EXTRA_PATH}/httpd-php-handlers.conf"
+    printf "" > "${APACHE_EXTRA_PATH}/httpd-php-handlers.conf"
   fi
 
   if [ ! -e "${APACHE_EXTRA_PATH}/httpd-phpmodules.conf" ]; then
-    echo -n "" > "${APACHE_EXTRA_PATH}/httpd-phpmodules.conf"
+    printf "" > "${APACHE_EXTRA_PATH}/httpd-phpmodules.conf"
   fi
 }
 
@@ -4630,9 +4630,9 @@ rewrite_confs() {
 
     PHPMODULES=${APACHE_EXTRA_PATH}/httpd-phpmodules.conf
 
-    echo -n "" > "${APACHE_EXTRA_PATH}/httpd-nginx.conf"
+    printf "" > "${APACHE_EXTRA_PATH}/httpd-nginx.conf"
 
-    echo -n "" > "${PHPMODULES}"
+    printf "" > "${PHPMODULES}"
 
     if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
       ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' "${APACHE_CONF}"
@@ -4767,7 +4767,7 @@ rewrite_confs() {
     create_httpd_nginx
 
     if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-      echo "Restarting Apache"
+      printf "Restarting Apache\n"
       ${SERVICE} apachectl restart
     fi
   fi
@@ -4816,7 +4816,7 @@ rewrite_confs() {
     if [ ! -e "${NGINXCONF}/nginx-modsecurity-enable.conf" ]; then
       touch "${NGINXCONF}/nginx-modsecurity-enable.conf"
     elif [ "${MODSECURITY_OPT}" = "no" ]; then
-      echo -n '' > "${NGINXCONF}/nginx-modsecurity-enable.conf"
+      printf '' > "${NGINXCONF}/nginx-modsecurity-enable.conf"
     fi
 
     if [ "${NGINXCUSTOMCONFDIR}" != "0" ]; then
@@ -4847,7 +4847,7 @@ rewrite_confs() {
 
     rewrite_php_confs
 
-    echo "Restarting nginx."
+    printf "Restarting nginx.\n"
     # /usr/sbin/nginx -s stop >/dev/null 2>&1
     # control_service nginx start
     ${SERVICE} nginx restart
@@ -4891,7 +4891,7 @@ rewrite_vhosts() {
     mkdir -p "${PATHNAME}"
   fi
 
-  echo -n '' > ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf
+  printf '' > ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf
 
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
     for i in $(ls /usr/local/directadmin/data/users/*/nginx.conf); do
@@ -4918,10 +4918,10 @@ rewrite_vhosts() {
 suhosin_install() {
 
   if [ "${OPT_SUHOSIN}" != "YES" ]; then
-    echo "*** Error: Suhosin is not enabled in options.conf"
+    printf "*** Error: Suhosin is not enabled in options.conf\n"
   fi
 
-  echo "Starting Suhosin installation"
+  printf "Starting Suhosin installation\n"
 
   ## Main Installation
   pkgi "${PORT_SUHOSIN}"
@@ -4929,7 +4929,7 @@ suhosin_install() {
   ## Add support for scanning uploads using ClamAV
   if [ "${OPT_SUHOSIN_UPLOADSCAN}" = "YES" ] && [ ! -e "${CLAMDSCAN_BIN}" ]; then
     if [ "${OPT_CLAMAV}" = "NO" ]; then
-      echo "*** Error: Cannot install suhosin with PHP upload scan using ClamAV, because ${CLAMDSCAN_BIN} does not exist on the system and CLAMAV=NO is set in the options.conf file."
+      printf "*** Error: Cannot install suhosin with PHP upload scan using ClamAV,\n because %s does not exist on the system and CLAMAV=NO is set in the options.conf file." "${CLAMDSCAN_BIN}"
       return #exit
     fi
 
@@ -4957,12 +4957,12 @@ tokenize_IP() {
   if [ "${IP}" = "" ]; then
     IP="$(grep -m1 "${HOSTNAME}" /etc/hosts | awk '{print $1}')"
     if [ "${IP}" = "" ]; then
-      echo "Unable to detect your server IP in /etc/hosts. Please enter it: "
+      printf "Unable to detect your server IP in /etc/hosts. \nPlease enter it: "
       read IP
     fi
   fi
   if [ "${IP}" = "" ]; then
-    echo "Unable to detect your server IP. Exiting..."
+    printf "Unable to detect your server IP. Exiting.\n"
     exit 0 # was: do_exit 0
   fi
 
@@ -4970,7 +4970,7 @@ tokenize_IP() {
     IP="[${IP}]"
   fi
 
-  echo "Using $IP for your server IP"
+  printf "Using %s for your server IP\n" "$IP"
 
   LAN_IP=$(getDA_Opt lan_ip "")
 
@@ -4995,7 +4995,7 @@ tokenize_IP() {
           eval "${STR}"
         fi
 
-        echo "Using $IP for your server IP"
+        printf "Using %s for your server IP\n" "$IP"
         STR="perl -pi -e 's/\|IP\|/$IP/' ${TOKENFILE_NGINX}"
         eval "${STR}"
       fi
@@ -5348,9 +5348,9 @@ rewrite_php_confs() {
         echo "</IfModule>"
       } > "${SUPHP_HTTPD}"
 
-      echo "Done."
+      printf "Done.\n"
     elif [ -e "${SUPHP_HTTPD}" ]; then
-      echo -n "" > "${SUPHP_HTTPD}"
+      printf "" > "${SUPHP_HTTPD}"
     fi
   fi
 }
@@ -5363,6 +5363,9 @@ bfm_setup() {
   # brute_force_roundcube_log=${WWW_DIR}/roundcube/logs/errors
   # brute_force_squirrelmail_log=${WWW_DIR}/squirrelmail/data/squirrelmail_access_log
   # brute_force_pma_log=${WWW_DIR}/phpMyAdmin/log/auth.log
+
+  setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" ${DA_CONF_TEMPLATE_FILE}
+  setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF_TEMPLATE_FILE}
 
   setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" ${DA_CONF_FILE}
   setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF_FILE}
