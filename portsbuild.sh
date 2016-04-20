@@ -228,7 +228,7 @@ NGINX_IPS_CONF=${NGINX_PATH}/directadmin-ips.conf
 #NGINX_PID=/var/run/nginx.pid
 
 ## Global WWW Directory (for webmail scripts)
-WWW_DIR=/usr/local/www ## Ports uses "${WWWDIR}"
+WWW_DIR=/usr/local/www ## Ports uses "${WWW_DIR}"
 WWW_TMP_DIR=${WWW_DIR}/tmp
 
 WEBMAIL_DIR=${WWW_DIR}/webmail
@@ -3006,7 +3006,7 @@ phpmyadmin_install() {
   CUSTOM_PMA_CONFIG="${PB_PATH}/custom/phpmyadmin/config.inc.php"
   CUSTOM_PMA_THEMES="${PB_PATH}/custom/phpmyadmin/themes"
 
-  ##REALPATH=${WWWDIR}/phpMyAdmin-${PHPMYADMIN_VER}
+  ##REALPATH=${WWW_DIR}/phpMyAdmin-${PHPMYADMIN_VER}
   #REALPATH=${WWW_DIR}/phpMyAdmin
   PMA_ALIAS_PATH="${WWW_DIR}/phpmyadmin"
 
@@ -3252,6 +3252,475 @@ apache_uninstall() {
 
   return
 }
+
+
+################################################################################################################################
+
+## Apache Install v2 (copied from doApache2 from CB2)
+
+apache_install_v2() {
+
+  if [ "${OPT_WEBSERVER}" != "apache" ]; then
+    printf "***\n"
+    return
+  fi
+
+  printf "Starting Apache installation\n"
+
+  ### Main Installation
+  if [ "${APACHE24_MAKE_SET}" = "" ] && [ "${APACHE24_MAKE_UNSET}" = "" ] ; then
+    pkgi ${PORT_APACHE24}
+  else
+    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" rmconfig
+    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" www_apache24_SET="${APACHE24_MAKE_SET}" www_apache24_UNSET="${APACHE24_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+  fi
+
+
+  if [ -e /sbin/kldload ]; then
+    if [ ! -e /boot/loader.conf ]; then
+      touch /boot/loader.conf
+      chmod 444 /boot/loader.conf
+    fi
+    if ! grep -q -m1 '^accf_http_load="YES"$' /boot/loader.conf; then
+      /sbin/kldload accf_http
+      echo 'accf_http_load="YES"' >> /boot/loader.conf
+    fi
+    if ! grep -q -m1 '^accf_data_load="YES"$' /boot/loader.conf; then
+      /sbin/kldload accf_data
+      echo 'accf_data_load="YES"' >> /boot/loader.conf
+    fi
+  fi
+
+  # if [ -e ${APACHE_CONF} ]; then
+  #   if [ "$(grep -m1 -c 'ServerType standalone' ${APACHE_CONF})" -ne 0 ]; then
+  #     convert
+  #   fi
+  # fi
+
+  ADMIN_HTTP=/usr/local/directadmin/data/users/admin/httpd.conf
+  if [ ! -e ${ADMIN_HTTP} ] && [ -d /usr/local/directadmin/data/users/admin ]; then
+    echo -n "" > ${ADMIN_HTTP}
+    chown diradmin:admin ${ADMIN_HTTP}
+    chmod 640 ${ADMIN_HTTP}
+  fi
+
+  ## Verify:
+  # if [ ! -e /usr/local/bin/pcre-config ]; then
+  #   removeLockfile
+  #   doPCRE
+  # fi
+
+  if [ ! -d /var/log/httpd/domains ]; then
+    mkdir -p /var/log/httpd/domains
+    chmod 711 /var/log/httpd
+  fi
+
+  ## Verify:
+  addUserGroup apache apache
+  backupHttp
+
+  ## Todo: Verify:
+  # if [ "$HARDEN_SYMLINKS_PATCH_OPT" = "yes" ]; then
+  #   if [ "${OPT_APACHE_VER}" = "2.4" ]; then
+  #     PATCH_NAME=harden-symlinks-2.4.patch
+  #     getFile ${PATCH_NAME} ${PATCH_NAME}
+  #   else
+  #     PATCH_NAME=harden-symlinks.patch.${APACHE2_VER}
+  #     getFile ${PATCH_NAME} harden-symlinks-patch
+  #   fi
+
+  #   if [ -s ${PATCH_NAME} ]; then
+  #     echo "Patching apache for hardened symlinks patch..."
+  #     if [ "${APACHE_VER_OPT}" = "2.4" ]; then
+  #       cd httpd-${APACHE2_VER}
+  #       patch -p0 < ../${PATCH_NAME}
+  #       cd ..
+  #     else
+  #       patch -p0 < ${PATCH_NAME}
+  #     fi
+  #   else
+  #     echo "Cannot find ${PATCH_NAME} to for hardened symlinks patch."
+  #   fi
+  # fi
+
+  ## Verify: For ModSecurity
+  # if [ -d srclib/apr-util ]; then
+  #   echo "Patching srclib/apr-util/dbm/sdbm/sdbm_private.h..."
+  #   cd srclib/apr-util
+  #   patch -p0 < ${WORKDIR}/patches/sdbm_private.patch
+  #   cd ../../
+  # fi
+
+  ## Verify:
+  # echo "Patching apache to suexec safedir path..."
+  # if [ ! -s ../patches/suexec-safe.patch ]; then
+  #   echo "Error with patches/suexec-safe.patch. File is missing or empty"
+  # else
+  #   patch -p1 < ../patches/suexec-safe.patch
+  # fi
+
+  ## Verify:
+  # echo "Patching apache to allow SuexecUserGroup in Directory context..."
+  # if [ ! -s ../patches/mod_suexec_directory.patch ]; then
+  #   echo "Error with patches/mod_suexec_directory.patch. File is missing or empty"
+  # else
+  #   patch -p1 < ../patches/mod_suexec_directory.patch
+  # fi
+  #
+
+  # setFDSETSIZE
+
+  # echo "increasing FD_SETSIZE in os/tpf/os.h .."
+  # if [ -e ./os/tpf/os.h ]; then
+  #   perl -pi -e 's/\#define FD_SETSIZE.*2048/\#ifdef FD_SETSIZE\n\#undef FD_SETSIZE\n\#endif\n\#define FD_SETSIZE 32768/' ./os/tpf/os.h
+  # fi
+
+  # if [ -e ./srclib/apr/include/apr.hnw ]; then
+  #   perl -pi -e 's/FD_SETSIZE.*1024/FD_SETSIZE 32768/' ./srclib/apr/include/apr.hnw
+  # fi
+
+  # if [ -e ./srclib/apr/poll/unix/select.c ]; then
+  #   perl -pi -e 's/FD_SETSIZE.*1024/FD_SETSIZE 32768/' ./srclib/apr/poll/unix/select.c
+  # fi
+
+  setVal cloud_cache 0 ${DA_CONF_TEMPLATE_FILE}
+  setVal cloud_cache 0 ${DA_CONF_FILE}
+
+  setVal nginx 0 ${DA_CONF_TEMPLATE_FILE}
+  setVal nginx 0 ${DA_CONF_FILE}
+
+  if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    setVal nginx_proxy 1 ${DA_CONF_TEMPLATE_FILE}
+    setVal nginx_proxy 1 ${DA_CONF_FILE}
+    setVal litespeed 0 ${DA_CONF_TEMPLATE_FILE}
+    setVal litespeed 0 ${DA_CONF_FILE}
+    set_service litespeed delete
+    killall litespeed >/dev/null 2>&1
+    killall -9 litespeed >/dev/null 2>&1
+    doRestartDA
+  elif [ "${OPT_WEBSERVER}" = "apache" ]; then
+    setVal nginx_proxy 0 ${DA_CONF_TEMPLATE_FILE}
+    setVal nginx_proxy 0 ${DA_CONF_FILE}
+    setVal litespeed 0 ${DA_CONF_TEMPLATE_FILE}
+    setVal litespeed 0 ${DA_CONF_FILE}
+    killall nginx >/dev/null 2>&1
+    killall litespeed >/dev/null 2>&1
+    doRestartDA
+    set_service nginx delete
+    set_service litespeed delete
+    killall -9 nginx >/dev/null 2>&1
+    killall -9 litespeed >/dev/null 2>&1
+  fi
+
+  if [ "${OPT_WEBSERVER}" != "litespeed" ]; then
+    if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ] || [ ! -e /usr/sbin/httpd ]; then
+      set_service httpd ON
+      #rm -f /usr/sbin/apxs
+    fi
+  else
+    set_service httpd delete
+    set_service nginx delete
+  fi
+
+  # if [ ! -e /etc/mime.types ]; then
+  #   cp docs/conf/mime.types /etc/mime.types
+  # fi
+
+  # ln -sf /var/www/build /etc/httpd/build
+
+  chown webapps:apache ${WWW_DIR}
+  chmod 551 ${WWW_DIR}
+
+  ## Verify:
+  restoreHttp
+
+  # Fix for downgrades to let $1$ passwords version of apr-utils (1.4.1) work, if 1.5.1 was installed previously.
+  if [ "${APACHE_VER_OPT}" = "2.4" ] && [ "${APR_UTIL_VER}" = "1.4.1" ] && [ "${OPT_WEBSERVER}" != "litespeed" ]; then
+    if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ] || [ ! -e /usr/sbin/httpd ]; then
+      APR_51_LIB=${HTTPDDIR}/lib/libaprutil-1.so.0.5.1
+      APR_41_LIB=${HTTPDDIR}/lib/libaprutil-1.so.0.4.1
+      APR_LIB_LINK=${HTTPDDIR}/lib/libaprutil-1.so.0
+      if [ -e "${APR_51_LIB}" ] && [ -e "${APR_41_LIB}" ]; then
+        rm -f ${APR_LIB_LINK}
+        rm -f ${APR_51_LIB}
+        ln -s libaprutil-1.so.0.4.1 ${APR_LIB_LINK}
+      fi
+    fi
+  fi
+
+  if [ "${OPT_WEBSERVER}" != "litespeed" ]; then
+    if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ] || [ ! -e /usr/sbin/httpd ]; then
+      #ensure /usr/sbin/apxs
+      if [ ! -s /usr/sbin/apxs ] && [ -s /usr/bin/apxs ]; then
+        ln -s /usr/bin/apxs /usr/sbin/apxs
+      fi
+
+
+        if [ ${OS} = "FreeBSD" ]; then
+          cp -f ${CWD}/httpd_2_freebsd /usr/local/etc/rc.d/httpd
+          chmod 755 /usr/local/etc/rc.d/httpd
+
+        fi
+    fi
+  fi
+
+  #Disable nginx & litespeed when switching to apache
+  if [ "${OPT_WEBSERVER}" = "apache" ]; then
+
+        if [ -e /usr/local/etc/rc.d/nginx ]; then
+          rm -f /usr/local/etc/rc.d/nginx
+        fi
+        if [ -e /usr/local/etc/rc.d/litespeed ]; then
+          rm -f /etc/init.d/litespeed
+        fi
+  fi
+
+  HAVE_DACONF=0
+  if [ -s ${DA_CONF_FILE} ]; then
+    HAVE_DACONF=1
+  fi
+
+  #check directadmin.conf file
+  if [ "`grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_TEMPLATE_FILE}`" = "1" ]; then
+    perl -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/etc/httpd/conf/extra/directadmin-vhosts.conf#' ${DA_CONF_TEMPLATE_FILE}
+  fi
+
+  if [ "${HAVE_DACONF}" = "1" ] && [ "`grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_FILE}`" = "1" ]; then
+    if [ "`grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_FILE}`" = "1" ]; then
+      ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/etc/httpd/conf/extra/directadmin-vhosts.conf#' ${DA_CONF_FILE}
+      doRestartDA
+    fi
+
+    mv -f ${APACHE_CONF} ${APACHE_CONF}.${APACHE_VER_OPT}.backup
+
+    cp -rf ${APCONFDIR} ${HTTPDDIR}
+
+    if [ "${APCUSTOMCONFDIR}" != "0" ]; then
+      cp -rf ${APCUSTOMCONFDIR} ${HTTPDDIR}
+    fi
+    cp -rf ${APACHE_CONF}.${APACHE_VER_OPT}.backup/ssl.key ${APACHE_CONF}
+    cp -rf ${APACHE_CONF}.${APACHE_VER_OPT}.backup/ssl.crt ${APACHE_CONF}
+    doRestartDA
+  fi
+
+  #copy the new configs if needed
+  if [ "`grep -m1 -c 'Include' ${APACHE_CONF}/extra/directadmin-vhosts.conf`" = "0" ] || [ ! -e ${APACHE_CONF}/extra/directadmin-vhosts.conf ]; then
+    cp -rf ${APCONFDIR} ${HTTPDDIR}
+
+    HDC=httpd-directories-old.conf
+
+    ln -sf $HDC ${APACHE_CONF}/extra/httpd-directories.conf
+
+    doApacheHostConf
+
+    if [ "${APCUSTOMCONFDIR}" != "0" ]; then
+      cp -rf ${APCUSTOMCONFDIR} ${HTTPDDIR}
+    fi
+  fi
+
+  create_httpd_nginx
+
+  #hide frontpage from the interface to avoid confusion
+  hideFrontpage
+
+  #ensure we have the correct apache_ver
+  if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE_FILE})" -eq "0" ]; then
+    echo "apache_ver=2.0" >> ${DA_CONF_TEMPLATE_FILE}
+    echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
+    doRestartDA
+  elif [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE_FILE})" -ne "0" ]; then
+    perl -pi -e 's/$(grep -m1 apache_ver= ${DA_CONF_TEMPLATE_FILE})/apache_ver=2.0/' ${DA_CONF_TEMPLATE_FILE}
+  fi
+  if [ "${HAVE_DACONF}" = "1" ]; then
+    if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_FILE})" -eq "0" ]; then
+      echo "apache_ver=2.0" >> ${DA_CONF_FILE}
+      doRestartDA
+      echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
+    elif [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_FILE})" -ne "0" ]; then
+      ${PERL} -pi -e 's/`grep -m1 apache_ver= ${DA_CONF_FILE})/apache_ver=2.0/' ${DA_CONF_FILE}
+      doRestartDA
+      echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
+    fi
+  fi
+
+  fpmChecks
+  dovecotChecks
+
+  if [ "${HAVE_FPM_CGI}" = "yes" ]; then
+    ${PERL} -pi -e 's/nginx/apache/' /usr/local/directadmin/data/templates/php-fpm.conf
+  fi
+
+  ensure_server_ca
+
+  do_rewrite_httpd_alias
+
+  #rewrite ips.conf if needed
+  echo "action=rewrite&value=ips" >> ${DA_TASK_QUEUE}
+  echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
+
+  run_dataskq
+
+  #tokenize the IP and ports if needed
+  tokenize_IP
+  tokenize_ports
+
+  #add all the Include lines if they do not exist
+  if [ "`grep -m1 -c 'Include' ${APACHE_CONF}/extra/directadmin-vhosts.conf`" = "0" ] || [ ! -e ${APACHE_CONF}/extra/directadmin-vhosts.conf ]; then
+    doVhosts
+    cd ${CWD}/httpd-${APACHE2_VER}
+  fi
+
+  if [ ! -s /etc/httpd/conf/ssl.key/server.key ] || [ ! -s /etc/httpd/conf/ssl.crt/server.crt ]; then
+    cd ${WORKDIR}
+    mkdir -p /etc/httpd/conf/ssl.key
+    mkdir -p /etc/httpd/conf/ssl.crt
+    #install the cert/key
+    /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout /etc/httpd/conf/ssl.key/server.key -out /etc/httpd/conf/ssl.crt/server.crt -days 9999 -nodes -config ./${APCERTCONF}
+
+    chmod 600 ${APACHE_CONF}/ssl.crt/server.crt
+    chmod 600 ${APACHE_CONF}/ssl.key/server.key
+
+  fi
+
+  doApacheCheck
+
+  mkdir -p ${WWW_DIR}
+
+  if [ ! -e ${WWW_DIR}/index.html ]; then
+    if [ -e ${WWW_DIR}/index.html.en ]; then
+      cp -f ${WWW_DIR}/index.html.en ${WWW_DIR}/index.html
+    else
+      echo "<html>Apache is functioning normally</html>" > ${WWW_DIR}/index.html
+    fi
+  fi
+  ${PERL} -pi -e 's/Nginx/Apache/' ${WWW_DIR}/index.html
+  if [ ! -e /etc/logrotate.d/apache ] && [ ${OS} != "FreeBSD" ]; then
+    wget ${WGET_CONNECT_OPTIONS} ${WEBPATH}/apache.logrotate -O /etc/logrotate.d/apache
+  fi
+
+  if [ ! -d /usr/local/safe-bin ]; then
+    mkdir -p /usr/local/safe-bin
+    chmod 511 /usr/local/safe-bin
+    chown apache:apache /usr/local/safe-bin
+  fi
+
+  # Make sure apr is linked correctly
+  if [ -e /usr/bin/apr-1-config ]; then
+    ln -sf /usr/bin/apr-1-config /usr/bin/apr-config
+  fi
+
+  PHPMODULES=${APACHE_CONF}/extra/httpd-phpmodules.conf
+
+  if [ -e ${PHPMODULES} ]; then
+    # if [ "${MOD_RUID2_OPT}" = "no" ] && [ "${PHP1_MODE_OPT}" = "lsphp" ]; then
+    #     echo "Mutex posixsem" >> ${PHPMODULES}
+    # fi
+
+    if [ "${MODSECURITY_OPT}" = "yes" ] && [ ! -e /usr/local/lib/apache/mod_security2.so ] && [ "${OPT_WEBSERVER}" = "apache" ]; then
+      doModSecurity
+    fi
+
+    COUNT="$(grep -m1 -c 'httpd-modsecurity' ${PHPMODULES})"
+    if [ "${MODSECURITY_OPT}" = "yes" ] && [ "${OPT_WEBSERVER}" = "apache" ] && [ ${COUNT} -eq 0 ]; then
+      perl -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' /etc/httpd/conf/httpd.conf
+      echo "Include /etc/httpd/conf/extra/httpd-modsecurity.conf" >> ${PHPMODULES}
+      cp -pf ${MODSECURITY_APACHE_INCLUDE} /etc/httpd/conf/extra/httpd-modsecurity.conf
+    fi
+
+    if ! grep -m1 -q '/usr/local/lib/apache/mod_mpm_' ${PHPMODULES}; then
+      #Use event MPM for php-fpm and prefork for mod_php
+      if [ "${APACHE_MPM_OPT}" = "auto" ]; then
+        if [ "${HAVE_CLI}" = "no" ]; then
+          # Add to httpd-phpmodules.conf
+          echo "LoadModule mpm_event_module /usr/lib/apache/mod_mpm_event.so" >> ${PHPMODULES}
+        else
+          # Add to httpd-phpmodules.conf
+          echo "LoadModule mpm_prefork_module /usr/lib/apache/mod_mpm_prefork.so" >> ${PHPMODULES}
+        fi
+      elif [ "${APACHE_MPM_OPT}" = "event" ]; then
+        echo "LoadModule mpm_event_module /usr/lib/apache/mod_mpm_event.so" >> ${PHPMODULES}
+      elif [ "${APACHE_MPM_OPT}" = "worker" ]; then
+        echo "LoadModule mpm_worker_module /usr/lib/apache/mod_mpm_worker.so" >> ${PHPMODULES}
+      else
+        echo "LoadModule mpm_prefork_module /usr/lib/apache/mod_mpm_prefork.so" >> ${PHPMODULES}
+      fi
+    fi
+
+    if [ "${OPT_HTSCANNER}" = "yes" ]; then
+      if [ "${OPT_WEBSERVER}" = "apache" ]  || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+        if [ "${HAVE_FCGID}" = "yes" ] || [ "${HAVE_FPM_CGI}" = "yes" ] || [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+          if ! grep -m1 -c 'htscanner_module' ${PHPMODULES}; then
+            ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
+            echo "LoadModule htscanner_module /usr/lib/apache/mod_htscanner2.so" >> ${PHPMODULES}
+          else
+            ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
+            ${PERL} -pi -e 's|^LoadModule  htscanner_module|^#LoadModule htscanner_module' ${PHPMODULES}
+          fi
+          doModHtscanner
+        fi
+      fi
+    fi
+
+    if [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+      if ! grep -m1 -q 'suphp_module' ${PHPMODULES}; then
+        ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' ${APACHE_CONF}
+        echo "LoadModule  suphp_module    /usr/lib/apache/mod_suphp.so" >> ${PHPMODULES}
+      fi
+    fi
+
+    if [ "${HAVE_FCGID}" = "yes" ]; then
+      if [ ! -s /usr/lib/apache/mod_fcgid.so ]; then
+        doModFCGID
+      fi
+      if ! grep -m1 -q 'fcgid_module' ${PHPMODULES}; then
+        ${PERL} -pi -e 's|^LoadModule  mod_fcgid|#LoadModule mod_fcgid|' /etc/httpd/conf/httpd.conf
+        echo "LoadModule  fcgid_module    /usr/lib/apache/mod_fcgid.so" >> ${PHPMODULES}
+      fi
+      if ! grep -m1 -q 'httpd-fcgid.conf' ${PHPMODULES}; then
+        echo "Include /etc/httpd/conf/extra/httpd-fcgid.conf" >> ${PHPMODULES}
+      fi
+    fi
+
+    if [ "${HAVE_FCGID}" = "yes" ] || [ "${HAVE_FPM_CGI}" = "yes" ] || [ "${HAVE_SUPHP_CGI}" = "yes" ]; then
+      if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+        if [ "${OPT_HTSCANNER}" = "yes" ] && [ ! -e /usr/local/lib/apache/mod_htscanner2.so ]; then
+          doModHtscanner
+        fi
+      fi
+    fi
+  fi
+
+  # Make sure there is no SSLMutex in /etc/httpd/conf/extra/httpd-ssl.conf
+  # Make sure there is no LockFile in /etc/httpd/conf/extra/httpd-mpm.conf
+  if [ "${APACHE_VER_OPT}" = "2.4" ]; then
+    ${PERL} -pi -e 's/^SSLMutex/#SSLMutex/' /etc/httpd/conf/extra/httpd-ssl.conf
+    ${PERL} -pi -e 's/^LockFile/#LockFile/' /etc/httpd/conf/extra/httpd-mpm.conf
+  fi
+
+  # Disable UserDir access if userdir_access=no is set in the options.conf file
+  if [ "${USERDIR_ACCESS_OPT}" = "no" ]; then
+    ${PERL} -pi -e 's#UserDir public_html#UserDir disabled#' /etc/httpd/conf/extra/httpd-vhosts.conf
+  else
+    ${PERL} -pi -e 's#UserDir disabled#UserDir public_html#' /etc/httpd/conf/extra/httpd-vhosts.conf
+  fi
+
+  doModHostingLimits 0
+  doModLsapi 0
+
+  ldconfig
+
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    echo "Restarting apache."
+    control_service httpd restart
+  elif [ "${OPT_WEBSERVER}" = "litespeed" ] && [ -e ${INITDDIR}/litespeed ]; then
+    echo "Restarting litespeed."
+    control_service litespeed restart
+  fi
+
+  writeLog "Apache ${APACHE2_VER} installed"
+
+}
+
 
 ################################################################################################################################
 
@@ -4902,7 +5371,7 @@ rewrite_vhosts() {
       echo "Include $i" >> "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf"
     done
   elif [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    echo -n '' > "${NGINXCONF}/directadmin-vhosts.conf"
+    printf '' > "${NGINXCONF}/directadmin-vhosts.conf"
     for i in $(ls /usr/local/directadmin/data/users/*/nginx.conf); do
       echo "include $i;" >> "${NGINXCONF}/directadmin-vhosts.conf"
     done
@@ -5506,9 +5975,9 @@ validate_options() {
         echo "     ./dataskq d1"
         exit 1
       fi
-    else
-      setVal unified_ftp_password_file 1 ${DA_CONF_TEMPLATE_FILE}
-      setVal unified_ftp_password_file 1 ${DA_CONF_FILE}
+    # else
+    #   setVal unified_ftp_password_file 1 ${DA_CONF_TEMPLATE_FILE}
+    #   setVal unified_ftp_password_file 1 ${DA_CONF_FILE}
     fi
   fi
 

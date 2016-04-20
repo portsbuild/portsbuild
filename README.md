@@ -14,7 +14,7 @@ Service 		| Versions      | Status
 --------------- | ------------- | -------
 Apache          | 2.4.18+       | Supported
 PHP-FPM         | 5.5/5.6/7.0   | Supported
-MariaDB         | 5.5/10.0      | Supported
+MariaDB         | 5.5/10.0/10.1 | Supported
 MySQL           | 5.5/5.6       | Supported
 Dovecot         | 2.2.x         | Supported
 Exim            | 4.8x          | Supported

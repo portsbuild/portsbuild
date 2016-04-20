@@ -312,3 +312,6 @@ with DISABLE_D_OPT set, but macros whitelisting will be
 removed in some future Exim release, so it is better
 to use TRUSTED_CONFIG_LIST to set the list of trusted
 configuration files.
+
+ mount_smbfs -I enclave -U saro //saro@enclave/portsbuild/ /mnt/pb/
+ 
