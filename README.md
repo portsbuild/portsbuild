@@ -12,7 +12,7 @@ The source code for this project will be open source. A distribution & copyright
 
 Service 		| Versions      | Status
 --------------- | ------------- | -------
-Apache          | 2.4.18+       | Supported
+Apache          | 2.4.x         | Supported
 PHP-FPM         | 5.5/5.6/7.0   | Supported
 MariaDB         | 5.5/10.0/10.1 | Supported
 MySQL           | 5.5/5.6       | Supported
@@ -21,7 +21,7 @@ Exim            | 4.8x          | Supported
 SpamBlocker     | 4.3.x         | Supported
 ClamAV          | 0.9x          | Supported
 SpamAssassin    | 3.4           | Supported
-RoundCube       | 1.1.3+        | In progress
+RoundCube       | 1.1.x         | In progress
 phpMyAdmin      | 4.5.x         | Supported
 proftpd         | 1.3.5a        | Supported
 pure-FTPd       | 1.0.42        | Supported
@@ -42,10 +42,9 @@ PortsBuild will NOT support:
 * mod_ruid2 - unsupported on FreeBSD
 
 ### Supported Operating Systems
-* FreeBSD 10.2 x64 (primary focus)
+* FreeBSD 10.3 x64 (primary focus)
 * FreeBSD 9.3 x64 (working)
 
-Untested on upcoming FreeBSD 10.3 branch (waiting for -RELEASE).
 
 ### Currently known issues and limitations
 * BIND (named) does not restart after adding a domain on 9.3 due to startup script location in /etc/rc.d/ instead of /usr/local/etc/rc.d/ (DirectAdmin limitation)
