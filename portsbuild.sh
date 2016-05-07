@@ -53,7 +53,7 @@
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160423
+PB_BUILD_DATE=20160506
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -77,7 +77,7 @@ if [ "${OS}" = "FreeBSD" ]; then
   if [ "${OS_B64}" -eq 1 ]; then
     if [ "${OS_VER}" != "10.1" ] && [ "${OS_VER}" != "10.2" ] && [ "${OS_VER}" != "10.3" ] && [ "${OS_VER}" != "9.3" ]; then
       printf "Warning: Unsupported FreeBSD operating system detected.\n"
-      printf "PortsBuild has been tested to work with FreeBSD versions 9.3, 10.1 and 10.2 amd64 only.\n"
+      printf "PortsBuild has been tested to work with FreeBSD versions 9.3, 10.1, 10.2 and 10.3 amd64 only.\n"
       printf "You can press CTRL+C within 5 seconds to quit the PortsBuild script now, or proceed at your own risk.\n"
       sleep 5
     fi
@@ -177,7 +177,7 @@ DA_LAN=0
 DA_INSECURE=0
 HTTP=https
 EXTRA_VALUE=""
-BIND_ADDRESS=--bind-address=$IP
+BIND_ADDRESS=--bind-address=$DA_SERVER_IP
 
 ## CustomBuild Paths & Files
 CB_PATH=${DA_PATH}/custombuild
@@ -462,6 +462,7 @@ PORT_MYSQL56=databases/mysql56-server
 PORT_MYSQL57=databases/mysql57-server
 PORT_MARIADB55=databases/mariadb55-server
 PORT_MARIADB100=databases/mariadb100-server
+PORT_MARIADB101=databases/mariadb101-server
 
 ## Ports: Database Clients
 PORT_MYSQL55_CLIENT=databases/mysql55-client
@@ -469,6 +470,7 @@ PORT_MYSQL56_CLIENT=databases/mysql56-client
 PORT_MYSQL57_CLIENT=databases/mysql56-client
 PORT_MARIADB55_CLIENT=databases/mariadb55-client
 PORT_MARIADB100_CLIENT=databases/mariadb100-client
+PORT_MARIADB101_CLIENT=databases/mariadb101-client
 
 ## Ports: Web Stats
 PORT_AWSTATS=www/awstats
@@ -537,7 +539,7 @@ ROUNDCUBE_MAKE_UNSET=""
 PMA_MAKE_SET=""
 PMA_MAKE_UNSET=""
 
-EXIM_MAKE_SET="DMARC SPF SA_EXIM SRS" # DCC MILTER
+EXIM_MAKE_SET="SPF SA_EXIM SRS" # DMARC DCC MILTER
 EXIM_MAKE_UNSET=""
 
 SPAMASSASSIN_MAKE_SET="DKIM SPF_QUERY" # DCC PYZOR RAZOR RELAY_COUNTRY
@@ -711,7 +713,7 @@ setVal() {
 
   ## Check if file exists.
   if [ ! -e "${3}" ]; then
-    printf "setVal(): File not found: %s" ${3}
+    printf "setVal(): File not found: %s\n" ${3}
     return
   fi
 
@@ -1014,6 +1016,8 @@ global_setup() {
     ETHERNET_DEV=$5
     DA_SERVER_IP=$6
     DA_SERVER_IP_MASK=$7
+    DA_LAN=$8
+    DA_INSECURE=$9
   fi
 
   printf "Global System Setup Initiated\n"
@@ -1051,6 +1055,16 @@ global_setup() {
   if [ "${OPT_MODSECURITY}" = "YES" ]; then ( printf ", ModSecurity" ); fi
   ## htscanner
   printf "\n\n"
+
+  if [ "${DA_LAN}" = 1 ]; then
+    printf "LAN Mode: Enabled\n"
+  fi
+
+  if [ "${DA_INSECURE}" = 1 ]; then
+    printf "Insecure Mode: Enabled\n"
+  fi
+
+  printf "\n"
 
   # echo "PHP ini Type: ${OPT_PHP_INI_TYPE}"
   # echo "Webapps Inbox Prefix: ${OPT_WEBAPPS_INBOX_PREFIX}"
@@ -1149,6 +1163,12 @@ global_setup() {
     sysrc -f /etc/sysctl.conf net.inet6.ip6.v6only=0
     ${SYSCTL} net.inet6.ip6.v6only=0
 
+    ## Verify if /etc/hosts has the localhost entry
+    VERIFY_HOSTS=$(grep 127.0.0.1 /etc/hosts | grep -c localhost)
+    if [ "${VERIFY_HOSTS}" -eq 0 ]; then
+      printf "127.0.0.1\t\tlocalhost\n" >> /etc/hosts
+    fi
+
     ## Disable sendmail if Exim is enabled
     if [ "${OPT_EXIM}" = "YES" ] || [ "${OPT_DISABLE_SENDMAIL}" = "YES" ] ; then
       printf "Disabling sendmail from running (updating /etc/rc.conf)\n"
@@ -1204,6 +1224,9 @@ global_setup() {
       fi
     fi
 
+    ## Replace templates/proftpd.conf with corrected version:
+    cp -f "${PB_PATH}/configure/proftpd/proftpd.conf" "${DA_PATH}/data/templates/proftpd.conf"
+
     chown -f diradmin:diradmin ${CB_CONF}
     chmod 755 "${CB_CONF}"
 
@@ -1217,6 +1240,16 @@ global_setup() {
     printf "Running ./directadmin p\n"
     cd ${DA_PATH} || exit
     ./directadmin p
+
+    ## From DA's scripts/install.sh
+    COUNT=$(grep -c -e '^admin:' /etc/group)
+    if [ "$COUNT" -eq 0 ]; then
+      COUNT=$(grep -c -e '^admin:' /etc/passwd)
+      if [ "$COUNT" -eq 1 ]; then
+        # We have a user, but no admin group.
+        /usr/sbin/pw groupadd admin
+      fi
+    fi
 
     ## Todo:
     # ${SERVICE} directadmin start
@@ -1470,6 +1503,11 @@ directadmin_install() {
 
   mkdir -p ${DA_PATH}
 
+  if [ ! -s "${DA_PATH}/update.tar.gz" ]; then
+    rm "${DA_PATH}/update.tar.gz"
+  fi
+
+
   ## PB: Testing mode (so I don't download the same tar over and over...)
   if [ -e /mnt/pb/update.tar.gz ]; then
     cp -f /mnt/pb/update.tar.gz ${DA_PATH}/update.tar.gz
@@ -1504,7 +1542,7 @@ directadmin_install() {
     exit 5
   fi
 
-  ## PB: Update addip and startips scripts with improved versions
+  ## PB: Todo: Update addip and startips scripts with improved versions
   # if [ ! -e ${DA_PATH}/scripts/custom/addip ]; then
   #   if [ -e "${PB_PATH}/directadmin/scripts/custom/addip" ]; then
   #     mkdir -p "${DA_PATH}/scripts/custom"
@@ -1653,20 +1691,36 @@ directadmin_install() {
   fi
 
   ## Testing mode: create a fake license.key file
-  if [ -d /mnt/pb ]; then
-    touch ${DA_LICENSE_FILE}
+  # if [ -d /mnt/pb ]; then
+  #   touch ${DA_LICENSE_FILE}
+  # fi
+
+  COUNT=$(grep -c "* You are not allowed to run this program *" ${DA_LICENSE_FILE})
+  if [ "${COUNT}" -ne 0 ]; then
+    rm "${DA_LICENSE_FILE}"
   fi
+
+  # if [ ! -s "${DA_LICENSE_FILE}" ]; then
+  #   rm "${DA_LICENSE_FILE}"
+  # fi
 
   ## Download DirectAdmin License file (untested)
   if [ ! -e "${DA_LICENSE_FILE}" ]; then
-    ${WGET} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
+
+    # if [ "${DA_LAN}" -eq 0 ]; then
+    #   ${WGET} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz --bind-address="${DA_SERVER_IP}" "${HTTP}://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+    # elif [ "${DA_LAN}" -eq 1 ]; then
+    #   ${WGET} --no-check-certificate -S -O ${DA_PATH}/update.tar.gz "${HTTP}://www.directadmin.com/cgi-bin/daupdate?uid=${DA_USER_ID}&lid=${DA_LICENSE_ID}"
+    # fi
+
+    ${WGET} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}&uid=${DA_USER_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
     if [ $? -ne 0 ]; then
       printf "*** Error: Unable to download the DirectAdmin license file.\n"
       da_myip
       printf "Trying the license relay server...\n"
 
-      ${WGET} "${HTTP}://license.directadmin.com/licenseupdate.php?lid=${DA_LICENSE_ID}\&uid=${DA_LICENSE_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
+      ${WGET} "${HTTP}://license.directadmin.com/licenseupdate.php?lid=${DA_LICENSE_ID}&uid=${DA_USER_ID}${EXTRA_VALUE}" -O "${DA_LICENSE_FILE}" "${BIND_ADDRESS}"
 
       if [ $? -ne 0 ]; then
         printf "*** Error: Unable to download the DirectAdmin license file from relay server as well.\n"
@@ -1675,8 +1729,8 @@ directadmin_install() {
       fi
     fi
 
-    COUNT=$(grep -c "* You are not allowed to run this program *" ${DA_LICENSE_FILE})
-    if [ "${COUNT}" -ne 0 ]; then
+    LICENSE_CHECK=$(grep -c "* You are not allowed to run this program *" ${DA_LICENSE_FILE})
+    if [ "${LICENSE_CHECK}" -ne 0 ]; then
       echo "*** Error: You are not authorized to download the DirectAdmin license"
       echo "           with that Client ID and License ID (and/or IP address)."
       echo "           Please email sales@directadmin.com"
@@ -2000,6 +2054,18 @@ exim_install() {
 
 }
 
+################################################################
+
+## Exim Upgrade
+exim_upgrade() {
+
+  pkg upgrade -y ${PORT_EXIM}
+
+  ${SERVICE} exim restart
+
+  return
+}
+
 ################################################################################################################################
 
 ## SpamAssassin Installation Tasks
@@ -2020,6 +2086,8 @@ spamassassin_install() {
   pkgi www/p5-LWP-UserAgent-WithCache
   # pkgi www/p5-LWP-UserAgent-Determined
   pkgi net/p5-Net-Patricia
+  pkgi mail/p5-Mail-DKIM
+  pkgi mail/p5-Mail-SPF
 
   printf "Starting SpamAssassin installation\n"
 
@@ -3314,10 +3382,6 @@ apache_install() {
     sysrc -x nginx_enable
   fi
 
-
-
-
-
   HAVE_DACONF=0
   if [ -s ${DA_CONF_FILE} ]; then
     HAVE_DACONF=1
@@ -3361,11 +3425,11 @@ apache_install() {
 
     ln -sf $HDC ${APACHE_EXTRA_PATH}/httpd-directories.conf
 
-    doApacheHostConf
+    apache_rewrite_confs
 
     ## Custom Configurations
     if [ "${APCUSTOMCONFDIR}" != "0" ]; then
-      cp -rf ${APCUSTOMCONFDIR} ${APACHE_PATH}
+      cp -rf "${APCUSTOMCONFDIR}" ${APACHE_PATH}
     fi
   fi
 
@@ -3428,7 +3492,7 @@ apache_install() {
   tokenize_ports
 
   ## CB2: add all the Include lines if they do not exist
-  if [ "$(grep -m1 -c 'Include' ${APACHE_CONF}/extra/directadmin-vhosts.conf)" = "0" ] || [ ! -e ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf ]; then
+  if [ "$(grep -m1 -c 'Include' ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf)" = "0" ] || [ ! -e "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf" ]; then
     ## CB2: doVhosts
     rewrite_vhosts
   fi
@@ -3451,7 +3515,7 @@ apache_install() {
     if [ -e ${WWW_DIR}/index.html.en ]; then
       cp -f ${WWW_DIR}/index.html.en ${WWW_DIR}/index.html
     else
-      printf "<html>\n<head>\n<title></title>\n</head>\n<body>\n<p>Apache is functioning normally</p>\n</body>\n</html>" > ${WWW_DIR}/index.html
+      printf "<html>\n<head>\n<title>Default Page</title>\n</head>\n<body>\n<p>Apache is functioning normally</p>\n</body>\n</html>\n" > ${WWW_DIR}/index.html
     fi
   fi
 
@@ -3481,10 +3545,10 @@ apache_install() {
     fi
 
     COUNT="$(grep -m1 -c 'httpd-modsecurity' ${PHPMODULES})"
-    if [ "${OPT_MODSECURITY}" = "YES" ] && [ "${OPT_WEBSERVER}" = "apache" ] && [ ${COUNT} -eq 0 ]; then
+    if [ "${OPT_MODSECURITY}" = "YES" ] && [ "${OPT_WEBSERVER}" = "apache" ] && [ "${COUNT}" -eq 0 ]; then
       perl -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' ${APACHE_CONF}
       echo "Include ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf" >> ${PHPMODULES}
-      cp -pf ${MODSECURITY_APACHE_INCLUDE} ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf
+      cp -pf "${MODSECURITY_APACHE_INCLUDE}" "${APACHE_EXTRA_PATH}/httpd-modsecurity.conf"
     fi
 
     ## Figure out which Apache MPM module we need to load
@@ -3578,9 +3642,6 @@ apache_install() {
     ${SERVICE} apache24 restart
   fi
 
-
-
-
   if [ ${COMPAT_APACHE24_SYMLINKS} = "YES" ]; then
 
     printf "PortsBuild+DirectAdmin Compatibility mode: Creating symlinks for Apache\n"
@@ -3629,7 +3690,6 @@ apache_install() {
     fi
 
   fi
-
 
   ## CB2: writeLog "Apache ${APACHE2_VER} installed"
 }
@@ -3898,10 +3958,10 @@ apache_install_v2() {
 
     ln -sf $HDC ${APACHE_EXTRA_PATH}/httpd-directories.conf
 
-    doApacheHostConf
+    apache_rewrite_confs
 
     if [ "${APCUSTOMCONFDIR}" != "0" ]; then
-      cp -rf ${APCUSTOMCONFDIR} ${APACHE_PATH}
+      cp -rf "${APCUSTOMCONFDIR}" ${APACHE_PATH}
     fi
   fi
 
@@ -3953,10 +4013,9 @@ apache_install_v2() {
   tokenize_ports
 
   ## CB2: add all the Include lines if they do not exist
-  if [ "$(grep -m1 -c 'Include' ${APACHE_CONF}/extra/directadmin-vhosts.conf)" = "0" ] || [ ! -e ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf ]; then
+  if [ "$(grep -m1 -c 'Include' ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf)" = "0" ] || [ ! -e "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf" ]; then
     ## CB2: doVhosts
     rewrite_vhosts
-    cd ${CWD}/httpd-${APACHE2_VER}
   fi
 
   if [ ! -s ${APACHE_SSL_KEY} ] || [ ! -s ${APACHE_SSL_CRT} ]; then
@@ -5366,6 +5425,23 @@ verify_webapps_tmp() {
 
 ################################################################################################################################
 
+## Get Webmail Link (copied from CB2)
+get_webmail_link() {
+
+  WEBMAIL_LINK=roundcube
+  if [ "${OPT_ROUNDCUBE}" = "NO" ]; then
+    WEBMAIL_LINK=squirrelmail
+  fi
+
+  if [ -s ${DA_CONF_FILE} ] && [ -s ${DA_PATH}/directadmin ]; then
+    WEBMAIL_LINK=$(/usr/local/directadmin/directadmin c | grep -m1 '^webmail_link' | cut -d= -f2)
+  fi
+
+  echo "${WEBMAIL_LINK}"
+}
+
+################################################################################################################################
+
 ## Apache Host Configuration (copied from CB2: doApacheHostConf())
 apache_rewrite_confs() {
 
@@ -5467,6 +5543,54 @@ apache_rewrite_confs() {
   ##fi
 
   return
+}
+
+################################################################################################################################
+
+## Add Alias Redirect (copied from CB2)
+add_alias_redirect() {
+  AF=$1
+  A=$2
+  P=$3
+
+  HTTP=http://
+  if [ "${OPT_REDIRECT_HOST_HTTPS}" = "YES" ]; then
+    HTTP=https://
+  fi
+
+  HOST_ALIAS=no
+  if [ "${OPT_USE_HOSTNAME_FOR_ALIAS}" = "YES" ]; then
+    HOST_ALIAS=yes
+  fi
+
+  IS_WELL_KNOWN=no
+  if [ "${P}" = ".well-known" ]; then
+    IS_WELL_KNOWN=yes
+  fi
+
+  if [ "${HOST_ALIAS}" = "YES" ] && [ "${IS_WELL_KNOWN}" = "NO" ]; then
+    {
+      echo "RewriteCond %{HTTP_HOST} !^${OPT_REDIRECT_HOST}\$"
+      echo "RewriteCond %{REQUEST_URI} ^/${A}/ [OR]"
+      echo "RewriteCond %{REQUEST_URI} ^/${A}\$ [OR]"
+      echo "RewriteRule ^/${A}(.*) ${HTTP}${OPT_REDIRECT_HOST}/${P}\$1"
+      echo ""
+    } >> "${AF}"
+  fi
+
+  ## CB2: For Let's Encrypt challenges
+  if [ "${IS_WELL_KNOWN}" = "YES" ]; then
+    LETSENCRYPT=$(getDA_Opt letsencrypt 0)
+    if [ "${LETSENCRYPT}" = "1" ]; then
+      echo "Alias /${A} ${WWW_DIR}/${P}" >> "${AF}"
+    fi
+    return
+  fi
+
+  ## CB2: "! -e /usr/local/www/${A}" is used to add Alias'es for the RewriteRules that don't have /usr/local/www/ALIAS
+  if [ "${HOST_ALIAS}" = "NO" ] || [ ! -e "${WWW_DIR}/${A}" ]; then
+    echo "Alias /${A} ${WWW_DIR}/${P}" >> "${AF}"
+  fi
 }
 
 ################################################################################################################################
@@ -6837,18 +6961,23 @@ validate_options() {
     *) printf "*** Error: Invalid WEBSERVER value set in options.conf\n"; exit ;;
   esac
 
-  case $(uc ${USERDIR_ACCESS}) in
+  case $(lc ${USERDIR_ACCESS}) in
     "yes"|"no") OPT_USERDIR_ACCESS=${USERDIR_ACCESS} ;;
     *) printf "*** Error: Invalid USERDIR_ACCESS value set in options.conf\n"; exit ;;
   esac
 
-  case $(uc ${USE_HOSTNAME_FOR_ALIAS}) in
+  case $(uc ${REDIRECT_HOST_HTTPS}) in
+    "YES"|"NO"|"AUTO") OPT_REDIRECT_HOST_HTTPS=${REDIRECT_HOST_HTTPS} ;;
+    *) printf "*** Error: Invalid REDIRECT_HOST_HTTPS value set in options.conf\n"; exit ;;
+  esac
+
+  case $(lc ${USE_HOSTNAME_FOR_ALIAS}) in
     "yes"|"no"|"auto") OPT_USE_HOSTNAME_FOR_ALIAS=${USE_HOSTNAME_FOR_ALIAS} ;;
     *) printf "*** Error: Invalid USE_HOSTNAME_FOR_ALIAS value set in options.conf\n"; exit ;;
   esac
 
   case $(lc ${SQL_DB}) in
-    "mysql55"|"mysql56"|"mysql57"|"mariadb55"|"mariadb100") OPT_SQL_DB="${SQL_DB}" ;;
+    "mysql55"|"mysql56"|"mysql57"|"mariadb55"|"mariadb100"|"mariadb101") OPT_SQL_DB="${SQL_DB}" ;;
     "no"|"none") OPT_SQL_DB="NO" ;;
     *) printf "*** Error: Invalid SQL_DB value set in options.conf\n"; exit ;;
   esac
@@ -7096,6 +7225,9 @@ install_app() {
     "mariadb100")
       pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
       sql_post_install ;;
+    "mariadb101")
+      pkgi ${PORT_MARIADB101} ${PORT_MARIADB101_CLIENT}
+      sql_post_install ;;
     "mysql55")
       pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
       sql_post_install ;;
@@ -7148,13 +7280,13 @@ update() {
   #fetch -o ./${PORTSBUILD_NAME}.tar.gz "${PB_MIRROR}/${PORTSBUILD_NAME}.tar.gz"
 
   if [ -s "${PORTSBUILD_NAME}.tar.gz" ]; then
-    printf "Extracting %s.tar.gz...\n" ${PORTSBUILD_NAME}
+    printf "Extracting %s.tar.gz...\n" "${PORTSBUILD_NAME}"
 
     tar xvf "${PORTSBUILD_NAME}.tar.gz" --no-same-owner
 
     chmod 700 portsbuild.sh
   else
-    printf "Unable to extract %s.tar.gz\n" ${PORTSBUILD_NAME}
+    printf "Unable to extract %s.tar.gz\n" "${PORTSBUILD_NAME}"
   fi
 
   ## Symlink pb->portsbuild.sh
@@ -7312,7 +7444,7 @@ rewrite_app() {
     "nginx") rewrite_nginx_confs ;;
     "php") rewrite_php_confs ;;
     "virtual") rewrite_virtual_confs ;;
-    *) show_rewrite_menu ;;
+    "") show_rewrite_menu ;;
   esac
 
   return
@@ -7371,7 +7503,6 @@ show_install() {
     echo "webalizer:Webalizer"
   } | column -t -s:
 
-
   # echo "Available packages to install:"
   # echo "apache Apache 2.4"
   # echo "awstats Awstats"
@@ -7387,6 +7518,7 @@ show_install() {
   # echo "mariadb MariaDB"
   # # echo "mariadb55 MariaDB 5.5"
   # # echo "mariadb100 MariaDB 10.0"
+  # # echo "mariadb101 MariaDB 10.1"
   # echo "mysql MySQL"
   # # echo "mysql55 MySQL 5.5"
   # # echo "mysql56 MySQL 5.6"
@@ -7402,13 +7534,14 @@ show_install() {
   # echo "webalizer Webalizer"
 
   return
-
 }
 
 ################################################################################################################################
 
 ## Show logo :)
 show_logo() {
+
+  printf "\n"
   printf "                ___\\\/_\n"
   printf "               /  /\/\\\  \n"
   printf "       _______/  /___  \n"
@@ -7512,8 +7645,9 @@ show_menu() {
     # printf "\tverify: Verify something\n"
     # printf "\n"
     printf "\tversions: Show version information on installed services\n"
-    printf "\n"
   } | column -t -s:
+
+  printf "\n"
 
 # menu_command
 # menu_command_desc
@@ -7551,7 +7685,7 @@ case "$1" in
   "version") show_version ;;            ## show portsbuild version
   "v"|"versions"|"installed") show_app_versions ;;  ## show app/service versions via pkg
   "pbtest") ./portsbuild.sh setup 1234 56789 pb.fallout.local em0 127.0.0.2 255.255.255.0 ;;
-  *) show_main_menu ;;
+  "") show_main_menu ;;
 esac
 
 ################################################################################################################################
