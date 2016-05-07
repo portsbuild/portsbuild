@@ -204,7 +204,7 @@ APACHE_PATH=/usr/local/etc/apache24
 APACHE_EXTRA_PATH=${APACHE_PATH}/extra
 APACHE_LIB_PATH=${APACHE_LIB_PATH}
 APACHE_CONF=${APACHE_PATH}/httpd.conf
-APACHE_HOST_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
+APACHE_HOSTNAME_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
 APACHE_MIME_TYPES=${APACHE_PATH}/mime.types
 
 APACHE_SSL_KEY=${APACHE_PATH}/ssl/server.key
@@ -1704,7 +1704,7 @@ directadmin_install() {
   #   rm "${DA_LICENSE_FILE}"
   # fi
 
-  ## Download DirectAdmin License file (untested)
+  ## Download DirectAdmin License file
   if [ ! -e "${DA_LICENSE_FILE}" ]; then
 
     # if [ "${DA_LAN}" -eq 0 ]; then
@@ -2915,17 +2915,17 @@ fpmChecks() {
 ## Dovecot Checks (copied from CB2: dovecotChecks())
 dovecotChecks() {
   if [ -e /etc/dovecot.conf ]; then
-    COUNT=`grep -m1 -c '/etc/httpd/conf/' /etc/dovecot.conf`
+    COUNT=`grep -m1 -c '/usr/local/etc/apache24/' /usr/local/etc/dovecot.conf`
     if [ "${OPT_WEBSERVER}" = "nginx" ] && [ ${COUNT} -gt 0 ]; then
-      perl -pi -e 's#/etc/httpd/conf/#/etc/nginx/#' /etc/dovecot.conf
-      if grep -m1 -q '/etc/nginx/' /etc/dovecot.conf; then
-        control_service dovecot restart
+      ${PERL} -pi -e 's#/usr/local/etc/apache24/#/usr/local/etc/nginx/#' /usr/local/etc/dovecot.conf
+      if grep -m1 -q '/usr/local/etc/nginx/' /usr/local/etc/dovecot.conf; then
+        ${SERVICE} dovecot restart
       fi
-    elif [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "litespeed" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    elif [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
       if [ ${COUNT} -eq 0 ]; then
-        perl -pi -e 's#/etc/nginx/#/etc/httpd/conf/#' /etc/dovecot.conf
-        if grep -m1 -q '/etc/httpd/conf/' /etc/dovecot.conf; then
-          control_service dovecot restart
+        ${PERL} -pi -e 's#/usr/local/etc/nginx/#/usr/local/etc/apache24/#' /usr/local/etc/dovecot.conf
+        if grep -m1 -q '/usr/local/etc/apache24/' /usr/local/etc/dovecot.conf; then
+          ${SERVICE} dovecot restart
         fi
       fi
     fi
@@ -3361,7 +3361,7 @@ apache_install() {
 
   restoreHttp
 
-  apache_rewrite_confs
+  #apache_host_conf
 
   ## Update /boot/loader.conf
   sysrc -f /boot/loader.conf accf_http_load="YES"
@@ -3425,7 +3425,7 @@ apache_install() {
 
     ln -sf $HDC ${APACHE_EXTRA_PATH}/httpd-directories.conf
 
-    apache_rewrite_confs
+    apache_host_conf
 
     ## Custom Configurations
     if [ "${APCUSTOMCONFDIR}" != "0" ]; then
@@ -3958,7 +3958,7 @@ apache_install_v2() {
 
     ln -sf $HDC ${APACHE_EXTRA_PATH}/httpd-directories.conf
 
-    apache_rewrite_confs
+    apache_host_conf
 
     if [ "${APCUSTOMCONFDIR}" != "0" ]; then
       cp -rf "${APCUSTOMCONFDIR}" ${APACHE_PATH}
@@ -5443,16 +5443,14 @@ get_webmail_link() {
 ################################################################################################################################
 
 ## Apache Host Configuration (copied from CB2: doApacheHostConf())
-apache_rewrite_confs() {
+apache_host_conf() {
 
-  ## if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+  APACHE_HOSTNAME_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
 
-    APACHE_HOST_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
-
-    ## Copy custom/ file
-    ## APACHE_HOST_CONF_CUSTOM
+  ## Copy custom/ file
+  ## APACHE_HOSTNAME_CONF_CUSTOM
   if [ -e "${PB_PATH}/custom/ap2/conf/extra/httpd-hostname.conf" ]; then
-    cp -pf "${PB_PATH}/custom/ap2/conf/extra/httpd-hostname.conf" ${APACHE_HOST_CONF}
+    cp -pf "${PB_PATH}/custom/ap2/conf/extra/httpd-hostname.conf" ${APACHE_HOSTNAME_CONF}
   else
     {
       if [ "${HAVE_FPM_CGI}" = "YES" ]; then
@@ -5495,7 +5493,7 @@ apache_rewrite_confs() {
         echo "    php_admin_value upload_tmp_dir ${APP_TMP}"
         echo '  </IfModule>'
       fi
-    } > ${APACHE_HOST_CONF}
+    } > ${APACHE_HOSTNAME_CONF}
 
       verify_webapps_tmp
 
@@ -5512,14 +5510,14 @@ apache_rewrite_confs() {
           echo "  <IfModule mod_fcgid.c>"
           echo "    FcgidWrapper /usr/local/safe-bin/fcgid${OPT_PHP1_VERSION}.sh .php"
           if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
-            printf "  SuexecUserGroup %s %s" "${WEBAPPS_USER}" "${WEBAPPS_GROUP}"
+            printf "  SuexecUserGroup %s %s\n" "${WEBAPPS_USER}" "${WEBAPPS_GROUP}"
           fi
           echo '    <FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
           echo "      Options +ExecCGI"
           echo "      AddHandler fcgid-script .php"
           echo "    </FilesMatch>"
           echo "  </IfModule>"
-        } >> ${APACHE_HOST_CONF}
+        } >> ${APACHE_HOSTNAME_CONF}
       fi
 
       ## PHP2: FastCGI:
@@ -5528,17 +5526,17 @@ apache_rewrite_confs() {
           echo "  <IfModule mod_fcgid.c>"
           echo "    FcgidWrapper /usr/local/safe-bin/fcgid${OPT_PHP2_VERSION}.sh .php${OPT_PHP2_VERSION}"
           if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
-            printf "  SuexecUserGroup %s %s" "${WEBAPPS_USER}" "${WEBAPPS_GROUP}"
+            printf "  SuexecUserGroup %s %s\n" "${WEBAPPS_USER}" "${WEBAPPS_GROUP}"
           fi
           echo "  <FilesMatch \"\.php${OPT_PHP2_VERSION}\$\">"
           echo "      Options +ExecCGI"
           echo "      AddHandler fcgid-script .php${OPT_PHP2_VERSION}"
           echo "    </FilesMatch>"
           echo "  </IfModule>"
-          } >> ${APACHE_HOST_CONF}
+          } >> ${APACHE_HOSTNAME_CONF}
       fi
 
-      echo "</Directory>" >> ${APACHE_HOST_CONF}
+      echo "</Directory>" >> ${APACHE_HOSTNAME_CONF}
     fi
   ##fi
 
@@ -5893,7 +5891,7 @@ rewrite_confs() {
 
     ln -sf $HDC "${APACHE_EXTRA_PATH}/httpd-directories.conf"
 
-    apache_rewrite_confs
+    apache_host_conf
 
     ## Todo: Custom configurations
     if [ "${APCUSTOMCONFDIR}" != "0" ]; then
@@ -6668,7 +6666,7 @@ rewrite_php_confs() {
   fpmChecks
 
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    apache_rewrite_confs
+    apache_host_conf
 
     ## Custom Configuration
     if [ -e "${PB_PATH}/custom/ap2/conf/extra/httpd-php-handlers.conf" ]; then
@@ -7437,7 +7435,7 @@ show_debug() {
 rewrite_app() {
 
   case $2 in
-    "apache"|"apache24") apache_rewrite_confs ;;
+    "apache"|"apache24") apache_host_conf ;;
     "exim") exim_rewrite_confs ;;
     "dovecot") dovecot_rewrite_confs ;;
     "named"|"bind"|"dns") named_rewrite_confs ;;
