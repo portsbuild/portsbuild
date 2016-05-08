@@ -177,7 +177,7 @@ DA_LAN=0
 DA_INSECURE=0
 HTTP=https
 EXTRA_VALUE=""
-BIND_ADDRESS=--bind-address=$DA_SERVER_IP
+BIND_ADDRESS="--bind-address=${DA_SERVER_IP}"
 
 ## CustomBuild Paths & Files
 CB_PATH=${DA_PATH}/custombuild
@@ -384,6 +384,7 @@ MODSECURITY_CUSTOM_RULES=${PB_PATH}/custom/modsecurity/conf
 
 ## Compatibility Settings
 COMPAT_APACHE24_SYMLINKS=YES
+COMPAT_EXIM_SYMLINKS=YES
 
 ################################################################################################################################
 
@@ -490,7 +491,8 @@ PORT_WEBALIZER=www/webalizer
 # DEFAULT_PHP_VER=56
 # PHP1_VER=56
 
-## These variables are included every time 'make' is called. Default is to source /etc/make.conf.
+## These variables are included every time 'make' is called.
+## Default is to source /etc/make.conf
 GLOBAL_MAKE_VARIABLES="" # e.g. WITH_OPENSSL_PORT=YES BATCH=YES WITH_CCACHE_BUILD=YES
 
 ## These options are included every time a Port is built via 'make'.
@@ -500,7 +502,7 @@ GLOBAL_MAKE_UNSET="" # EXAMPLES X11 HTMLDOCS CUPS TESTS DOCS NLS
 APACHE24_MAKE_SET="SUEXEC MPM_EVENT"
 APACHE24_MAKE_UNSET="MPM_PREFORK"
 
-## Todo: Harden symlinks patch?
+## Todo: Harden symlinks patch
 # APACHE24_EXTRA_PATCHES=""
 
 NGINX_MAKE_SET=""
@@ -564,6 +566,8 @@ PUREFTPD_MAKE_UNSET=""
 # MARIADB55_MAKE_UNSET=""
 # MARIADB100_MAKE_SET=""
 # MARIADB100_MAKE_UNSET=""
+# MARIADB101_MAKE_SET="TOKUDB"
+# MARIADB101_MAKE_UNSET=""
 # MYSQL55_MAKE_SET=""
 # MYSQL55_MAKE_UNSET=""
 # MYSQL56_MAKE_SET=""
@@ -573,10 +577,10 @@ PUREFTPD_MAKE_UNSET=""
 
 ################################################################################################################################
 
+## Todo:
 # if [ ! -f options.conf ]; then
-# # recreate them # exit;
+# # recreate file # exit;
 # fi
-
 
 ## See if IPV6 is enabled in DirectAdmin:
 IPV6_ENABLED=0
@@ -617,6 +621,7 @@ OPENSSL_EXTRA=""
 ## Get DirectAdmin Option Values (copied from CB2)
 ## Retrieves values from directadmin/conf/options.conf
 getDA_Opt() {
+
   ## $1 is option name
   ## $2 is default value
 
@@ -640,6 +645,7 @@ getDA_Opt() {
 
 ## Emulate ${!variable} (copied from CB2)
 eval_var() {
+
   var=${1}
   if [ -z "${var}" ]; then
     echo ""
@@ -654,6 +660,7 @@ eval_var() {
 ## Get Option (copied from CB2)
 ## Used to retrieve CB options.conf
 getOpt() {
+
   ## $1 = option name
   ## $2 = default value
 
@@ -671,6 +678,7 @@ getOpt() {
 ## Set Option (copied from CB2)
 ## Used to manipulate CB options.conf
 setOpt() {
+
   ## $1 = option name
   ## $2 = value
   ## PB Note: no eval_var
@@ -738,6 +746,7 @@ setVal() {
 ## Get Value ($1) from file ($2)
 ## (might deprecate this with sysrc as a replacement)
 getVal() {
+
   ## $1 = option
   ## $2 = file to parse
 
@@ -768,6 +777,7 @@ getVal() {
 ## Used to set values ON/OFF in the services.status (copied from CB2)
 ## set_service name ON|OFF|delete
 set_service() {
+
   if [ ! -e ${DA_SERVICES} ]; then
     return
   fi
@@ -798,9 +808,11 @@ set_service() {
 
 ################################################################################################################################
 
+## Todo:
 ## Get File from PB Mirror
-# e.g. getFile configure/proftpd/proftpd.conf ${PROFTPD_CONF}
+## e.g. getFile configure/proftpd/proftpd.conf ${PROFTPD_CONF}
 getfile() {
+
   ## $2 = source (input, from PB mirror)
   ## $3 = target (output)
   ## $4 = (optional)
@@ -813,6 +825,7 @@ getfile() {
 
 ## Convert string to lowercase
 lc() {
+
   local char="$*"
   out=$(echo $char | tr [:upper:] [:lower:])
   local retval=$?
@@ -824,6 +837,7 @@ lc() {
 
 ## Convert string to uppercase
 uc() {
+
   local char="$*"
   out=$(echo $char | tr [:lower:] [:upper:])
   local retval=$?
@@ -836,6 +850,7 @@ uc() {
 
 ## Ask User a Question
 ask_user() {
+
   ## $1 = question string
   ## not done: $2 = expected answer: "yn", "custom", etc. (optional)
   ## not done: $3 = execute command (optional)
@@ -862,6 +877,7 @@ ask_user() {
 
 ## pkg update
 pkg_update() {
+
   printf "Updating FreeBSD packages index\n"
   ${PKG} update
 }
@@ -870,6 +886,7 @@ pkg_update() {
 
 ## Install packages without prompts
 pkgi() {
+
   ${PKG} install -y "$@"
 }
 
@@ -877,6 +894,7 @@ pkgi() {
 
 ## Update /usr/ports
 ports_update() {
+
   printf "Updating /usr/ports\n"
   ${PORTSNAP} fetch update
 }
@@ -886,6 +904,7 @@ ports_update() {
 ## Todo: Rinse & Repeat
 ## (Need to work with eval)
 make_install_clean() {
+
   ## $1 = category?
   ## $2 = port?
 
@@ -908,6 +927,7 @@ make_install_clean() {
 
 ## Clean stale ports (deprecate soon)
 clean_stale_ports() {
+
   printf "Cleaning stale ports\n"
   ${PORTMASTER} -s
 }
@@ -917,6 +937,7 @@ clean_stale_ports() {
 ## Reinstall all ports "in place" (deprecate soon)
 ## Todo: migrate this process to synth
 reinstall_all_ports() {
+
   ## Consider -R
   ${PORTMASTER} -a -f -d
 
@@ -928,6 +949,7 @@ reinstall_all_ports() {
 
 ## Update /etc/hosts
 update_hosts() {
+
   COUNT=$(grep 127.0.0.1 /etc/hosts | grep -c localhost)
   if [ "$COUNT" -eq 0 ]; then
     printf "Updating /etc/hosts\n"
@@ -939,6 +961,7 @@ update_hosts() {
 
 ## Backup a file before performing an operation.
 backup_file() {
+
   return
 }
 
@@ -946,6 +969,7 @@ backup_file() {
 
 ## Get System Timezone (copied from CB2)
 getTimezone() {
+
   if [ -d /usr/share/zoneinfo ] && [ -e /etc/localtime ]; then
     MD5_LOCALTIME=$(md5 /etc/localtime | awk '{print $4}')
     # we don't use 'grep -m1' here to fix: "xargs: md5: terminated with signal 13; aborting"
@@ -963,6 +987,7 @@ getTimezone() {
 
 ## Add (new) User to (new) Group (copied from CB2)
 addUserGroup() {
+
   ## $1 = user
   ## $2 = group
 
@@ -978,6 +1003,7 @@ addUserGroup() {
 
 ## Random Password Generator (from CB2)
 random_pass() {
+
   ## $1 = length (default: 12)
 
   if [ "$1" = "" ]; then
@@ -994,6 +1020,7 @@ random_pass() {
 ## Setup PortsBuild and DirectAdmin
 ## Possible arguments: <USER_ID> <LICENSE_ID> <SERVER_FQDN> <ETH_DEV> (<IP_ADDRESS>)"
 global_setup() {
+
   ## $1 = setup
   ## $2 = user_id
   ## $3 = license_id
@@ -1266,6 +1293,7 @@ global_setup() {
 
 ## Global Post-Install Tasks
 global_post_install() {
+
   printf "All done!\n"
   # exit 0
 }
@@ -1275,6 +1303,7 @@ global_post_install() {
 ## Update System Startup Scripts
 ## Modifies /etc/rc.conf, /boot/loader.conf, /etc/periodic.conf, etc.
 update_rc() {
+
   ## Go through installed/enabled services and make sure they're all enabled.
   ## Perhaps rename this function to verify_rc?
 
@@ -1507,7 +1536,6 @@ directadmin_install() {
     rm "${DA_PATH}/update.tar.gz"
   fi
 
-
   ## PB: Testing mode (so I don't download the same tar over and over...)
   if [ -e /mnt/pb/update.tar.gz ]; then
     cp -f /mnt/pb/update.tar.gz ${DA_PATH}/update.tar.gz
@@ -1567,13 +1595,13 @@ directadmin_install() {
   fi
 
   ## Detect the ethernet interfaces that are available on the system, or use the one supplied by the user from first time setup
-  ## PB: NOTE: eth dev discovery can return more than 1 interface (even ones commented out) from /etc/rc.conf
+  ## PB: NOTE: Ethernet device discovery can return more than 1 interface (even ones commented out) from /etc/rc.conf
   if [ "${ETHERNET_DEV}" = "" ]; then
-    ETH_DEV="$(grep ifconfig /etc/rc.conf | cut -d= -f1 | cut -d_ -f2)"
-    if [ "$ETH_DEV" != "" ]; then
-      COUNT=$(grep -c ethernet_dev ${DA_CONF_TEMPLATE_FILE})
-      if [ "$COUNT" -eq 0 ]; then
-        printf "Setting ethernet_dev=${ETH_DEV} in DirectAdmin's Configuration Template File\n"
+    RC_ETH_DEV="$(grep ifconfig /etc/rc.conf | cut -d= -f1 | cut -d_ -f2)"
+    if [ "${RC_ETH_DEV}" != "" ]; then
+      ETH_COUNT=$(grep -c ethernet_dev ${DA_CONF_TEMPLATE_FILE})
+      if [ "${ETH_COUNT}" -eq 0 ]; then
+        printf "Setting ethernet_dev=%s in DirectAdmin's Configuration Template File\n" "${RC_ETH_DEV}"
         setVal ethernet_dev "${ETH_DEV}" "${DA_CONF_TEMPLATE_FILE}"
       fi
     fi
@@ -1759,27 +1787,34 @@ directadmin_install() {
 
 ## Copied from DA/scripts/getLicense.sh
 da_myip() {
-  IP=$(${WGET} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
 
-  if [ "${IP}" = "" ]; then
+  DISCOVERED_IP=$(${WGET} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
+
+  if [ "${DISCOVERED_IP}" = "" ]; then
     printf "*** Error: Cannot determine the server's IP address via myip.directadmin.com\n"
     return
   fi
 
-  printf "IP used to connect out: %s\n" "${IP}"
+  printf "IP used to connect out: %s\n" "${DISCOVERED_IP}"
+
+  return
 }
 
 ################################################################
 
 ## DirectAdmin Upgrade
 directadmin_upgrade() {
+
   return
 }
 
 ## DirectAdmin Restart
 directadmin_restart() {
+
   echo "action=directadmin&value=reload" >> "${DA_TASK_QUEUE}"
   run_dataskq
+
+  return
 }
 
 ################################################################################################################################
@@ -1797,6 +1832,9 @@ basic_system_security() {
 
 # setVal enforce_difficult_passwords 1 ${DA_CONF_TEMPLATE_FILE}
 # setVal enforce_difficult_passwords 1 ${DA_CONF_FILE}
+
+  printf "Please note that AllowUsers root was added to /etc/ssh/sshd_config as a precautionary step (in case you get locked out)\n"
+  printf "You may want to modify this value/file later on when setting up this machine for production use.\n"
 
   return
 }
@@ -1834,8 +1872,9 @@ install_cron() {
 ## <include> /etc/newsyslog.conf.d/*
 ## <include> /usr/local/etc/newsyslog.conf.d/*
 setup_newsyslog() {
-  #fix this
-  #cp /etc/newsyslog.conf.d/directadmin.conf /usr/local/etc/newsyslog.conf.d/
+
+  ## Fix this
+  # cp /etc/newsyslog.conf.d/directadmin.conf /usr/local/etc/newsyslog.conf.d/
 
   ## See what's enabled/installed on the system and update the newsyslog with the appropriate services
   ##
@@ -1847,8 +1886,9 @@ setup_newsyslog() {
 
 ################################################################################################################################
 
-## FreeBSD Set NewSyslog (Copied from CB2)
+## FreeBSD Set NewSyslog (from CB2)
 freebsd_set_newsyslog() {
+
   NSL_L=$1
   NSL_V=$2
 
@@ -1877,7 +1917,7 @@ freebsd_set_newsyslog() {
 
 ################################################################
 
-## Verify Webapps Log Rotation (copied from CB2)
+## Verify Webapps Log Rotation (from CB2)
 verify_webapps_logrotate() {
 
     # By default it sets each log to webapps:webapps.
@@ -1911,13 +1951,13 @@ verify_webapps_logrotate() {
 exim_install() {
 
   if [ "${OPT_EXIM}" != "YES" ]; then
-    printf "*** Notice: EXIM is disabled in options.conf\n"
+    printf "*** Notice: Exim is disabled in options.conf\n"
     return
   fi
 
   printf "Starting Exim installation\n"
 
-  ### Main Installation (verify: exim_user/exim_group arguments)
+  ### Main Installation
   if [ "${EXIM_MAKE_SET}" = "" ] && [ "${EXIM_MAKE_UNSET}" = "" ] ; then
     pkgi ${PORT_EXIM}
   else
@@ -1926,8 +1966,6 @@ exim_install() {
     OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
   fi
   # EXIM_USER="${EXIM_USER}" EXIM_GROUP="${EXIM_GROUP}"
-
-  ### Pre-Installation Tasks
 
   ## From: DA's scripts/install.sh
   mkdir -p ${VIRTUAL_PATH}
@@ -1982,11 +2020,6 @@ exim_install() {
   ## Set permissions
   chown -R ${EXIM_USER}:${EXIM_GROUP} /var/spool/exim
 
-  ## Symlink for compat:
-  if [ ! -e /etc/exim.conf ]; then
-    ln -s ${EXIM_CONF} /etc/exim.conf
-  fi
-
   ## Generate Self-Signed SSL Certificates
   ## See: http://help.directadmin.com/item.php?id=245
   ${OPENSSL_BIN} req -x509 -newkey rsa:2048 -keyout ${EXIM_SSL_KEY} -out ${EXIM_SSL_CRT} -days 9000 -nodes "${OPENSSL_EXTRA}"
@@ -1998,12 +2031,19 @@ exim_install() {
     chmod 644 ${EXIM_SSL_KEY}
   fi
 
-  if [ -e ${EXIM_SSL_CRT} ]; then
-    ln -s ${EXIM_SSL_CRT} /etc/exim.cert
-    chmod 644 ${EXIM_SSL_CRT}
+  ## Symlink for DA compat:
+  if [ "${COMPAT_EXIM_SYMLINKS}" = "YES" ]; then
+    if [ ! -e /etc/exim.conf ]; then
+      ln -s ${EXIM_CONF} /etc/exim.conf
+    fi
+
+    if [ -e ${EXIM_SSL_CRT} ]; then
+      ln -s ${EXIM_SSL_CRT} /etc/exim.cert
+      chmod 644 ${EXIM_SSL_CRT}
+    fi
   fi
 
-  ## Reference: Verify Exim config:
+  ## Verify Exim config:
   ${EXIM_BIN} -C "${EXIM_CONF}" -bV
 
   ## Update /etc/rc.conf
@@ -2012,6 +2052,7 @@ exim_install() {
   sysrc exim_flags="-bd -q1h"
 
   if [ ! -e /etc/periodic.conf ]; then
+    printf "Creating /etc/periodic.conf\n"
     touch /etc/periodic.conf
   fi
 
@@ -2024,7 +2065,10 @@ exim_install() {
 
   printf "Updating mq_exim_bin paths in DirectAdmin template + configuration files\n"
   setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_TEMPLATE_FILE}
-  setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_FILE}
+
+  if [ -e "${DA_CONF_FILE}" ]; then
+    setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_FILE}
+  fi
 
   ## Todo: Cleaner version
   ## Replace sendmail programs with Exim binaries.
@@ -2056,6 +2100,7 @@ exim_install() {
 
 ################################################################
 
+## Todo:
 ## Exim Upgrade
 exim_upgrade() {
 
@@ -2109,6 +2154,25 @@ spamassassin_install() {
 
   ## Update rules via 'sa-update' (or using sa-utils):
   # sa-update
+}
+
+################################################################
+
+## Todo:
+## SpamAssassin Upgrade
+spamassassin_upgrade() {
+
+  if [ "${SPAMASSASSIN_MAKE_SET}" = "" ] && [ "${SPAMASSASSIN_MAKE_UNSET}" = "" ] ; then
+    pkg upgrade -y ${PORT_SPAMASSASSIN}
+  else
+    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" rmconfig
+    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" mail_spamassassin_SET="${SPAMASSASSIN_MAKE_SET}" mail_spamassassin_UNSET="${SPAMASSASSIN_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+  fi
+
+  ${SERVICE} sa-spamd restart
+
+  return
 }
 
 ################################################################
@@ -2914,17 +2978,17 @@ fpmChecks() {
 
 ## Dovecot Checks (copied from CB2: dovecotChecks())
 dovecotChecks() {
-  if [ -e /etc/dovecot.conf ]; then
-    COUNT=`grep -m1 -c '/usr/local/etc/apache24/' /usr/local/etc/dovecot.conf`
-    if [ "${OPT_WEBSERVER}" = "nginx" ] && [ ${COUNT} -gt 0 ]; then
-      ${PERL} -pi -e 's#/usr/local/etc/apache24/#/usr/local/etc/nginx/#' /usr/local/etc/dovecot.conf
-      if grep -m1 -q '/usr/local/etc/nginx/' /usr/local/etc/dovecot.conf; then
+  if [ -e ${DOVECOT_CONF} ]; then
+    COUNT=$(grep -m1 -c '/usr/local/etc/apache24/' ${DOVECOT_CONF})
+    if [ "${OPT_WEBSERVER}" = "nginx" ] && [ "${COUNT}" -gt 0 ]; then
+      ${PERL} -pi -e 's#/usr/local/etc/apache24/#/usr/local/etc/nginx/#' ${DOVECOT_CONF}
+      if grep -m1 -q '/usr/local/etc/nginx/' ${DOVECOT_CONF}; then
         ${SERVICE} dovecot restart
       fi
     elif [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-      if [ ${COUNT} -eq 0 ]; then
-        ${PERL} -pi -e 's#/usr/local/etc/nginx/#/usr/local/etc/apache24/#' /usr/local/etc/dovecot.conf
-        if grep -m1 -q '/usr/local/etc/apache24/' /usr/local/etc/dovecot.conf; then
+      if [ "${COUNT}" -eq 0 ]; then
+        ${PERL} -pi -e 's#/usr/local/etc/nginx/#/usr/local/etc/apache24/#' ${DOVECOT_CONF}
+        if grep -m1 -q '/usr/local/etc/apache24/' ${DOVECOT_CONF}; then
           ${SERVICE} dovecot restart
         fi
       fi
@@ -6090,7 +6154,7 @@ rewrite_confs() {
     WEBMAILLINK=$(get_webmail_link)
     ${PERL} -pi -e "s#Alias /webmail \"/usr/local/www/roundcube/\"#Alias /webmail \"/usr/local/www/${WEBMAILLINK}/\"#" ${APACHE_EXTRA_PATH}/httpd-alias.conf
 
-    rewrite_php_confs
+    php_conf
 
     doModLsapi 0
 
@@ -6183,7 +6247,7 @@ rewrite_confs() {
       ${PERL} -pi -e "s| #include ${NGINX_PATH}/nginx-userdir.conf;| include ${NGINX_PATH}/nginx-userdir.conf;|" "${NGINX_PATH}/nginx-vhosts.conf"
     fi
 
-    rewrite_php_confs
+    php_conf
 
     printf "Restarting nginx.\n"
     # /usr/sbin/nginx -s stop >/dev/null 2>&1
@@ -6638,8 +6702,8 @@ tokenize_ports() {
 ################################################################################################################################
 
 ## Verify: Todo:
-## Rewrite PHP Configuration (copied from CB2: doPhpConf)
-rewrite_php_confs() {
+## PHP Configuration (copied from CB2: doPhpConf)
+php_conf() {
 
   if [ "${HAVE_FPM_CGI}" = "YES" ]; then
     for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
@@ -6698,10 +6762,6 @@ rewrite_php_confs() {
     eval $(echo "HAVE_FPM${php_shortrelease}=no")
   done
 
-  # eval $(echo "HAVE_FPM55=no")
-  # eval $(echo "HAVE_FPM56=no")
-  # eval $(echo "HAVE_FPM70=no")
-
   ## PHP1:
   if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
     ## PB: Future: ${SERVICE} "php-fpm${OPT_PHP1_VERSION}" restart
@@ -6717,24 +6777,26 @@ rewrite_php_confs() {
     eval $(echo "HAVE_FPM${OPT_PHP2_VERSION}=YES")
   fi
 
+  ## PHP1 FPM startup script:
   for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
     EVAL_FPM_VAR=HAVE_FPM${php_shortrelease}
     HAVE_SHORTRELEASE="$(eval_var ${EVAL_FPM_VAR})"
 
     if [ "${HAVE_SHORTRELEASE}" = "NO" ]; then
-        if [ -e "${INITDDIR}/php-fpm${php_shortrelease}" ]; then
-          "${INITDDIR}/php-fpm${php_shortrelease}" stop
-        else
-          ${SERVICE} php-fpm stop
-        fi
-        # set_service php-fpm${php_shortrelease} delete
-        # boot/init script: rm -f ${INITDDIR}/php-fpm${php_shortrelease}
+      if [ -e "${INITDDIR}/php-fpm${php_shortrelease}" ]; then
+        ${SERVICE} "php-fpm${php_shortrelease}" stop
+      else
+        ## Default non-prefixed installation
+        ${SERVICE} php-fpm stop
+      fi
+      set_service "php-fpm${php_shortrelease}" delete
+      # boot/init script: rm -f ${INITDDIR}/php-fpm${php_shortrelease}
     fi
   done
 
+  ## Writing data to suphp.conf:
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
-      ## Writing data to suphp.conf:
       {
         echo "[global]"
         echo ";Path to logfile"
@@ -6749,7 +6811,7 @@ rewrite_php_confs() {
         echo ";Path all scripts have to be in"
         echo "docroot=/"
         echo ""
-        echo "; Security options"
+        echo ";Security options"
         echo "allow_file_group_writeable=false"
         echo "allow_file_others_writeable=false"
         echo "allow_directory_group_writeable=false"
@@ -6776,6 +6838,7 @@ rewrite_php_confs() {
         echo "[handlers]"
         echo ";Handler for php-scripts"
 
+        ## PHP1:
         if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
           echo "x-httpd-php${OPT_PHP1_VERSION}=\"php:/usr/local/php${OPT_PHP1_VERSION}/bin/php-cgi${OPT_PHP1_VERSION}\""
         fi
@@ -7440,7 +7503,7 @@ rewrite_app() {
     "dovecot") dovecot_rewrite_confs ;;
     "named"|"bind"|"dns") named_rewrite_confs ;;
     "nginx") rewrite_nginx_confs ;;
-    "php") rewrite_php_confs ;;
+    "php") php_conf ;;
     "virtual") rewrite_virtual_confs ;;
     "") show_rewrite_menu ;;
   esac
