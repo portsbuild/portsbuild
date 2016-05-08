@@ -1,11 +1,15 @@
-# SpamBlockerTechnology* powered exim.conf, Version 4.4.2
-# Dec 5, 2015
-#
-# *** PortsBuild Version ***
-#
+# SpamBlockerTechnology* powered exim.conf, Version 4.3.4
+# beta-1
+# September 9, 2014 03:03 (-0700)
 # Exim configuration file for DirectAdmin
 # Requires exim.pl as distributed by DirectAdmin here:
-# http://files.directadmin.com/services/exim.pl version 21 or higher
+# http://files.directadmin.com/services/exim.pl version 19 or higher
+# New version 4.2.1 removes obsolete dnsbl.njabl.org blocklist
+# and two ahbl blocklists; see: # http://forum.directadmin.com/showthread.php?t=48774
+# Edit#42 : entire section now commented out as there is no other
+# name-based blocklist in use
+# Includes SpamBlockerTechnology blocklists and optimizations:
+# http://www.nobaloney.net/downloads/spamblocker/
 # ClamAV optional
 # SpamAssassin optional
 # Dovecot/IMAP Mandatory
@@ -66,13 +70,10 @@ smtp_active_hostname = ${if exists{/etc/virtual/helo_data}{${lookup{$interface_a
 #.include_if_exists /usr/local/etc/exim/exim.clamav.load.conf
 
 #Block Cracking variables
-.include_if_exists /usr/local/etc/exim/exim.blockcracking/variables.conf
+.include_if_exists /usr/local/etc/exim/blockcracking/variables.conf
 
 #Easy Spam Figher variables
-.include_if_exists /usr/local/etc/exim/exim.easy_spam_fighter/variables.conf
-
-#SRS
-.include_if_exists /usr/local/etc/exim/exim.srs.conf
+.include_if_exists /usr/local/etc/exim/easy_spam_fighter/variables.conf
 
 #EDIT#3:
 # qualify_domain =
@@ -182,14 +183,13 @@ rfc1413_query_timeout = 0s
 #exim.variables.conf
 
 #EDIT#23:
-tls_certificate = /usr/local/etc/exim/ssl/exim.cert
-tls_privatekey = /usr/local/etc/exim/ssl/exim.key
+tls_certificate = /usr/local/etc/exim/exim.cert
+tls_privatekey = /usr/local/etc/exim/exim.key
 openssl_options = +no_sslv2 +no_sslv3
 tls_require_ciphers = ALL:!ADH:RC4+RSA:+HIGH:+MEDIUM:-LOW:-SSLv2:-EXP
 tls_advertise_hosts = *
 #auth_over_tls_hosts = *
 
-.include_if_exists /usr/local/etc/exim/exim.variables.conf.post
 
 ##################################################################################
 # Access Control Lists
@@ -204,7 +204,7 @@ begin acl
 acl_connect:
   warn set acl_m_spam_assassin_has_run = 0
   warn set acl_m_is_whitelisted = 0
-  .include_if_exists /usr/local/etc/exim/exim.easy_spam_fighter/connect.conf
+  .include_if_exists /usr/local/etc/exim/easy_spam_fighter/connect.conf
   accept hosts = *
 
 
@@ -229,7 +229,7 @@ acl_check_mail:
           logwrite = $sender_host_address whitelisted in local sender whitelist
           set acl_m_is_whitelisted = 1
 
-  .include_if_exists /usr/local/etc/exim/exim.easy_spam_fighter/check_mail.conf
+  .include_if_exists /usr/local/etc/exim/easy_spam_fighter/check_mail.conf
   accept
 
 
@@ -288,11 +288,11 @@ acl_script:
           condition = ${lookup{$acl_m_username}lsearch{BLACKLIST_USERNAMES}{1}{0}}
           message = USER_ON_BLACKLIST_SCRIPT
 
-  .include_if_exists /usr/local/etc/exim/exim.blockcracking/script.conf
+  .include_if_exists /usr/local/etc/exim/blockcracking/script.conf
 
   accept
 
-  .include_if_exists /usr/local/etc/exim/exim.blockcracking/script.recipients.conf
+  .include_if_exists /usr/local/etc/exim/blockcracking/script.recipients.conf
 
 
 ######################################
@@ -335,7 +335,7 @@ acl_check_recipient:
   accept  condition = ${if eq{$acl_m_is_whitelisted}{1}{1}{0}}
 
   #Block Cracking - https://github.com/Exim/exim/wiki/BlockCracking
-  .include_if_exists /usr/local/etc/exim/exim.blockcracking/auth.conf
+  .include_if_exists /usr/local/etc/exim/blockcracking/auth.conf
 
   # restrict port 587 to authenticated users only
   # see also daemon_smtp_ports above
@@ -455,7 +455,7 @@ acl_check_recipient:
        !authenticated = *
        dnslists = RBL_DNS_LIST
 
-  .include_if_exists /usr/local/etc/exim/exim.easy_spam_fighter/check_rcpt.conf
+  .include_if_exists /usr/local/etc/exim/easy_spam_fighter/check_rcpt.conf
 
 #COMMENT#43:
 # ACCEPT EMAIL BEGINNING HERE
@@ -491,7 +491,7 @@ acl_check_recipient:
 acl_check_dkim:
   accept  condition = ${if eq{$acl_m_is_whitelisted}{1}{1}{0}}
 
-  .include_if_exists /usr/local/etc/exim/exim.easy_spam_fighter/check_dkim.conf
+  .include_if_exists /usr/local/etc/exim/easy_spam_fighter/check_dkim.conf
   accept
 
 
@@ -502,7 +502,7 @@ acl_check_dkim:
 acl_check_message:
   accept  condition = ${if eq{$acl_m_is_whitelisted}{1}{1}{0}}
 
-  .include_if_exists /usr/local/etc/exim/exim.easy_spam_fighter/check_message.conf
+  .include_if_exists /usr/local/etc/exim/easy_spam_fighter/check_message.conf
 
 #EDIT#46:
 #.include_if_exists /usr/local/etc/exim/exim.clamav.conf
@@ -667,7 +667,6 @@ userautoreply:
 
 virtual_aliases_nostar:
   driver = redirect
-  srs = forward
   allow_defer
   allow_fail
   data = ${if exists{/etc/virtual/${domain}/aliases}{${lookup{$local_part}lsearch{/etc/virtual/${domain}/aliases}}}}
@@ -690,7 +689,6 @@ virtual_user:
 # (this implements catch-all)
 virtual_aliases:
   driver = redirect
-  srs = forward
   allow_defer
   allow_fail
   condition = ${if eq {}{${if exists{/etc/virtual/${domain}/aliases}{${lookup{$local_part}lsearch{/etc/virtual/${domain}/aliases}}}}}{yes}{no}}
@@ -712,11 +710,6 @@ drop_solo_alias:
   pipe_transport = devnull
   retry_use_local_part
   #include_domain = true
-
-srs_router:
-  driver = redirect
-  srs = reverseandforward
-  data = ${srs_recipient}
 
 #COMMENT#52:
 userforward:
@@ -748,9 +741,7 @@ localuser:
   transport = local_delivery
 
 #COMMENT#53:
-##################################################################################
 # TRANSPORTS CONFIGURATION
-##################################################################################
 begin transports
 
 #COMMENT#54:
@@ -782,7 +773,7 @@ local_delivery:
   driver = appendfile
   delivery_date_add
   envelope_to_add
-  directory = /home/$local_part/Maildir/
+  directory = /usr/home/$local_part/Maildir/
   directory_mode = 770
   create_directory = true
   maildir_format
@@ -798,7 +789,7 @@ virtual_localdelivery:
   delivery_date_add
   directory_mode = 770
   envelope_to_add
-  directory = /home/${lookup{$domain}lsearch*{/etc/virtual/domainowners}{$value}}/imap/${domain}/${local_part}/Maildir
+  directory = /usr/home/${lookup{$domain}lsearch*{/etc/virtual/domainowners}{$value}}/imap/${domain}/${local_part}/Maildir
   maildir_format
   group = mail
   mode = 660
@@ -813,18 +804,17 @@ uservacation:
   from = "${local_part}@${domain}"
   log = /etc/virtual/${domain}/reply/${local_part}.log
   no_return_message
-  headers = ${if exists{/etc/virtual/${domain}/reply/${local_part}.headers}{${readfile{/etc/virtual/${domain}/reply/${local_part}.headers}}}}
-  subject = ${if def:h_Subject: {\
-                ${if exists{/etc/virtual/${domain}/reply/${local_part}.subject}\
-                    {${readfile{/etc/virtual/${domain}/reply/${local_part}.subject}{}}}\
-                    {Autoreply}\
-                }: ${quote:${escape:${length_60:$h_Subject:}}}}\
-                {I am on vacation}}
+  subject = "${if def:h_Subject: {Autoreply: ${quote:${escape:$h_Subject:}}} {I am on vacation}}"
+  text = "\
+	------                                                           ------\n\n\
+	This message was automatically generated by email software\n\
+	The delivery of your message has not been affected.\n\n\
+	------                                                           ------\n\n"
   to = "${sender_address}"
   user = mail
   once = /etc/virtual/${domain}/reply/${local_part}.once
   once_file_size = 100K
-  once_repeat = ${if exists{/etc/virtual/${domain}/reply/${local_part}.once_time}{${readfile{/etc/virtual/${domain}/reply/${local_part}.once_time}{}}}{2d}}
+  once_repeat = 2d
 
 #COMMENT#59:
 userautoreply:
@@ -834,18 +824,12 @@ userautoreply:
   from = "${local_part}@${domain}"
   log = /etc/virtual/${domain}/reply/${local_part}.log
   no_return_message
-  headers = ${if exists{/etc/virtual/${domain}/reply/${local_part}.headers}{${readfile{/etc/virtual/${domain}/reply/${local_part}.headers}}}}
-  subject = ${if def:h_Subject: {\
-                ${if exists{/etc/virtual/${domain}/reply/${local_part}.subject}\
-                    {${readfile{/etc/virtual/${domain}/reply/${local_part}.subject}{}}}\
-                    {Autoreply}\
-                }: ${quote:${escape:${length_60:$h_Subject:}}}}\
-                {Autoreply Message}}
+  subject = "${if def:h_Subject: {Autoreply: ${quote:${escape:$h_Subject:}}} {Autoreply Message}}"
   to = "${sender_address}"
   user = mail
   once = /etc/virtual/${domain}/reply/${local_part}.once
   once_file_size = 100K
-  once_repeat = ${if exists{/etc/virtual/${domain}/reply/${local_part}.once_time}{${readfile{/etc/virtual/${domain}/reply/${local_part}.once_time}{}}}{2d}}
+  once_repeat = 2d
 
 #COMMENT#60:
 devnull:
@@ -856,7 +840,7 @@ devnull:
 remote_smtp:
   driver = smtp
   headers_add = "${if def:authenticated_id{X-Authenticated-Id: ${authenticated_id}}}"
-  interface = <; ${if exists{/etc/virtual/domainips}{${lookup{$sender_address_domain}lsearch*{/etc/virtual/domainips}}}}
+  interface = <; ${if exists{/etc/virtual/domainips}{${lookup{$sender_address_domain}lsearch{/etc/virtual/domainips}}}}
   helo_data = ${if exists{/etc/virtual/helo_data}{${lookup{$sending_ip_address}iplsearch{/etc/virtual/helo_data}{$value}{$primary_hostname}}}{$primary_hostname}}
 .include_if_exists /usr/local/etc/exim/exim.dkim.conf
 
@@ -888,10 +872,7 @@ dovecot_lmtp_udp:
   socket = /var/run/dovecot/lmtp
   #maximum number of deliveries per batch, default 1
   batch_max = 200
-  delivery_date_add
-  envelope_to_add
   return_path_add
-  user = mail
 
 ##################################################################################
 # RETRY CONFIGURATION
