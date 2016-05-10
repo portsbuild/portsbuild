@@ -48,12 +48,12 @@
 #
 # *** If you want to modify PortsBuild settings, please check out 'options.conf' ***
 #
-################################################################################################################################
+################################################################################################
 
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160508
+PB_BUILD_DATE=20160510
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -92,17 +92,31 @@ else
   exit 1
 fi
 
-################################################################################################################################
+################################################################################################
+
+## PortsBuild Paths & Files
+PB_PATH=/usr/local/portsbuild
+if [ ! -e ${PB_PATH} ] || [ "$(pwd)" != "${PB_PATH}" ]; then
+  PB_PATH=$(pwd)
+fi
+
+PB_CONF=${PB_PATH}/options.conf
+
+## PortsBuild Remote File Repository
+PB_MIRROR1="http://s3.amazonaws.com/portsbuild/files"
+PB_MIRROR=${PB_MIRROR1}
+
+################################################################################################
 
 ###
 ### defaults.conf
 ###
 
 ## System & User Accounts
-DA_ADMIN_USERNAME=admin
-DA_SQLDB_USERNAME=da_admin
-DA_SRV_USER=diradmin
-DA_SRV_GROUP=diradmin
+DA_ADMIN_USER=admin
+DA_SQLDB_USER=da_admin
+# DA_SRV_USER=diradmin
+# DA_SRV_GROUP=diradmin
 APACHE_USER=apache ## www
 APACHE_GROUP=apache ## www
 NGINX_USER=nginx ## www
@@ -118,9 +132,9 @@ CHMOD=/bin/chmod
 BOOT_DIR=/usr/local/etc/rc.d
 FETCH=/usr/bin/fetch
 file_mtime="stat -f %m"
+GREP=/usr/bin/grep
 PERL=/usr/local/bin/perl
 PKG=/usr/sbin/pkg
-# PKGI="${PKG} install -y"
 PORTSNAP=/usr/sbin/portsnap
 PORTMASTER=/usr/local/sbin/portmaster
 SERVICE=/usr/sbin/service
@@ -130,20 +144,6 @@ WGET=/usr/local/bin/wget
 WGET_CONNECT_OPTIONS="--connect-timeout=5 --read-timeout=10 --tries=3"
 TAR=/usr/bin/tar
 
-## PortsBuild Paths & Files
-PB_PATH=/usr/local/portsbuild
-if [ ! -e ${PB_PATH} ] || [ "$(pwd)" != "${PB_PATH}" ]; then
-  PB_PATH=$(pwd)
-fi
-
-PB_CONF=${PB_PATH}/options.conf
-# PB_FILES_PATH=${PB_PATH}/files
-# PB_PATH=${PB_PATH}
-
-## PortsBuild Remote File Repository
-PB_MIRROR1="http://s3.amazonaws.com/portsbuild/files"
-PB_MIRROR=${PB_MIRROR1}
-
 SERVER_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
 
 ## DirectAdmin Paths & Files
@@ -152,17 +152,16 @@ DA_BIN=${DA_PATH}/directadmin
 DA_SCRIPTS_PATH=${DA_PATH}/scripts
 DA_CRON_FILE=${DA_SCRIPTS}/directadmin_cron
 DA_CONF_FILE=${DA_PATH}/conf/directadmin.conf
-# DA_CONF=${DA_CONF_FILE}
 DA_CONF_TEMPLATE_FILE=${DA_PATH}/data/templates/directadmin.conf
 DA_MYSQL_CONF=${DA_PATH}/conf/mysql.conf
 DA_MYSQL_CNF=${DA_PATH}/conf/my.cnf
 DA_LICENSE_FILE=${DA_PATH}/conf/license.key
+# DA_CONF=${DA_CONF_FILE}
 # DA_MY_CNF=${DA_MYSQL_CNF}
-# DACONF_FILE=${DA_CONF_FILE}
-# DACONF_TEMPLATE_FILE=${DA_CONF_TEMPLATE_FILE}
 
-DA_ADMIN_EMAIL=${DA_ADMIN_USERNAME}@${SERVER_DOMAIN}
+DA_ADMIN_EMAIL=${DA_ADMIN_USER}@${SERVER_DOMAIN}
 DA_SETUP_TXT=${DA_SCRIPTS_PATH}/setup.txt
+DA_FREEBSD_SERVICES="services_freebsd90_64.tar.gz"
 
 DA_SERVICES=${DA_PATH}/data/admin/services.status
 DA_TASK_QUEUE=${DA_PATH}/data/task.queue.cb
@@ -170,8 +169,6 @@ DA_TASK_QUEUE=${DA_PATH}/data/task.queue.cb
 DA_SSL_KEY=${DA_PATH}/conf/cakey.pem
 DA_SSL_CRT=${DA_PATH}/conf/cacert.pem
 DA_SSL_CA=${DA_PATH}/conf/carootcert.pem
-
-DA_FREEBSD_SERVICES="services_freebsd90_64.tar.gz"
 
 DA_LAN=0
 DA_INSECURE=0
@@ -189,8 +186,6 @@ MAX_PASS_LENGTH=16
 
 ## Virtual Mail Directory (keeping this path as-is for simplicity)
 VIRTUAL_PATH=/etc/virtual
-# VIRTUAL=/etc/virtual
-# VIRTUAL_DIR=${VIRTUAL_PATH}
 
 ## Custom SSL Certificates
 CUSTOM_SSL_KEY=/usr/local/etc/ssl/server.key
@@ -199,33 +194,32 @@ CUSTOM_SSL_CA=/usr/local/etc/ssl/server.ca
 
 ## Apache 2.4
 APACHE_PATH=/usr/local/etc/apache24
-# APACHE_DIR=${APACHE_PATH}
-# APACHE_HTTPD_BIN=/usr/local/sbin/httpd
 APACHE_EXTRA_PATH=${APACHE_PATH}/extra
 APACHE_LIB_PATH=/usr/local/libexec/apache24
 APACHE_CONF=${APACHE_PATH}/httpd.conf
 APACHE_HOSTNAME_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
 APACHE_MIME_TYPES=${APACHE_PATH}/mime.types
+APACHE_HTTPD_BIN=/usr/local/sbin/httpd
 
 APACHE_SSL_KEY=${APACHE_PATH}/ssl/server.key
 APACHE_SSL_CRT=${APACHE_PATH}/ssl/server.crt
 APACHE_SSL_CA=${APACHE_PATH}/ssl/server.ca
-APACHE_PID=/var/run/httpd.pid
+# APACHE_PID=/var/run/httpd.pid
 
 ## Nginx (untested)
 NGINX_PATH=/usr/local/etc/nginx
 NGINX_CONF=${NGINX_PATH}/nginx.conf
-NGINX_VHOSTS_PATH=${NGINX_PATH}/vhosts
 
 NGINX_SSL_KEY=${NGINX_PATH}/ssl/server.key
 NGINX_SSL_CRT=${NGINX_PATH}/ssl/server.crt
 NGINX_SSL_CA=${NGINX_PATH}/ssl/server.ca
 
 ## Needed?
-NGINX_VHOSTS_CONF=${NGINX_PATH}/directadmin-vhosts.conf
-NGINX_LOG_DIR=/var/log/nginx/domains
-NGINX_IPS_CONF=${NGINX_PATH}/directadmin-ips.conf
-#NGINX_PID=/var/run/nginx.pid
+# NGINX_VHOSTS_PATH=${NGINX_PATH}/vhosts
+# NGINX_VHOSTS_CONF=${NGINX_PATH}/directadmin-vhosts.conf
+# NGINX_LOG_DIR=/var/log/nginx/domains
+# NGINX_IPS_CONF=${NGINX_PATH}/directadmin-ips.conf
+# NGINX_PID=/var/run/nginx.pid
 
 ## Global WWW Directory (for webmail scripts)
 WWW_DIR=/usr/local/www ## Ports uses "${WWW_DIR}"
@@ -247,31 +241,28 @@ ROUNDCUBE_HTACCESS=${PB_PATH}/custom/roundcube/.htaccess
 
 ## phpMyAdmin
 PMA_PATH=${WWW_DIR}/phpMyAdmin
-# PMA_DIR=${PMA_PATH}
 PMA_CONFIG=${PMA_PATH}/config.inc.php
 
 ## PHP
 PHP1_VERSION=56
-PHP1_MODE=fpm
+PHP1_MODE="php-fpm"
 # PHP2_VERSION=70
-# PHP2_MODE=fpm
+# PHP2_MODE="fastcgi"
 
 PHP1_RELEASE_SET="5.5 5.6 7.0"
 PHP1_SHORTRELEASE_SET="$(echo "${PHP1_RELEASE_SET}" | tr -d '.')"
 
 PHP_ETC_PATH=/usr/local/etc/php
-# PHP_DIR=${PHP_ETC_PATH}
 PHP_INI=/usr/local/etc/php.ini
+PHP_INI_WEBAPPS=${PHP_ETC_PATH}/50-webapps.ini
 PHP_INI_EXTENSIONS=${PHP_ETC_PATH}/extensions.ini
 PHP_INI_OPCACHE=${PHP_ETC_PATH}/opcache.ini
-PHP_INI_WEBAPPS=${PHP_ETC_PATH}/50-webapps.ini
 PHP_INI_DIRECTADMIN=${PHP_ETC_PATH}/10-directadmin.ini
 
 ## Exim
 EXIM_BIN=/usr/local/sbin/exim
 EXIM_PATH=/usr/local/etc/exim
-# EXIM_DIR=${EXIM_PATH}
-EXIM_CONF=${EXIM_PATH}/configure ## verify
+EXIM_CONF=${EXIM_PATH}/configure ## required_files in rc.d/exim
 EXIM_RECIPIENTS_MAX=150
 
 EXIM_SSL_KEY=${EXIM_PATH}/ssl/exim.key
@@ -284,7 +275,6 @@ EXIM_ESF_PATH=${EXIM_PATH}/esf
 ## Dovecot
 DOVECOT_BIN=/usr/local/sbin/dovecot
 DOVECOT_PATH=/usr/local/etc/dovecot
-# DOVECOT_DIR=${DOVECOT_PATH}
 DOVECOT_CONF=${DOVECOT_PATH}/dovecot.conf
 DOVECOT_CONF_SIEVE=
 
@@ -392,7 +382,7 @@ COMPAT_EXIM_SYMLINKS=YES
 COMPAT_NAMED_SYMLINKS=YES
 COMPAT_DOVECOT_SYMLINKS=YES
 
-################################################################################################################################
+################################################################################################
 
 ###
 ### ports.conf
@@ -485,7 +475,7 @@ PORT_MARIADB101_CLIENT=databases/mariadb101-client
 PORT_AWSTATS=www/awstats
 PORT_WEBALIZER=www/webalizer
 
-################################################################################################################################
+################################################################################################
 
 ###
 ### make.conf
@@ -587,7 +577,7 @@ PUREFTPD_MAKE_UNSET=""
 # MYSQL57_MAKE_SET=""
 # MYSQL57_MAKE_UNSET=""
 
-################################################################################################################################
+################################################################################################
 
 ## Todo:
 # if [ ! -f options.conf ]; then
@@ -624,12 +614,12 @@ fi
 # -config ${PB_PATH}/custom/ap2/cert_config.txt
 OPENSSL_EXTRA=""
 
-################################################################################################################################
+################################################################################################
 
 ## Source (include) additional files into the script:
 . options.conf
 
-################################################################################################################################
+################################################################################################
 
 ## Get DirectAdmin Option Values (copied from CB2)
 ## Retrieves values from directadmin/conf/options.conf
@@ -654,7 +644,7 @@ getDA_Opt() {
   ${DA_BIN} c | grep -m1 "^$1=" | cut -d= -f2
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Emulate ${!variable} (copied from CB2)
 eval_var() {
@@ -668,7 +658,7 @@ eval_var() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Get Option (copied from CB2)
 ## Used to retrieve CB options.conf
@@ -724,7 +714,7 @@ setOpt() {
   ${PERL} -pi -e "s#$1=${OPT_VALUE}#$1=$2#" "${PB_CONF}"
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Set Value ($1) to ($2) in file ($3) (copied from CB2)
 setVal() {
@@ -787,7 +777,7 @@ getVal() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Used to set values ON/OFF in the services.status (copied from CB2)
 ## set_service name ON|OFF|delete
@@ -821,7 +811,7 @@ set_service() {
   printf "set_service(): %s: unknown option: %s\n" "$1" "$2"
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo:
 ## Get File from PB Mirror
@@ -836,7 +826,7 @@ getfile() {
 
   return
 }
-################################################################################################################################
+################################################################################################
 
 ## Convert string to lowercase
 lc() {
@@ -863,7 +853,7 @@ uc() {
   return $retval
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Ask User a Question
 ask_user() {
@@ -890,7 +880,7 @@ ask_user() {
   done
 }
 
-################################################################################################################################
+################################################################################################
 
 ## pkg update
 pkg_update() {
@@ -990,7 +980,7 @@ backup_file() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Get System Timezone (from CB2)
 getTimezone() {
@@ -1008,7 +998,7 @@ getTimezone() {
   printf "%s\n" ${DATETIMEZONE}
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Add (new) User to (new) Group (from CB2)
 addUserGroup() {
@@ -1024,7 +1014,7 @@ addUserGroup() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Random Password Generator (from CB2)
 random_pass() {
@@ -1040,7 +1030,7 @@ random_pass() {
   ${PERL} -le"print map+(A..Z,a..z,0..9)[rand 62],0..${MIN_PASS_LENGTH}"
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Setup PortsBuild and DirectAdmin
 ## Possible arguments: <USER_ID> <LICENSE_ID> <SERVER_FQDN> <ETH_DEV> (<IP_ADDRESS>)"
@@ -1313,6 +1303,8 @@ global_setup() {
     ## Todo:
     bfm_setup
 
+    # ipfw_enable
+
     basic_system_security
 
     global_post_install
@@ -1330,7 +1322,7 @@ global_post_install() {
   # exit 0
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Update System Startup Scripts
 ## Modifies /etc/rc.conf, /boot/loader.conf, /etc/periodic.conf, etc.
@@ -1451,7 +1443,7 @@ update_rc() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Setup BIND (named)
 bind_setup() {
@@ -1472,6 +1464,7 @@ bind_setup() {
     RNDC_KEY=/usr/local/etc/namedb/rndc.key
 
     if [ "${COMPAT_NAMED_SYMLINKS}" = "YES" ]; then
+      ## PB: Needed as of 2016-05-10:
       ln -s /usr/local/sbin/named-checkzone /usr/sbin/named-checkzone
     fi
   elif [ "$OS_MAJ" -eq 9 ]; then
@@ -1520,7 +1513,7 @@ bind_setup() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## DirectAdmin Installation
 ## Install DirectAdmin (replaces scripts/install.sh)
@@ -1648,7 +1641,7 @@ directadmin_install() {
 
   ## Verify:
   if [ "${DA_ADMIN_EMAIL}" = "" ]; then
-    DA_ADMIN_EMAIL="${DA_ADMIN_USERNAME}@${SERVER_DOMAIN}"
+    DA_ADMIN_EMAIL="${DA_ADMIN_USER}@${SERVER_DOMAIN}"
   fi
 
   # DB_ROOT_PASS=`perl -le'print map+(A..Z,a..z,0..9)[rand 62],0..7'`;
@@ -1659,10 +1652,10 @@ directadmin_install() {
   ## From DA/setup.sh: generate scripts/setup.txt
   {
     echo "hostname=${SERVER_FQDN}"
-    echo "email=${DA_ADMIN_USERNAME}@${SERVER_DOMAIN}"
+    echo "email=${DA_ADMIN_USER}@${SERVER_DOMAIN}"
     echo "mysql=${DA_SQLDB_PASSWORD}"
-    echo "mysqluser=${DA_SQLDB_USERNAME}"
-    echo "adminname=${DA_ADMIN_USERNAME}"
+    echo "mysqluser=${DA_SQLDB_USER}"
+    echo "adminname=${DA_ADMIN_USER}"
     echo "adminpass=${DA_ADMIN_PASSWORD}"
     echo "ns1=ns1.${SERVER_DOMAIN}"
     echo "ns2=ns2.${SERVER_DOMAIN}"
@@ -1745,7 +1738,7 @@ directadmin_install() {
     printf "*** Notice: Adding the 'root' user to the sshd configuration's AllowUsers list.\n"
     {
       echo "AllowUsers root"
-      echo "AllowUsers ${DA_ADMIN_USERNAME}"
+      echo "AllowUsers ${DA_ADMIN_USER}"
       echo "AllowUsers $(logname)"
       ## echo "AllowUsers YOUR_OTHER_ADMIN_ACCOUNT" >> /etc/ssh/sshd_config
     } >> /etc/ssh/sshd_config
@@ -1848,7 +1841,7 @@ directadmin_restart() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Basic System Security Tasks
 basic_system_security() {
@@ -1872,7 +1865,7 @@ basic_system_security() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Install DA cron (from: scripts/install.sh)
 install_cron() {
@@ -1904,7 +1897,7 @@ install_cron() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Setup newsyslog configuration
 ## Additional include directories in /etc/newsyslog.conf are:
@@ -1923,7 +1916,7 @@ setup_newsyslog() {
 }
 
 
-################################################################################################################################
+################################################################################################
 
 ## FreeBSD Set NewSyslog (from CB2)
 freebsd_set_newsyslog() {
@@ -1984,7 +1977,7 @@ verify_webapps_logrotate() {
     return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Exim Installation
 exim_install() {
@@ -2170,7 +2163,7 @@ exim_upgrade() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## SpamAssassin Installation Tasks
 spamassassin_install() {
@@ -2301,7 +2294,7 @@ spamassassin_utilities_uninstall() {
 }
 
 
-################################################################################################################################
+################################################################################################
 
 ## Todo:
 ## Install Exim BlockCracking (BC)
@@ -2344,7 +2337,7 @@ blockcracking_install() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo:
 ## Install Easy Spam Figter (ESF)
@@ -2410,7 +2403,7 @@ easyspamfighter_install() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Dovecot2 Installation Tasks
 dovecot_install() {
@@ -2689,7 +2682,7 @@ pigeonhole_install() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo:
 ## Webalizer Installation
@@ -2764,7 +2757,7 @@ awstats_install() {
   directadmin_restart
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Verify my.cnf (copied from CB2)
 verify_my_cnf() {
@@ -2808,7 +2801,7 @@ verify_my_cnf() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Initialize SQL Parameters (copied from CB2)
 get_sql_settings() {
@@ -2852,7 +2845,7 @@ get_sql_settings() {
   chown diradmin:diradmin "${DA_MYSQL_CNF}"
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo:
 ## SQL Post-Installation Tasks
@@ -2927,18 +2920,18 @@ sql_post_install() {
   rm -f mysql.temp
 
   ## Add the `da_admin` user to MySQL (replace the variables!):
-  echo "GRANT CREATE, DROP ON *.* TO ${DA_SQLDB_USERNAME}@${MYSQL_ACCESS_HOST} IDENTIFIED BY '${DA_SQLDB_PASSWORD}' WITH GRANT OPTION;" > mysql.temp
-  echo "GRANT ALL PRIVILEGES ON *.* TO ${DA_SQLDB_USERNAME}@${MYSQL_ACCESS_HOST} IDENTIFIED BY '${DA_SQLDB_PASSWORD}' WITH GRANT OPTION;" >> mysql.temp
+  echo "GRANT CREATE, DROP ON *.* TO ${DA_SQLDB_USER}@${MYSQL_ACCESS_HOST} IDENTIFIED BY '${DA_SQLDB_PASSWORD}' WITH GRANT OPTION;" > mysql.temp
+  echo "GRANT ALL PRIVILEGES ON *.* TO ${DA_SQLDB_USER}@${MYSQL_ACCESS_HOST} IDENTIFIED BY '${DA_SQLDB_PASSWORD}' WITH GRANT OPTION;" >> mysql.temp
 
   ${MYSQL_BIN} --user=root --password="${DA_SQLDB_PASSWORD}" < mysql.temp
   rm -f mysql.temp
 
   ## CLI method (incomplete):
-  # /usr/local/bin/mysql --user=root --password="${DA_SQLDB_PASSWORD}" "GRANT CREATE, DROP ON *.* TO ${DA_SQLDB_USERNAME}@${MYSQL_ACCESS_HOST} IDENTIFIED BY '${DA_SQLDB_PASSWORD}' WITH GRANT OPTION;"
+  # /usr/local/bin/mysql --user=root --password="${DA_SQLDB_PASSWORD}" "GRANT CREATE, DROP ON *.* TO ${DA_SQLDB_USER}@${MYSQL_ACCESS_HOST} IDENTIFIED BY '${DA_SQLDB_PASSWORD}' WITH GRANT OPTION;"
 
   ## Add DirectAdmin 'da_admin' SQL database credentials to 'mysql.conf':
   {
-   echo "user=${DA_SQLDB_USERNAME}"
+   echo "user=${DA_SQLDB_USER}"
    echo "passwd=${DA_SQLDB_PASSWORD}"
   } > ${DA_MYSQL_CONF}
 
@@ -2987,26 +2980,31 @@ sql_post_install() {
   ${SERVICE} mysql-server restart
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo: Verify:
 ## FPM Check (from CB2: fpmCheck())
+## Checks to see if any changes were done (e.g. converting between web server softwares)
 fpmCheck() {
 
   ARG=$1
   CHANGED=0
   COUNT=$(grep -m1 -c nginx /usr/local/php${ARG}/etc/php-fpm.conf)
-  CHOWN_USER=${OPT_WEBSERVER}
 
-  if [ "${CHOWN_USER}" = "nginx_apache" ]; then
-    CHOWN_USER=apache
+  ## PB: Select appropriate web user depending on chosen web server
+  if [ "${OPT_WEBSERVER}" = "apache" ] ||  [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    CHOWN_USER=${APACHE_USER}
+  elif [ "${OPT_WEBSERVER}" = "nginx" ]; then
+    CHOWN_USER=${NGINX_USER}
+  else
+    CHOWN_USER=${OPT_WEBSERVER}
   fi
 
-  chown ${CHOWN_USER}:${CHOWN_USER} /usr/local/php${ARG}/sockets
+  ${CHOWN} "${CHOWN_USER}:${CHOWN_USER}" "/usr/local/php${ARG}/sockets"
 
   FPM_SOCK_CHMOD=700
 
-  chmod ${FPM_SOCK_CHMOD} /usr/local/php${ARG}/sockets
+  ${CHMOD} ${FPM_SOCK_CHMOD} "/usr/local/php${ARG}/sockets"
 
   if [ "${OPT_WEBSERVER}" = "nginx" ] && [ "${COUNT}" -eq 0 ]; then
     ${PERL} -pi -e 's/apache/nginx/' "/usr/local/php${ARG}/etc/php-fpm.conf"
@@ -3020,29 +3018,31 @@ fpmCheck() {
 
   if [ -d "/usr/local/php${ARG}/sockets" ]; then
     if [ "${OPT_WEBSERVER}" = "nginx" ]; then
-      chown -R ${NGINX_USER}:${NGINX_GROUP} "/usr/local/php${ARG}/sockets"
+      ${CHOWN} -R ${NGINX_USER}:${NGINX_GROUP} "/usr/local/php${ARG}/sockets"
     elif [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-      chown -R ${APACHE_USER}:${APACHE_GROUP} "/usr/local/php${ARG}/sockets"
+      ${CHOWN} -R ${APACHE_USER}:${APACHE_GROUP} "/usr/local/php${ARG}/sockets"
     fi
   fi
 
   if [ ${CHANGED} -eq 1 ]; then
-    ${SERVICE} php-fpm${ARG} restart
+    ${SERVICE} "php-fpm${ARG}" restart
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo: Verify:
 ## FPM Checks (from CB2: fpmChecks())
 fpmChecks() {
 
-  for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
+  # if [ ${DUAL_PHP_MODE} = "YES" ]; then
+
+  for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
     EVAL_CHECK_VAR=HAVE_FPM${php_shortrelease}_CGI
     EVAL_COPY_VAR=PHP${php_shortrelease}_FPM_CONF
-    if [ "$(eval_var ${EVAL_CHECK_VAR})" = "YES" ] && [ -d "/usr/local/php${php_shortrelease}/sockets" ]; then
-      cp -f $(eval_var ${EVAL_COPY_VAR}) "/usr/local/php${php_shortrelease}/etc/php-fpm.conf"
-      fpmCheck ${php_shortrelease}
+    if [ "$(eval_var "${EVAL_CHECK_VAR}")" = "YES" ] && [ -d "/usr/local/php${php_shortrelease}/sockets" ]; then
+      cp -f "$(eval_var "${EVAL_COPY_VAR}")" "/usr/local/php${php_shortrelease}/etc/php-fpm.conf"
+      fpmCheck "${php_shortrelease}"
     fi
   done
 
@@ -3053,9 +3053,9 @@ fpmChecks() {
       ${PERL} -pi -e 's/nginx/apache/' ${DA_PATH}/data/templates/php-fpm.conf
     fi
 
-    # CB2: update the webapps_settings.conf
-    # CB2: swap "fastcgi_pass unix:/usr/local/php54/sockets/webapps.sock;" if needed
-    # CB2: might be a better way to do this, other checks. Close enough for now.
+    ## CB2: update the webapps_settings.conf
+    ## CB2: swap "fastcgi_pass unix:/usr/local/php54/sockets/webapps.sock;" if needed
+    ## CB2: might be a better way to do this, other checks. Close enough for now.
     if [ -e ${NGINX_PATH}/webapps_settings.conf ]; then
       PHP_REPLACE_STRING="$(grep -m1 '^fastcgi_pass unix:/usr/local/php../sockets/webapps.sock;' /usr/local/etc/nginx/webapps_settings.conf | cut -d/ -f4)"
       if [ "${PHP_REPLACE_STRING}" = "" ]; then
@@ -3066,6 +3066,7 @@ fpmChecks() {
       fi
     fi
 
+    ## Update PHP-FPM version in Nginx configuration files
     if [ -e ${NGINX_PATH}/nginx-vhosts.conf ]; then
       PHP_REPLACE_STRING="$(grep -m1 '^fastcgi_pass unix:/usr/local/php../sockets/webapps.sock;' /usr/local/etc/nginx/nginx-vhosts.conf | cut -d/ -f4)"
       if [ "${PHP_REPLACE_STRING}" = "" ]; then
@@ -3078,7 +3079,7 @@ fpmChecks() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Dovecot Checks (from CB2: dovecotChecks())
 dovecotChecks() {
@@ -3101,7 +3102,7 @@ dovecotChecks() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## PHP Installation Tasks
 php_install() {
@@ -3345,7 +3346,7 @@ have_php_system() {
 }
 
 
-################################################################################################################################
+################################################################################################
 
 ## phpMyAdmin Installation
 phpmyadmin_install() {
@@ -3465,7 +3466,7 @@ phpmyadmin_upgrade() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Apache 2.4 Installation (refereces doApache2 from CB2)
 apache_install() {
@@ -3695,7 +3696,7 @@ apache_install() {
 
   create_httpd_nginx
 
-  ## Hide frontpage
+  ## Hide frontpage (from CB2: hideFrontpage())
   if [ -e ${DA_CONF_TEMPLATE_FILE} ] && [ "$(grep -m1 -c frontpage_on ${DA_CONF_TEMPLATE_FILE})" = "0" ]; then
     echo "frontpage_on=0" >> ${DA_CONF_TEMPLATE_FILE}
   fi
@@ -3971,7 +3972,7 @@ apache_uninstall() {
 }
 
 
-################################################################################################################################
+################################################################################################
 
 ## Install Mod_HTScanner (from CB2: doModHtscanner())
 install_mod_htscanner() {
@@ -4004,7 +4005,7 @@ install_mod_htscanner() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Verify:
 ## do Mod FCGID (from CB2: doModFCGID())
@@ -4042,7 +4043,7 @@ install_mod_fcgid() {
   ## CB2: writeLog "mod_fcgid ${MOD_FCGID_VER} installed"
 }
 
-################################################################################################################################
+################################################################################################
 
 
 
@@ -4094,7 +4095,10 @@ nginx_install() {
   sysrc nginx_enable="YES"
 
   ## Add 'nginx' user into 'access' group
-  usermod -G access nginx
+  addUserGroup nginx access
+
+  # /usr/sbin/pw groupadd ${APPUSER} 2> /dev/null
+  # /usr/sbin/pw useradd -g ${APPUSER} -n ${APPUSER} -b ${WWWDIR} -s /sbin/nologin 2> /dev/null
 
   ## Start nginx
   ${SERVICE} nginx start
@@ -4106,19 +4110,6 @@ nginx_install() {
 
   return
 }
-
-################################################################
-
-## Copied from CB2
-# addNginxToAccess() {
-#   ## Check for nginx user in access group
-#   if grep -m1 -q "^access" /etc/group; then
-#     if ! grep -m1 "^access" /etc/group | grep -q nginx; then
-#       usermod -G access nginx
-#     fi
-#   fi
-#}
-
 
 ################################################################
 
@@ -4136,7 +4127,7 @@ nginx_uninstall() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Majordomo Install
 majordomo_install() {
@@ -4167,7 +4158,7 @@ majordomo_uninstall() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## PureFTPD Installation
 pureftpd_install() {
@@ -4302,7 +4293,7 @@ pureftpd_uninstall() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## ProFTPD Installation
 proftpd_install() {
@@ -4414,7 +4405,7 @@ proftpd_uninstall() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## ClamAV Installation Tasks
 clamav_install() {
@@ -4472,6 +4463,9 @@ clamav_install() {
     ${PERL} -pi -e 's|#.include_if_exists /usr/local/etc/exim.clamav.conf|.include_if_exists /usr/local/etc/exim/exim.clamav.conf|' "${EXIM_CONF}"
   fi
 
+  ## Add 'clamav' user to 'access' group
+  addUserGroup clamav access
+
   sysrc clamav_clamd_enable="YES"
   sysrc clamav_freshclam_enable="YES"
 
@@ -4504,7 +4498,7 @@ clamav_uninstall() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## RoundCube Installation
 roundcube_install() {
@@ -4880,7 +4874,7 @@ roundcube_install() {
   #cd ${CWD}
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Webapps Installation
 webapps_install() {
@@ -4928,7 +4922,7 @@ webapps_install() {
   cp -f ${DA_PATH}/scripts/redirect.php ${WWW_DIR}/redirect.php
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Secure php.ini (copied from CB2)
 ## $1 = php.ini file to update
@@ -4951,7 +4945,7 @@ secure_php_ini() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Configure php.ini (Copied from CB2: doPhpIni())
 configure_php_ini() {
@@ -5040,7 +5034,7 @@ configure_php_ini() {
 
 }
 
-################################################################################################################################
+################################################################################################
 
 ## ModSecurity Installation
 modsecurity_install() {
@@ -5250,7 +5244,7 @@ update_modsecurity_rules() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Ensure Webapps php.ini (copied from CB2)
 verify_webapps_php_ini() {
@@ -5280,7 +5274,7 @@ verify_webapps_php_ini() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Verify Webapps Temp Directory (copied from CB2)
 verify_webapps_tmp() {
@@ -5296,7 +5290,7 @@ verify_webapps_tmp() {
   verify_webapps_php_ini
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Get Webmail Link (copied from CB2)
 get_webmail_link() {
@@ -5313,7 +5307,7 @@ get_webmail_link() {
   echo "${WEBMAIL_LINK}"
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Apache Host Configuration (copied from CB2: doApacheHostConf())
 apache_host_conf() {
@@ -5416,7 +5410,7 @@ apache_host_conf() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Add Alias Redirect (from CB2: add_alias_redirect())
 add_alias_redirect() {
@@ -5464,7 +5458,7 @@ add_alias_redirect() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Rewrite httpd Alias (from CB2: do_rewrite_httpd_alias())
 do_rewrite_httpd_alias() {
@@ -5537,7 +5531,7 @@ do_rewrite_httpd_alias() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Verify: Todo:
 ## Add Nginx Alias Redirect (copied from CB2: add_nginx_alias_redirect)
@@ -5554,7 +5548,7 @@ add_nginx_alias_redirect() {
   } >> "${FILE}"
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Verify: Todo:
 ## Add Nginx Alias (copied from CB2: add_nginx_alias)
@@ -5600,7 +5594,7 @@ add_nginx_alias() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Verify: Todo:
 ## Rewrite Nginx Webapps (copied from CB2: do_rewrite_nginx_webapps)
@@ -5700,7 +5694,7 @@ do_rewrite_nginx_webapps() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Create httpd Nginx (copied from CB2: create_httpd_nginx())
 create_httpd_nginx() {
@@ -5723,7 +5717,7 @@ create_httpd_nginx() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Do Apache Check (from CB2: doApacheCheck())
 doApacheCheck() {
@@ -5745,7 +5739,7 @@ doApacheCheck() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Rewrite Confs (from CB2: doRewriteConfs())
 rewrite_confs() {
@@ -6075,7 +6069,7 @@ rewrite_confs() {
   directadmin_restart
 
 }
-################################################################################################################################
+################################################################################################
 
 ## Run DirectAdmin Task Query (copied from CB2)
 run_dataskq() {
@@ -6087,7 +6081,7 @@ run_dataskq() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Rewrite directadmin-vhosts.conf (copied from CB2: doVhosts())
 rewrite_vhosts() {
@@ -6123,7 +6117,7 @@ rewrite_vhosts() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo:
 ## Verify Server CA Certificate (Copied from CB2: ensure_server_ca())
@@ -6205,7 +6199,7 @@ verify_server_ca() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Backup HTTP (Copied from CB2: backupHttp())
 backupHttp() {
@@ -6226,7 +6220,7 @@ backupHttp() {
   set_service httpd OFF
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Restore HTTP (Copied from CB2: restoreHttp())
 restoreHttp() {
@@ -6251,7 +6245,7 @@ restoreHttp() {
   set_service httpd ON
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Suhosin Installation
 suhosin_install() {
@@ -6276,9 +6270,9 @@ suhosin_install() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
-## Tokenize the IP (copied from CB2: tokenizeIP)
+## Tokenize the IP (from CB2: tokenizeIP())
 tokenize_IP() {
   TOKENFILE_APACHE=${APACHE_EXTRA_PATH}/httpd-vhosts.conf
 
@@ -6310,7 +6304,7 @@ tokenize_IP() {
     IP="[${IP}]"
   fi
 
-  printf "Using %s for your server IP\n" "$IP"
+  printf "Using %s as your server's IP address.\n" "$IP"
 
   LAN_IP=$(getDA_Opt lan_ip "")
 
@@ -6342,6 +6336,7 @@ tokenize_IP() {
       fi
     fi
 
+    ## Nginx UserDir
     if [ -e "${TOKENFILE_NGINX_USERDIR}" ]; then
       if [ "$(grep -m1 -c '|IP|' "${TOKENFILE_NGINX_USERDIR}")" -gt "0" ]; then
         if [ "${LAN_IP}" != "" ]; then
@@ -6359,9 +6354,9 @@ tokenize_IP() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
-## Tokenize Ports (copied from CB2)
+## Tokenize Ports (from CB2: tokenize_ports())
 tokenize_ports() {
 
   TOKENFILE_APACHE="${APACHE_EXTRA_PATH}/httpd-vhosts.conf"
@@ -6375,7 +6370,7 @@ tokenize_ports() {
   TOKENFILE_NGINX_USERDIR=${NGINX_PATH}/nginx-userdir.conf
 
   ## Apache:
-  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "litespeed" ]; then
+  if [ "${OPT_WEBSERVER}" = "apache" ]; then
     if [ -e ${TOKENFILE_APACHE} ]; then
       if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_APACHE})" -gt "0" ]; then
         STR="${PERL} -pi -e \"s/\|PORT_80\|/${PORT_80}/\" ${TOKENFILE_APACHE}"
@@ -6507,7 +6502,7 @@ tokenize_ports() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Verify: Todo:
 ## PHP Configuration (copied from CB2: doPhpConf)
@@ -6706,7 +6701,7 @@ php_conf() {
   fi
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo: Setup Brute-Force Monitor
 bfm_setup() {
@@ -6792,11 +6787,13 @@ ipfw_disable() {
 ## Remove IPFW Settings
 ipfw_remove() {
 
+  ## /etc/rc.conf
   sysrc -x firewall_enable
   sysrc -x firewall_type
   sysrc -x firewall_script
   sysrc -x firewall_logging
 
+  ## /etc/sysctl.conf
   sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.verbose
   sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.verbose_limit
   sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.dyn_max
@@ -6804,16 +6801,17 @@ ipfw_remove() {
   sysrc -f /etc/sysctl.conf -x net.inet.tcp.fast_finwait2_recycle
   sysrc -f /etc/sysctl.conf -x net.inet.tcp.finwait2_timeout
 
-  rm -f "${PB_PATH}/directadmin/scripts/custom/block_ip.sh"
-  rm -f "${PB_PATH}/directadmin/scripts/custom/unblock_ip.sh"
-  rm -f "${PB_PATH}/directadmin/scripts/custom/brute_force_notice_ip.sh"
-  rm -f "${PB_PATH}/directadmin/scripts/custom/show_blocked_ips.sh"
+  ## da/scripts/custom:
+  rm -f "${DA_PATH}/scripts/custom/block_ip.sh"
+  rm -f "${DA_PATH}/scripts/custom/unblock_ip.sh"
+  rm -f "${DA_PATH}/scripts/custom/brute_force_notice_ip.sh"
+  rm -f "${DA_PATH}/scripts/custom/show_blocked_ips.sh"
 
   return
 }
 
 
-################################################################################################################################
+################################################################################################
 
 ## Validate Options
 validate_options() {
@@ -7147,7 +7145,7 @@ validate_options() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Install Application
 ## $2 = name of service
@@ -7216,7 +7214,7 @@ uninstall_app() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo: Update PortsBuild Script
 update() {
@@ -7247,7 +7245,7 @@ update() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo: Upgrade
 upgrade() {
@@ -7277,7 +7275,7 @@ upgrade_app() {
     "modsecurity"|"modsec"|"mod_security") modsecurity_upgrade ;;
     "mysql"|"sql") mysql_upgrade ;;
     "nginx") nginx_upgrade ;;
-    "php"|"fpm") php_upgrade ;;
+    "php"|"fpm"|"php-fpm") php_upgrade ;;
     "phpmyadmin"|"pma") phpmyadmin_upgrade ;;
     "pigeonhole"|"ph") pigeonhole_upgrade ;;
     "portsbuild"|"pb") portsbuild_upgrade ;;
@@ -7293,7 +7291,7 @@ upgrade_app() {
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo:Show Menu for Upgrades
 show_menu_upgrade() {
@@ -7308,56 +7306,60 @@ show_menu_upgrade() {
 ## Show Setup Menu
 show_menu_setup() {
 
-  printf "To setup PortsBuild and DirectAdmin for the first time, run:\n"
-  printf "  ./portsbuild setup <USER_ID> <LICENSE_ID> <SERVER_FQDN> <ETH_DEV> <IP_ADDRESS> <IP_NETMASK>\n\n"
+  printf "\n"
+  printf "  To setup PortsBuild and DirectAdmin for the first time, run:\n"
+  printf "\t%s setup <USER_ID> <LICENSE_ID> <SERVER_FQDN> <ETH_DEV> <IP_ADDRESS> <IP_NETMASK>\n\n" "$0"
 
   return
 }
-################################################################################################################################
+################################################################################################
 
 ## Show Configuration Values
 show_config() {
 
-  printf "\nConfigured Option Values\n"
-  printf "=====================================\n"
+  printf "\n"
+  printf "\tConfigured Option Values\n"
+  printf "\t=====================================\n"
   {
-    echo "PHP1 Version: ${OPT_PHP1_VERSION}"
-    echo "PHP1 Mode: ${OPT_PHP1_MODE}"
-    echo "PHP ini Type: ${OPT_PHP_INI_TYPE}"
-    echo "Web Server: ${OPT_WEBSERVER}"
-    echo "Apache MPM: ${OPT_APACHE_MPM}"
-    echo "SQL Server: ${OPT_SQL_DB}"
-    echo "FTP Server: ${OPT_FTPD}"
-    echo "Exim: ${OPT_EXIM}"
-    echo "Dovecot: ${OPT_DOVECOT}"
-    echo "ClamAV: ${OPT_CLAMAV}"
-    echo "Exim w/ClamAV: ${OPT_CLAMAV_WITH_EXIM}"
-    echo "Webapps Inbox Prefix: ${OPT_WEBAPPS_INBOX_PREFIX}"
-    echo "Spam Inbox Prefix: ${OPT_SPAM_INBOX_PREFIX}"
-    echo "BlockCracking: ${OPT_BLOCKCRACKING}"
-    echo "Easy Spam Fighter: ${OPT_EASY_SPAM_FIGHTER}"
-    echo "SpamAssassin: ${OPT_SPAMASSASSIN}"
-    echo "SpamAssassin Utilities: ${OPT_SPAMASSASSIN_UTILITIES}"
-    echo "ProFTPD Upload Scan: ${OPT_PROFTPD_UPLOADSCAN}"
-    echo "PureFTPD Upload Scan: ${OPT_PUREFTPD_UPLOADSCAN}"
-    echo "Awstats: ${OPT_AWSTATS}"
-    echo "Webalizer: ${OPT_WEBALIZER}"
-    echo "Majordomo: ${OPT_MAJORDOMO}"
-    echo "phpMyAdmin: ${OPT_PHPMYADMIN}"
-    echo "Suhosin: ${OPT_SUHOSIN}"
-    echo "Suhosin Upload Scan: ${OPT_SUHOSIN_UPLOADSCAN}"
-    echo "ModSecurity: ${OPT_MODSECURITY}"
-    echo "RoundCube: ${OPT_ROUNDCUBE}"
-    echo "PigeonHole: ${OPT_PIGEONHOLE}"
-    echo "PB Symlink: ${OPT_PB_SYMLINK}"
-    echo "Install CCache: ${OPT_INSTALL_CCACHE}"
-    echo "Install Synth: ${OPT_INSTALL_SYNTH}"
+    printf "\tPHP1 Version: %s\n" ${OPT_PHP1_VERSION}
+    printf "\tPHP1 Mode: %s\n" ${OPT_PHP1_MODE}
+    printf "\tPHP ini Type: %s\n" ${OPT_PHP_INI_TYPE}
+    printf "\tWeb Server: %s\n" ${OPT_WEBSERVER}
+    printf "\tApache MPM: %s\n" ${OPT_APACHE_MPM}
+    printf "\tSQL Server: %s\n" ${OPT_SQL_DB}
+    printf "\tFTP Server: %s\n" ${OPT_FTPD}
+    printf "\tExim: %s\n" ${OPT_EXIM}
+    printf "\tDovecot: %s\n" ${OPT_DOVECOT}
+    printf "\tClamAV: %s\n" ${OPT_CLAMAV}
+    printf "\tExim w/ClamAV: %s\n" ${OPT_CLAMAV_WITH_EXIM}
+    printf "\tWebapps Inbox Prefix: %s\n" ${OPT_WEBAPPS_INBOX_PREFIX}
+    printf "\tSpam Inbox Prefix: %s\n" ${OPT_SPAM_INBOX_PREFIX}
+    printf "\tBlockCracking: %s\n" ${OPT_BLOCKCRACKING}
+    printf "\tEasy Spam Fighter: %s\n" ${OPT_EASY_SPAM_FIGHTER}
+    printf "\tSpamAssassin: %s\n" ${OPT_SPAMASSASSIN}
+    printf "\tSpamAssassin Utilities: %s\n" ${OPT_SPAMASSASSIN_UTILITIES}
+    printf "\tProFTPD Upload Scan: %s\n" ${OPT_PROFTPD_UPLOADSCAN}
+    printf "\tPureFTPD Upload Scan: %s\n" ${OPT_PUREFTPD_UPLOADSCAN}
+    printf "\tAwstats: %s\n" ${OPT_AWSTATS}
+    printf "\tWebalizer: %s\n" ${OPT_WEBALIZER}
+    printf "\tMajordomo: %s\n" ${OPT_MAJORDOMO}
+    printf "\tphpMyAdmin: %s\n" ${OPT_PHPMYADMIN}
+    printf "\tSuhosin: %s\n" ${OPT_SUHOSIN}
+    printf "\tSuhosin Upload Scan: %s\n" ${OPT_SUHOSIN_UPLOADSCAN}
+    printf "\tModSecurity: %s\n" ${OPT_MODSECURITY}
+    printf "\tRoundCube: %s\n" ${OPT_ROUNDCUBE}
+    printf "\tPigeonHole: %s\n" ${OPT_PIGEONHOLE}
+    printf "\tPB Symlink: %s\n" ${OPT_PB_SYMLINK}
+    printf "\tInstall CCache: %s\n" ${OPT_INSTALL_CCACHE}
+    printf "\tInstall Synth: %s\n" ${OPT_INSTALL_SYNTH}
   } | column -t -s:
+
+  printf "\n"
 
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Show Debugging Information
 show_debug() {
@@ -7407,7 +7409,11 @@ rewrite_app() {
 ## Show Rewrite Menu
 show_rewrite_menu() {
 
-  printf "\n  Rewrite Configuration Files:\n"
+  printf "\n"
+  printf "  Rewrite Configuration Files\n\n"
+  printf "  Usage:\n"
+  printf "\t%s rewrite [options] [arguments]\n\n" "$0"
+  printf "  Available rewrite options:\n"
   {
     printf "\tapache: Rewrite Apache configuration files and virtual hosts\n"
     printf "\tdovecot: Rewrite Dovecot configuration files\n"
@@ -7418,76 +7424,54 @@ show_rewrite_menu() {
     printf "\tvirtual: Rewrite Mail (/etc/virtual) directory\n"
   } | column -t -s:
 
+  printf "\n"
+
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Todo: Show Installation Menu
 show_install() {
 
 #  ( printf "Package Version Origin\n" ; pkg query -i -x "%n %v %o" '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
 
-  printf "Available packages to install:\n"
+  printf "\n"
+  printf "  Install a Package (Application or Service)\n\n"
+  printf "  Usage:\n"
+  printf "\t%s install [package] [arguments]\n\n" "$0"
+  printf "  Available packages to install:\n"
   {
-    echo "apache:Apache 2.4"
-    echo "awstats:Awstats"
-    echo "bfm:Brute Force Monitor"
-    echo "bc:Blockcracking"
-    echo "directadmin:DirectAdmin"
-    echo "dkim:DKIM"
-    echo "esf:Easy Spam Fighter"
-    echo "exim:Exim"
-    echo "ioncube:Ioncube"
-    echo "ipfw:IPFW Firewall setup"
-    echo "libspf2:libspf"
-    echo "mariadb:MariaDB"
-    echo "mysql:MySQL"
-    echo "nginx:Nginx"
-    echo "php:PHP"
-    echo "pma:phpMyAdmin"
-    echo "proftpd:ProFTPd"
-    echo "pureftpd:PureFTPd"
-    echo "roundcube:RoundCube"
-    echo "spamassassin:SpamAssassin"
-    echo "suhosin:Suhosin"
-    echo "webalizer:Webalizer"
+    printf "\tapache:Apache 2.4\n"
+    printf "\tawstats:Awstats\n"
+    printf "\tbfm:Brute Force Monitor\n"
+    printf "\tbc:Blockcracking\n"
+    printf "\tdirectadmin:DirectAdmin\n"
+    printf "\tdkim:DKIM\n"
+    printf "\tesf:Easy Spam Fighter\n"
+    printf "\texim:Exim\n"
+    printf "\tioncube:Ioncube\n"
+    printf "\tipfw:IPFW Firewall setup\n"
+    printf "\tlibspf2:libspf\n"
+    printf "\tmariadb:MariaDB\n"
+    printf "\tmysql:MySQL\n"
+    printf "\tnginx:Nginx\n"
+    printf "\tphp:PHP\n"
+    printf "\tpma:phpMyAdmin\n"
+    printf "\tproftpd:ProFTPd\n"
+    printf "\tpureftpd:PureFTPd\n"
+    printf "\troundcube:RoundCube\n"
+    printf "\tspamassassin:SpamAssassin\n"
+    printf "\tsuhosin:Suhosin\n"
+    printf "\twebalizer:Webalizer\n"
   } | column -t -s:
 
-  # echo "Available packages to install:"
-  # echo "apache Apache 2.4"
-  # echo "awstats Awstats"
-  # echo "bfm Brute Force Monitor"
-  # echo "bc Blockcracking"
-  # echo "directadmin DirectAdmin"
-  # echo "dkim DKIM"
-  # echo "esf Easy Spam Fighter"
-  # echo "exim Exim"
-  # echo "ioncube Ioncube"
-  # echo "ipfw IPFW Firewall setup"
-  # echo "libspf2 libspf"
-  # echo "mariadb MariaDB"
-  # # echo "mariadb55 MariaDB 5.5"
-  # # echo "mariadb100 MariaDB 10.0"
-  # # echo "mariadb101 MariaDB 10.1"
-  # echo "mysql MySQL"
-  # # echo "mysql55 MySQL 5.5"
-  # # echo "mysql56 MySQL 5.6"
-  # # echo "mysql57 MySQL 5.7"
-  # echo "nginx Nginx"
-  # echo "php PHP"
-  # echo "pma phpMyAdmin"
-  # echo "proftpd ProFTPd"
-  # echo "pureftpd PureFTPd"
-  # echo "roundcube RoundCube"
-  # echo "spamassassin SpamAssassin"
-  # echo "suhosin Suhosin"
-  # echo "webalizer Webalizer"
+  printf "\n"
 
   return
 }
 
-################################################################################################################################
+################################################################################################
 
 ## Show logo :)
 show_logo() {
@@ -7514,20 +7498,28 @@ show_version() {
 
 ################################################################
 
-## Show versions
+## Show Application Versions
 show_versions() {
+
+  printf "\n"
+  printf "List of installed packages and their versions:\n\n"
   ## alternative way: awk '{printf("%15s %10s\n", $1, $2)}'
-  ( printf "Package Version Origin\n" ; pkg query -i -x "%n %v %o" '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
+  ( printf "Package Version Origin\n" ; pkg query -i -x "%n %v %o" '(www/apache24|www/nginx|security/clamav|lang/php54|lang/php55|lang/php56|lang/php70|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget|security/suhosin|www/suphp|databases/mariadb55-server|databases/mariadb55-client|databases/mariadb100-server|databases/mariadb100-client|databases/mariadb101-server|databases/mariadb101-client|databases/mysql55-server|databases/mysql55-client|databases/mysql56-server|databases/mysql56-client|databases/mysql57-server|databases/mysql57-client|databases/phpmyadmin)' ) | column -t
+  printf "\n"
+
   return
 }
 
 ################################################################
 
-## Show outdated versions of (select) packages
+## Show versions of (select) packages
 show_outdated() {
 
-  printf "List of installed packages that are out of date:\n"
-  ( printf "Package Outdated\n" ; pkg version -l '<' -x '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
+  printf "\n"
+  printf "List of installed packages that are out of date:\n\n"
+  ( printf "Package Outdated\n" ; pkg version -l '<' -x '(www/apache24|www/nginx|security/clamav|lang/php54|lang/php55|lang/php56|lang/php70|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget|security/suhosin|www/suphp|databases/mariadb55-server|databases/mariadb55-client|databases/mariadb100-server|databases/mariadb100-client|databases/mariadb101-server|databases/mariadb101-client|databases/mysql55-server|databases/mysql55-client|databases/mysql56-server|databases/mysql56-client|databases/mysql57-server|databases/mysql57-client|databases/phpmyadmin)' ) | column -t
+  printf "\n"
+
   return
 }
 
@@ -7536,7 +7528,12 @@ show_outdated() {
 ## Show Audit
 show_audit() {
 
+  printf "\n"
+  printf "List of installed packages that are vulnerable:\n\n"
   ${PKG} audit
+  printf "\n"
+
+  return
 }
 
 ################################################################
@@ -7546,7 +7543,8 @@ show_about() {
 
   show_logo
   show_version
-  printf "Visit portsbuild.org or github.com/portsbuild/portsbuild\n"
+  printf "\n  Visit portsbuild.org or github.com/portsbuild/portsbuild\n\n"
+
   return
 }
 
@@ -7565,8 +7563,9 @@ show_main_menu() {
 ## Show selection menu
 show_menu() {
 
-  printf "\n  Usage:\n"
-  printf "\t%s command [options] [arguments]\n\n" $0
+  printf "\n"
+  printf "  Usage:\n"
+  printf "\t%s command [options] [arguments]\n\n" "$0"
 
   # Options:
   #   -h, --help                     Display this help message
@@ -7596,10 +7595,10 @@ show_menu() {
     printf "\toutdated: Show outdated applications or services on the system\n"
     printf "\trewrite: Rewrite (update) a configuration file\n"
     printf "\tsetup: Setup PortsBuild and DirectAdmin (first-time installations)\n"
+    # printf "\tshow: Show something\n"
     printf "\tupdate: Updates the portsbuild script\n"
     printf "\tupgrade: Upgrades an application or service\n"
     # printf "\tverify: Verify something\n"
-    # printf "\n"
     printf "\tversions: Show version information on installed services\n"
   } | column -t -s:
 
@@ -7616,28 +7615,27 @@ validate_options
 
 ## ./portsbuild selection screen
 case "$1" in
-  # create_options)  ;;
-  # set)  ;;
-  # check_options) ;;
   "about") show_about ;;                ## show about
   "audit") show_audit ;;                ## run "pkg audit"
   "c"|"config") show_config ;;          ## show configured option values
   "d"|"debug") show_debug ;;            ## show debugging info
   "i"|"install") install_app "$@" ;;    ## install an application
-  # "installed") show_installed ;;        ## show currently installed packages
   "o"|"outdated") show_outdated ;;      ## show installed packages that are out of date
   "r"|"rewrite") rewrite_app "$@" ;;    ## rewrite a configuration file (e.g. apache vhosts)
   "setup") global_setup "$@" ;;         ## first time setup
+  # "show") show_show "$@" ;;             ## show something
   "upd"|"update") update ;;             ## update PB script
   "upg"|"upgrade") upgrade "$@" ;;      ## let portsbuild upgrade an app/service (e.g. php via pkg)
   "check"|"verify") verify ;;           ## verify system state
   "version") show_version ;;            ## show portsbuild version
-  "v"|"versions"|"installed") show_app_versions ;;  ## show app/service versions via pkg
-  "pbtest") ./portsbuild.sh setup 1234 56789 pb.fallout.local em0 127.0.0.2 255.255.255.0 ;;
+  "v"|"versions"|"installed") show_versions ;;  ## show app/service versions via pkg
   "") show_main_menu ;;
+  # "create_options") create_options ;;   ## create options.conf
+  # "set") set_option "$@" ;;             ## set value in options.conf
+  # check_options) check_options ;;       ## validate options.conf
 esac
 
-################################################################################################################################
+################################################################################################
 
 ## EOF
 exit 0

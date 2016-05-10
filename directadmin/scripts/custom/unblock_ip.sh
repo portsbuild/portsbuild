@@ -19,7 +19,7 @@ if [ ! -e "$BF" ]; then
   exit 2
 fi
 
-COUNT=$(grep -c "^$ip=" $BF);
+COUNT=$(grep -c "^$ip=" $BF)
 
 if [ "$COUNT" -eq 0 ]; then
   echo "$1 was not in $BF. Not unblocking"
@@ -27,9 +27,9 @@ if [ "$COUNT" -eq 0 ]; then
 fi
 
 ## Unblock
-printf "Unblocking %s" $IP
+printf "Unblocking %s\n" "$IP"
 
-cat $BF | grep -v "^$ip=" > $BF.temp
+grep -v "^$ip=" $BF > $BF.temp
 mv $BF.temp $BF
 
 chmod 600 $BF

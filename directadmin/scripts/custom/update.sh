@@ -7,8 +7,8 @@ DA_SCRIPTS=${DA_PATH}/scripts
 DA_TQ=${DA_PATH}/data/task.queue
 PERL=/usr/local/bin/perl
 
-#added new options to templates
-#echo 'action=rewrite&value=httpd' >> $DA_TQ
+## DA: Added new options to templates
+# echo 'action=rewrite&value=httpd' >> $DA_TQ
 
 {
   echo "action=cache&value=showallusers"
@@ -18,7 +18,7 @@ PERL=/usr/local/bin/perl
   echo "action=syscheck"
 } >> $DA_TQ
 
-## PB: Verify this:
+## PB: Verify:
 if [ ! -d /usr/local/sysbk ]; then
   cd $DA_SCRIPTS || exit
   ./sysbk.sh
@@ -37,10 +37,10 @@ fi
 ${PERL} -pi -e 's/\sN\s/\t-\t/' /usr/local/etc/newsyslog.conf.d/directadmin.conf
 ${PERL} -pi -e 's/\sU\s/\t-\t/' /usr/local/etc/newsyslog.conf.d/directadmin.conf
 
-## PB: Fix this:
-$DA_SCRIPTS/newsyslog.sh
+"${DA_SCRIPTS}/custom/newsyslog.sh"
 
 rm -f /usr/local/directadmin/data/skins/*/ssi_test.html 2> /dev/null
+
 ${PERL} -pi -e 's/trusted_users = mail:majordomo:apache$/trusted_users = mail:majordomo:apache:diradmin/' /usr/local/etc/exim/exim.conf
 
 COUNT=$(grep uid_exempt /usr/local/etc/exim/exim.pl | grep -c yes)
@@ -67,8 +67,10 @@ if [ -e /var/spool/virtual ]; then
 fi
 
 ${PERL} -pi -e "s/userlog \"%u %b\"/userlog \"%u %b %m\"/" /usr/local/etc/proftpd.conf
+
 echo "action=proftpd&value=restart" >> ${DA_PATH}/data/task.queue
 
+## PB: Verify: Needed?
 if [ ! -e /usr/local/bin/mysqld ] && [ -e /usr/local/libexec/mysqld ]; then
   ln -s ../libexec/mysqld /usr/local/bin/mysqld
 fi
@@ -81,7 +83,7 @@ fi
 # Very important update to allow DA to listen correctly on IPv4 and IPv6 interfaces.
 COUNT=$(grep -c ipv6_ipv4mapping /etc/rc.conf)
 if [ "$COUNT" -eq 0 ]; then
-  ## PB: echo "ipv6_ipv4mapping=\"YES\"" >> /etc/rc.conf
+  ## PB: was: echo "ipv6_ipv4mapping=\"YES\"" >> /etc/rc.conf
   sysrc ipv6_ipv4mapping="YES"
 fi
 

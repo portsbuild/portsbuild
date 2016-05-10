@@ -56,7 +56,7 @@ if [ "$COUNT" -ne 0 ]; then
   exit 2
 fi
 
-echo "Blocking $ip ...<br>"
+printf "Blocking %s<br>\n" $ip
 echo "$ip=dateblocked=$(date +%s)" >> $BF
 
 if [ "$OS" = "FreeBSD" ]; then
