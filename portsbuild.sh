@@ -6766,12 +6766,12 @@ ipfw_enable() {
   cp -f "${PB_PATH}/directadmin/scripts/custom/block_ip.sh" ${DA_PATH}/scripts/custom/
   cp -f "${PB_PATH}/directadmin/scripts/custom/unblock_ip.sh" ${DA_PATH}/scripts/custom/
   cp -f "${PB_PATH}/directadmin/scripts/custom/show_blocked_ips.sh" ${DA_PATH}/scripts/custom/
-  # cp -f "${PB_PATH}/directadmin/scripts/custom/brute_force_notice_ip.sh" ${DA_PATH}/scripts/custom/
+  cp -f "${PB_PATH}/directadmin/scripts/custom/brute_force_notice_ip.sh" ${DA_PATH}/scripts/custom/
 
   chmod 700 ${DA_PATH}/scripts/custom/block_ip.sh
   chmod 700 ${DA_PATH}/scripts/custom/unblock_ip.sh
   chmod 700 ${DA_PATH}/scripts/custom/show_blocked_ips.sh
-  #chmod 700 ${DA_PATH}/scripts/custom/brute_force_notice_ip.sh
+  chmod 700 ${DA_PATH}/scripts/custom/brute_force_notice_ip.sh
 
   return
 }
