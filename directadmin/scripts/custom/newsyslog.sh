@@ -52,4 +52,4 @@ addLog /usr/local/www/roundcube/logs/errors webapps:webapps -
 #addLog /usr/local/www/squirrelmail/data/squirrelmail_access_log webapps:webapps -
 addLog /usr/local/www/phpMyAdmin/log/auth.log webapps:webapps -
 
-exit 1;
+exit 1

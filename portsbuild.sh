@@ -6732,9 +6732,14 @@ bfm_setup() {
 
 ################################################################
 
-## Todo: IPFW Enable
+## Verify: Test:
+## IPFW Enable
 ipfw_enable() {
 
+  ## From: http://help.directadmin.com/item.php?id=380
+  ##  and: http://forum.directadmin.com/showthread.php?t=42202
+
+  ## Updated /etc/sysctl.conf
   sysrc firewall_enable="YES"
   sysrc firewall_type="simple"
   sysrc firewall_script="/etc/ipfw.rules"
@@ -6755,12 +6760,25 @@ ipfw_enable() {
   ## Verify:
   sysrc -f /etc/ipfw.rules pif="${ETH_DEV}"
 
+  touch /root/blocked_ips.txt
+  touch /root/exempt_ips.txt
+
+  cp -f "${PB_PATH}/directadmin/scripts/custom/block_ip.sh" ${DA_PATH}/scripts/custom/
+  cp -f "${PB_PATH}/directadmin/scripts/custom/unblock_ip.sh" ${DA_PATH}/scripts/custom/
+  cp -f "${PB_PATH}/directadmin/scripts/custom/show_blocked_ips.sh" ${DA_PATH}/scripts/custom/
+  # cp -f "${PB_PATH}/directadmin/scripts/custom/brute_force_notice_ip.sh" ${DA_PATH}/scripts/custom/
+
+  chmod 700 ${DA_PATH}/scripts/custom/block_ip.sh
+  chmod 700 ${DA_PATH}/scripts/custom/unblock_ip.sh
+  chmod 700 ${DA_PATH}/scripts/custom/show_blocked_ips.sh
+  #chmod 700 ${DA_PATH}/scripts/custom/brute_force_notice_ip.sh
+
   return
 }
 
 ################################################################
 
-## Todo: Disable IPFW
+## Disable IPFW
 ipfw_disable() {
 
   sysrc firewall_enable="NO"
@@ -6771,7 +6789,7 @@ ipfw_disable() {
 
 ################################################################
 
-## Todo: Remove IPFW Settings
+## Remove IPFW Settings
 ipfw_remove() {
 
   sysrc -x firewall_enable
@@ -6785,6 +6803,11 @@ ipfw_remove() {
   sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.dyn_keepalive
   sysrc -f /etc/sysctl.conf -x net.inet.tcp.fast_finwait2_recycle
   sysrc -f /etc/sysctl.conf -x net.inet.tcp.finwait2_timeout
+
+  rm -f "${PB_PATH}/directadmin/scripts/custom/block_ip.sh"
+  rm -f "${PB_PATH}/directadmin/scripts/custom/unblock_ip.sh"
+  rm -f "${PB_PATH}/directadmin/scripts/custom/brute_force_notice_ip.sh"
+  rm -f "${PB_PATH}/directadmin/scripts/custom/show_blocked_ips.sh"
 
   return
 }
