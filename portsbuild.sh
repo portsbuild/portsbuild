@@ -53,7 +53,7 @@
 ### PortsBuild ###
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160506
+PB_BUILD_DATE=20160508
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -385,7 +385,7 @@ fi
 MODSECURITY_CUSTOM_RULES=${PB_PATH}/custom/modsecurity/conf
 
 ## Compatibility Settings
-COMPAT_APACHE24_SYMLINKS=YES
+COMPAT_APACHE24_SYMLINKS=NO
 COMPAT_PHP_SYMLINKS=YES
 COMPAT_EXIM_SYMLINKS=YES
 COMPAT_NAMED_SYMLINKS=YES
@@ -444,6 +444,7 @@ PORT_SUPHP=www/suphp
 PORT_PHPMYADMIN=databases/phpmyadmin
 PORT_IONCUBE=devel/ioncube
 PORT_SUHOSIN=security/suhosin
+PORT_HTSCANNER=devel/pecl-htscanner
 # PORT_PCRE=devel/pcre
 
 ## Ports: Mail & Related Services
@@ -724,10 +725,9 @@ setOpt() {
 ################################################################################################################################
 
 ## Set Value ($1) to ($2) in file ($3) (copied from CB2)
-## (might deprecate this with sysrc as a replacement)
 setVal() {
 
-  if [ "${3}" = ${DA_CONF_FILE} ] && [ ! -e ${DA_CONF_FILE} ]; then
+  if [ "${3}" = "${DA_CONF_FILE}" ] && [ ! -e "${DA_CONF_FILE}" ]; then
     return
   fi
 
@@ -741,12 +741,12 @@ setVal() {
 
   ## Can't put [brackets] around the statement else grep flips out.
   if ! grep -m1 -q "${1}=" "${3}"; then
-    printf "Option %s doesn't exist, adding it now.\n" ${1}
+    printf "Option %s doesn't exist, adding it now.\n" "${1}"
     ## It's not there, so add it.
     echo "$1=$2" >> "${3}"
     return
   else
-    printf "Option %s exists, updating it now.\n" ${1}
+    printf "Option %s exists, updating it now.\n" "${1}"
     FIND_OPTION="$(grep "${1}=" "${3}")"
     NEW_OPT_VALUE="${1}=${2}"
     ## The value is already in the file $3, so use Perl regex to replace it.
@@ -758,7 +758,6 @@ setVal() {
 ################################################################
 
 ## Get Value ($1) from file ($2)
-## (might deprecate this with sysrc as a replacement)
 getVal() {
 
   ## $1 = option
@@ -3474,8 +3473,46 @@ apache_install() {
 
   printf "Starting Apache installation\n"
 
+  ## Todo: Harden Symlinks Patch for Apache 2.4
+  if [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "YES" ]; then
+    if [ "${OPT_APACHE_VER}" = "2.4" ]; then
+      APACHE_HSP=${PB_PATH}/patches/harden-symlinks-2.4.patch
+
+      if [ -s "${APACHE_HSP}" ]; then
+        printf "Applying Apache 2.4 Hardened Symlinks Patch\n"
+        ## Copy into /usr/ports/www/apache24/files
+      else
+        printf "*** Error: Cannot apply the Apache 2.4 Hardened Symlinks Patch\n."
+        printf "File %s does not exist.\n" "${APACHE_HSP}"
+      fi
+    fi
+  fi
+
+  ## Todo:
+  # ## For ModSecurity
+  # if [ -d srclib/apr-util ]; then
+  #   echo "Patching srclib/apr-util/dbm/sdbm/sdbm_private.h..."
+  #   cd srclib/apr-util
+  #   patch -p0 < ${PB_PATH}/patches/sdbm_private.patch
+  #   cd ../../
+  # fi
+
+  #   echo "Patching apache to suexec safedir path..."
+  #   if [ ! -s ../patches/suexec-safe.patch ]; then
+  #     echo "Error with patches/suexec-safe.patch. File is missing or empty"
+  #   else
+  #     patch -p1 < ../patches/suexec-safe.patch
+  #   fi
+
+  # echo "Patching apache to allow SuexecUserGroup in Directory context..."
+  # if [ ! -s ../patches/mod_suexec_directory.patch ]; then
+  #   echo "Error with patches/mod_suexec_directory.patch. File is missing or empty"
+  # else
+  #   patch -p1 < ../patches/mod_suexec_directory.patch
+  # fi
+
   ### Main Installation
-  if [ "${APACHE24_MAKE_SET}" = "" ] && [ "${APACHE24_MAKE_UNSET}" = "" ] ; then
+  if [ "${APACHE24_MAKE_SET}" = "" ] && [ "${APACHE24_MAKE_UNSET}" = "" ] && [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "NO" ]; then
     pkgi ${PORT_APACHE24}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" rmconfig
@@ -3485,29 +3522,27 @@ apache_install() {
   ## Todo: Research:
   # USERS=${APACHE_USER} GROUPS=${APACHE_GROUP}
 
-  ### Post-Installation Tasks
-
   ## PB: Verify:
-  ## Copy over configuration files to conf/:
+  ## Copy over configuration files to etc/apache24/:
   if [ -d "${PB_PATH}/configure/ap2/conf/" ]; then
     cp -rf "${PB_PATH}/configure/ap2/conf/" ${APACHE_PATH}/
     # cp -f "${PB_PATH}/configure/ap2/conf/httpd.conf" ${APACHE_PATH}/
     # cp -f "${PB_PATH}/configure/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRA_PATH}/httpd-mpm.conf
   fi
 
-  ## Copy over modified (custom) configuration files to conf/:
+  ## Copy over modified (custom) configuration files to etc/apache24/:
   if [ -d "${PB_PATH}/custom/ap2/conf/" ]; then
     cp -rf "${PB_PATH}/custom/ap2/conf/" ${APACHE_PATH}/
     # cp -f "${PB_PATH}/custom/ap2/conf/httpd.conf" ${APACHE_PATH}/
     # cp -f "${PB_PATH}/custom/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRA_PATH}/httpd-mpm.conf
   fi
 
-  ## This is already done (Apache default)
+  ## This is already done (Apache 2.4 default)
   ${PERL} -pi -e 's/^DefaultType/#DefaultType/' ${APACHE_PATH}/httpd.conf
 
   chmod 710 ${APACHE_PATH}
 
-  ## Update directadmin.conf (template) with new paths
+  ## Update directadmin.conf (template) with new paths:
   setVal apache_ver 2.0 ${DA_CONF_TEMPLATE_FILE}
   setVal apacheconf ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf ${DA_CONF_TEMPLATE_FILE}
   setVal apacheips ${APACHE_PATH}/ips.conf ${DA_CONF_TEMPLATE_FILE}
@@ -3516,6 +3551,8 @@ apache_install() {
   setVal apachekey ${APACHE_SSL_KEY} ${DA_CONF_TEMPLATE_FILE}
   setVal apacheca ${APACHE_SSL_CA} ${DA_CONF_TEMPLATE_FILE}
   setVal htpasswd /usr/local/bin/htpasswd ${DA_CONF_TEMPLATE_FILE}
+  setVal cloud_cache 0 ${DA_CONF_TEMPLATE_FILE}
+  setVal nginx 0 ${DA_CONF_TEMPLATE_FILE}
 
   ## Update existing directadmin.conf file if present
   if [ -s ${DA_CONF_FILE} ]; then
@@ -3527,8 +3564,11 @@ apache_install() {
     setVal apachekey ${APACHE_SSL_KEY} ${DA_CONF_FILE}
     setVal apacheca ${APACHE_SSL_CA} ${DA_CONF_FILE}
     setVal htpasswd /usr/local/bin/htpasswd ${DA_CONF_FILE}
+    setVal cloud_cache 0 ${DA_CONF_FILE}
+    setVal nginx 0 ${DA_CONF_FILE}
   fi
 
+  ## Setup initial httpd.conf for user 'admin'
   ADMIN_HTTP=${DA_PATH}/data/users/admin/httpd.conf
   if [ ! -e ${ADMIN_HTTP} ] && [ -d ${DA_PATH}/data/users/admin ]; then
     printf "" > ${ADMIN_HTTP}
@@ -3546,12 +3586,6 @@ apache_install() {
 
   ## Backup SSL Certificates and httpd.conf
   backupHttp
-
-  setVal cloud_cache 0 ${DA_CONF_TEMPLATE_FILE}
-  setVal cloud_cache 0 ${DA_CONF_FILE}
-
-  setVal nginx 0 ${DA_CONF_TEMPLATE_FILE}
-  setVal nginx 0 ${DA_CONF_FILE}
 
   if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     setVal nginx_proxy 1 ${DA_CONF_TEMPLATE_FILE}
@@ -3574,9 +3608,11 @@ apache_install() {
     set_service litespeed delete
     killall -9 nginx >/dev/null 2>&1
     killall -9 litespeed >/dev/null 2>&1
+    sysrc -x nginx_enable
   fi
 
-  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ] || [ ! -e /usr/local/sbin/httpd ]; then
+  ## Verify:
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then ## || [ ! -e "${APACHE_HTTPD_BIN}" ]
     set_service httpd ON
     # CB2: rm -f /usr/sbin/apxs
   fi
@@ -3585,8 +3621,6 @@ apache_install() {
   chmod 551 ${WWW_DIR}
 
   restoreHttp
-
-  #apache_host_conf
 
   ## Update /boot/loader.conf
   sysrc -f /boot/loader.conf accf_http_load="YES"
@@ -3603,10 +3637,6 @@ apache_install() {
   ## Start Apache
   ${SERVICE} apache24 start
 
-  if [ "${OPT_WEBSERVER}" = "apache" ]; then
-    sysrc -x nginx_enable
-  fi
-
   HAVE_DACONF=0
   if [ -s ${DA_CONF_FILE} ]; then
     HAVE_DACONF=1
@@ -3619,20 +3649,20 @@ apache_install() {
   #   ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/usr/local/etc/apache24/extra/directadmin-vhosts.conf#' ${DA_CONF_TEMPLATE_FILE}
   # fi
 
-  ## PB: Existing DA install with directadmin.conf present
+  ## PB: Existing DA install with directadmin.conf present (and referencing httpd.conf)
   # if [ "${HAVE_DACONF}" = "1" ] && [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_FILE})" = "1" ]; then
   #   if [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_FILE})" = "1" ]; then
   #     ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/usr/local/etc/apache24/extra/directadmin-vhosts.conf#' ${DA_CONF_FILE}
   #     directadmin_restart
   #   fi
-
+  #
   #   ## Verify: Backup Apache directory
   #   mv -f ${APACHE_PATH} ${APACHE_PATH}.${OPT_APACHE_VER}.backup
-
+  #
   #   ## Copy portsbuild/configure/ap2/conf files to etc/apache24
   #   # CB2: cp -rf ${APCONFDIR} ${APACHE_PATH}
   #   cp -rf "${PB_PATH}/configure/ap2/conf" ${APACHE_PATH}
-
+  #
   #   ## Custom configuration files (portsbuild/custom/ap2/conf)
   #   if [ "${APCUSTOMCONFDIR}" != "0" ]; then
   #     cp -rf ${APCUSTOMCONFDIR} ${APACHE_PATH}
@@ -3648,10 +3678,11 @@ apache_install() {
 
     HDC=httpd-directories-old.conf
 
-    ln -sf $HDC ${APACHE_EXTRA_PATH}/httpd-directories.conf
+    ln -sf ${HDC} ${APACHE_EXTRA_PATH}/httpd-directories.conf
 
     apache_host_conf
 
+    ## Todo:
     ## Custom Configurations
     if [ "${APCUSTOMCONFDIR}" != "0" ]; then
       cp -rf "${APCUSTOMCONFDIR}" ${APACHE_PATH}
@@ -3716,13 +3747,13 @@ apache_install() {
   tokenize_IP
   tokenize_ports
 
-  ## CB2: add all the Include lines if they do not exist
+  ## CB2: add all the Include lines if they do not exist (or if directadmin-vhosts.conf doesn't exist)
   if [ "$(grep -m1 -c 'Include' ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf)" = "0" ] || [ ! -e "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf" ]; then
     ## CB2: doVhosts
     rewrite_vhosts
   fi
 
-  ## Generate self-signedSSL Key and Certificate for Apache if they don't exist
+  ## Generate self-signed SSL Key and Certificate for Apache if they don't exist
   if [ ! -s ${APACHE_SSL_KEY} ] || [ ! -s ${APACHE_SSL_CRT} ]; then
     mkdir -p ${APACHE_PATH}/ssl
 
@@ -3735,6 +3766,8 @@ apache_install() {
 
   doApacheCheck
 
+  mkdir -p ${WWW_DIR}
+
   ## Create default "blank" page
   if [ ! -e ${WWW_DIR}/index.html ]; then
     if [ -e ${WWW_DIR}/index.html.en ]; then
@@ -3744,9 +3777,10 @@ apache_install() {
     fi
   fi
 
+  ## If we were switching from Nginx to Apache:
   ${PERL} -pi -e 's/Nginx/Apache/' ${WWW_DIR}/index.html
 
-  ## PB: Verify:
+  ## Safe-bin directory
   if [ ! -d /usr/local/safe-bin ]; then
     mkdir -p /usr/local/safe-bin
     chmod 511 /usr/local/safe-bin
@@ -3763,15 +3797,13 @@ apache_install() {
   PHPMODULES=${APACHE_EXTRA_PATH}/httpd-phpmodules.conf
 
   if [ -e ${PHPMODULES} ]; then
-
     if [ "${OPT_MODSECURITY}" = "YES" ] && [ ! -e "${APACHE_LIB_PATH}/mod_security2.so" ] && [ "${OPT_WEBSERVER}" = "apache" ]; then
-      ## CB2: doModSecurity
       modsecurity_install
     fi
 
     COUNT="$(grep -m1 -c 'httpd-modsecurity' ${PHPMODULES})"
     if [ "${OPT_MODSECURITY}" = "YES" ] && [ "${OPT_WEBSERVER}" = "apache" ] && [ "${COUNT}" -eq 0 ]; then
-      perl -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' ${APACHE_CONF}
+      ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' ${APACHE_CONF}
       echo "Include ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf" >> ${PHPMODULES}
       cp -pf "${MODSECURITY_APACHE_INCLUDE}" "${APACHE_EXTRA_PATH}/httpd-modsecurity.conf"
     fi
@@ -3794,22 +3826,22 @@ apache_install() {
       fi
     fi
 
-    ## PB: Todo: Verify:
+    ## PB: Todo:
     ## HTScanner
-    # if [ "${OPT_HTSCANNER}" = "YES" ]; then
-    #   if [ "${OPT_WEBSERVER}" = "apache" ]  || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    #     if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
-    #       if ! grep -m1 -c 'htscanner_module' ${PHPMODULES}; then
-    #         ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
-    #         echo "LoadModule htscanner_module ${APACHE_LIB_PATH}/mod_htscanner2.so" >> ${PHPMODULES}
-    #       else
-    #         ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
-    #         ${PERL} -pi -e 's|^LoadModule  htscanner_module|^#LoadModule htscanner_module' ${PHPMODULES}
-    #       fi
-    #       doModHtscanner
-    #     fi
-    #   fi
-    # fi
+    if [ "${OPT_HTSCANNER}" = "YES" ]; then
+      if [ "${OPT_WEBSERVER}" = "apache" ]  || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+        if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
+          if ! grep -m1 -c 'htscanner_module' ${PHPMODULES}; then
+            ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
+            echo "LoadModule htscanner_module ${APACHE_LIB_PATH}/mod_htscanner2.so" >> ${PHPMODULES}
+          else
+            ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
+            ${PERL} -pi -e 's|^LoadModule  htscanner_module|^#LoadModule htscanner_module' ${PHPMODULES}
+          fi
+          install_mod_htscanner
+        fi
+      fi
+    fi
 
     ## suPHP
     if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
@@ -3819,13 +3851,14 @@ apache_install() {
       fi
     fi
 
-    ## PB: Needed?
+    ## Verify:
+    ## PB: FastCGI... or FCGI?
     if [ "${HAVE_FCGID}" = "YES" ]; then
       if [ ! -s "${APACHE_LIB_PATH}/mod_fcgid.so" ]; then
         install_mod_fcgid
       fi
       if ! grep -m1 -q 'fcgid_module' ${PHPMODULES}; then
-        ${PERL} -pi -e 's|^LoadModule  mod_fcgid|#LoadModule mod_fcgid|' /etc/httpd/conf/httpd.conf
+        ${PERL} -pi -e 's|^LoadModule  mod_fcgid|#LoadModule mod_fcgid|' ${APACHE_PATH}/httpd.conf
         echo "LoadModule  fcgid_module    ${APACHE_LIB_PATH}/mod_fcgid.so" >> ${PHPMODULES}
       fi
       if ! grep -m1 -q 'httpd-fcgid.conf' ${PHPMODULES}; then
@@ -3833,15 +3866,15 @@ apache_install() {
       fi
     fi
 
-    ## PB: Todo: Verify:
+    ## PB: Todo:
     ## HTScanner
-    # if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
-    #   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    #     if [ "${OPT_HTSCANNER}" = "YES" ] && [ ! -e "${APACHE_LIB_PATH}/mod_htscanner2.so" ]; then
-    #       doModHtscanner
-    #     fi
-    #   fi
-    # fi
+    if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
+      if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+        if [ "${OPT_HTSCANNER}" = "YES" ] && [ ! -e "${APACHE_LIB_PATH}/mod_htscanner2.so" ]; then
+          install_mod_htscanner
+        fi
+      fi
+    fi
   fi
 
   ## CB2: Make sure there is no SSLMutex in /usr/local/etc/apache24/extra/httpd-ssl.conf
@@ -3862,16 +3895,10 @@ apache_install() {
   ## CB2: doModLsapi 0
   ## CB2: ldconfig
 
-  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    printf "Restarting Apache\n"
-    ${SERVICE} apache24 restart
-  fi
-
-  if [ ${COMPAT_APACHE24_SYMLINKS} = "YES" ]; then
+  if [ "${COMPAT_APACHE24_SYMLINKS}" = "YES" ]; then
 
     printf "PortsBuild+DirectAdmin Compatibility mode: Creating symlinks for Apache\n"
 
-    ## Symlink for backwards compatibility:
     ## 2016-03-05: no longer needed?
     mkdir -p /etc/httpd
     ln -s ${APACHE_PATH} /etc/httpd/conf
@@ -3910,13 +3937,16 @@ apache_install() {
     ln -s ${APACHE_SSL_CA} ${APACHE_PATH}/ssl.crt/server.ca
 
     ## Symlink for DA compat:
-    if [ ! -e /usr/local/sbin/httpd ]; then
-      ln -s /usr/local/sbin/httpd /usr/sbin/httpd
+    if [ ! -e ${APACHE_HTTPD_BIN} ]; then
+      ln -s ${APACHE_HTTPD_BIN} /usr/sbin/httpd
     fi
-
   fi
 
-  ## CB2: writeLog "Apache ${APACHE2_VER} installed"
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    printf "Restarting Apache\n"
+    ${SERVICE} apache24 restart
+  fi
+
 }
 
 ################################################################
@@ -3939,468 +3969,41 @@ apache_uninstall() {
 
 ################################################################################################################################
 
-## Apache Install v2 (copied from doApache2 from CB2)
-apache_install_v2() {
+## Install Mod_HTScanner (from CB2: doModHtscanner())
+install_mod_htscanner() {
 
-  if [ "${OPT_WEBSERVER}" != "apache" ]; then
-    printf "***\n"
+  if [ "${OPT_HTSCANNER}" = "NO" ]; then
+    printf "*** Notice: HTScanner is not enabled in options.conf.\n"
     return
   fi
 
-  printf "Starting Apache installation\n"
+  pkgi ${PORT_HTSCANNER}
 
-  ### Main Installation
-  if [ "${APACHE24_MAKE_SET}" = "" ] && [ "${APACHE24_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_APACHE24}
-  else
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" www_apache24_SET="${APACHE24_MAKE_SET}" www_apache24_UNSET="${APACHE24_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
-  fi
-
-  ## Load accf_http and accf_data modules at startup
-  if [ -e /sbin/kldload ]; then
-    if [ ! -e /boot/loader.conf ]; then
-      touch /boot/loader.conf
-      chmod 444 /boot/loader.conf
-    fi
-    if ! grep -q -m1 '^accf_http_load="YES"$' /boot/loader.conf; then
-      sysrc -f /boot/loader.conf accf_http_load="YES"
-      /sbin/kldload accf_http
-    fi
-    if ! grep -q -m1 '^accf_data_load="YES"$' /boot/loader.conf; then
-      sysrc -f /boot/loader.conf accf_data_load="YES"
-      /sbin/kldload accf_data
-    fi
-  fi
-
-  ## PB: Conversion from previous Apache versions? Needed?
-  # if [ -e ${APACHE_CONF} ]; then
-  #   if [ "$(grep -m1 -c 'ServerType standalone' ${APACHE_CONF})" -ne 0 ]; then
-  #     convert
-  #   fi
-  # fi
-
-  ADMIN_HTTP=${DA_PATH}/data/users/admin/httpd.conf
-  if [ ! -e ${ADMIN_HTTP} ] && [ -d ${DA_PATH}/data/users/admin ]; then
-    printf "" > ${ADMIN_HTTP}
-    chown diradmin:admin ${ADMIN_HTTP}
-    chmod 640 ${ADMIN_HTTP}
-  fi
-
-  ## Verify: Check for PCRE (needed?)
-  # if [ ! -e /usr/local/bin/pcre-config ]; then
-  #   removeLockfile
-  #   ## CB2: doPCRE
-  #   pkg install -y devel/pcre
-  # fi
-
-  ## Create httpd log directories
-  if [ ! -d /var/log/httpd/domains ]; then
-    mkdir -p /var/log/httpd/domains
-    chmod 711 /var/log/httpd
-  fi
-
-  ## Verify:
-  addUserGroup apache apache
-  backupHttp
-
-  ## Todo: Verify: Harden Symlinks patch
-  # if [ "$OPT_HARDEN_SYMLINKS_PATCH" = "YES" ]; then
-  #   if [ "${OPT_APACHE_VER}" = "2.4" ]; then
-  #     PATCH_NAME=harden-symlinks-2.4.patch
-  #     getFile ${PATCH_NAME} ${PATCH_NAME}
-  #   else
-  #     PATCH_NAME=harden-symlinks.patch.${APACHE2_VER}
-  #     getFile ${PATCH_NAME} harden-symlinks-patch
-  #   fi
-
-  #   if [ -s ${PATCH_NAME} ]; then
-  #     echo "Patching apache for hardened symlinks patch..."
-  #     if [ "${OPT_APACHE_VER}" = "2.4" ]; then
-  #       cd httpd-${APACHE2_VER}
-  #       patch -p0 < ../${PATCH_NAME}
-  #       cd ..
-  #     else
-  #       patch -p0 < ${PATCH_NAME}
-  #     fi
-  #   else
-  #     echo "Cannot find ${PATCH_NAME} to for hardened symlinks patch."
-  #   fi
-  # fi
-
-  ## Verify: For ModSecurity
-  # if [ -d srclib/apr-util ]; then
-  #   echo "Patching srclib/apr-util/dbm/sdbm/sdbm_private.h..."
-  #   cd srclib/apr-util
-  #   patch -p0 < ${WORKDIR}/patches/sdbm_private.patch
-  #   cd ../../
-  # fi
-
-  ## Verify: Apache/Suexec path
-  # echo "Patching Apache to suexec safedir path..."
-  # if [ ! -s ../patches/suexec-safe.patch ]; then
-  #   echo "Error with patches/suexec-safe.patch. File is missing or empty"
-  # else
-  #   patch -p1 < ../patches/suexec-safe.patch
-  # fi
-
-  ## Verify: Apache/Suexec patch
-  # echo "Patching apache to allow SuexecUserGroup in Directory context..."
-  # if [ ! -s ../patches/mod_suexec_directory.patch ]; then
-  #   echo "Error with patches/mod_suexec_directory.patch. File is missing or empty"
-  # else
-  #   patch -p1 < ../patches/mod_suexec_directory.patch
-  # fi
-  #
-
-  # setFDSETSIZE
-
-  # echo "increasing FD_SETSIZE in os/tpf/os.h .."
-  # if [ -e ./os/tpf/os.h ]; then
-  #   perl -pi -e 's/\#define FD_SETSIZE.*2048/\#ifdef FD_SETSIZE\n\#undef FD_SETSIZE\n\#endif\n\#define FD_SETSIZE 32768/' ./os/tpf/os.h
-  # fi
-
-  # if [ -e ./srclib/apr/include/apr.hnw ]; then
-  #   perl -pi -e 's/FD_SETSIZE.*1024/FD_SETSIZE 32768/' ./srclib/apr/include/apr.hnw
-  # fi
-
-  # if [ -e ./srclib/apr/poll/unix/select.c ]; then
-  #   perl -pi -e 's/FD_SETSIZE.*1024/FD_SETSIZE 32768/' ./srclib/apr/poll/unix/select.c
-  # fi
-
-  setVal cloud_cache 0 ${DA_CONF_TEMPLATE_FILE}
-  setVal nginx 0 ${DA_CONF_TEMPLATE_FILE}
-
-  if [ -e "${DA_CONF_FILE}" ]; then
-    setVal cloud_cache 0 ${DA_CONF_FILE}
-    setVal nginx 0 ${DA_CONF_FILE}
-  fi
-
-  if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    setVal nginx_proxy 1 ${DA_CONF_TEMPLATE_FILE}
-    setVal nginx_proxy 1 ${DA_CONF_FILE}
-    setVal litespeed 0 ${DA_CONF_TEMPLATE_FILE}
-    setVal litespeed 0 ${DA_CONF_FILE}
-    # set_service litespeed delete
-    # killall litespeed >/dev/null 2>&1
-    # killall -9 litespeed >/dev/null 2>&1
-    directadmin_restart
-  elif [ "${OPT_WEBSERVER}" = "apache" ]; then
-    setVal nginx_proxy 0 ${DA_CONF_TEMPLATE_FILE}
-    setVal nginx_proxy 0 ${DA_CONF_FILE}
-    setVal litespeed 0 ${DA_CONF_TEMPLATE_FILE}
-    setVal litespeed 0 ${DA_CONF_FILE}
-    killall nginx >/dev/null 2>&1
-    # killall litespeed >/dev/null 2>&1
-    directadmin_restart
-    set_service nginx delete
-    # set_service litespeed delete
-    killall -9 nginx >/dev/null 2>&1
-    # killall -9 litespeed >/dev/null 2>&1
-  fi
-
-  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ] || [ ! -e /usr/local/sbin/httpd ]; then
-    set_service httpd ON
-    # CB2: rm -f /usr/sbin/apxs
-  fi
-
-  ## PB: Not needed?
-  # ln -sf /var/www/build /etc/httpd/build
-
-  chown ${WEBAPPS_USER}:apache ${WWW_DIR}
-  chmod 551 ${WWW_DIR}
-
-  ## Verify:
-  restoreHttp
-
-
-  ## PB: Not needed
-  # if [ "${OPT_WEBSERVER}" != "litespeed" ]; then
-  #   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ] || [ ! -e /usr/local/sbin/httpd ]; then
-  #     ## CB2: ensure /usr/sbin/apxs
-  #     if [ ! -s /usr/sbin/apxs ] && [ -s /usr/local/bin/apxs ]; then
-  #       ln -s /usr/bin/apxs /usr/sbin/apxs
-  #     fi
-
-  ## CB2: Startup script:
-  #     if [ ${OS} = "FreeBSD" ]; then
-  #       cp -f ${CWD}/httpd_2_freebsd /usr/local/etc/rc.d/httpd
-  #       chmod 755 /usr/local/etc/rc.d/httpd
-  #     fi
-  #   fi
-  # fi
-
-  ## Add Apache to startup
-  sysrc apache24_enable="YES"
-
-  ## CB2: Disable nginx & litespeed when switching to apache
-  ## PB: Verify:
-  if [ "${OPT_WEBSERVER}" = "apache" ]; then
-    if [ -e /usr/local/etc/rc.d/nginx ]; then
-      sysrc -x nginx_enable
-    fi
-    # if [ -e /usr/local/etc/rc.d/litespeed ]; then
-    #   rm -f /usr/local/etc/rc.d/litespeed
-    # fi
-  fi
-
-  HAVE_DACONF=0
-  if [ -s ${DA_CONF_FILE} ]; then
-    HAVE_DACONF=1
-  fi
-
-  ## CB2: Check directadmin.conf file
-  ## PB: Verify:
-  if [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_TEMPLATE_FILE})" = "1" ]; then
-    ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/usr/local/etc/apache24/extra/directadmin-vhosts.conf#' ${DA_CONF_TEMPLATE_FILE}
-  fi
-
-  if [ "${HAVE_DACONF}" = "1" ] && [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_FILE})" = "1" ]; then
-    if [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_FILE})" = "1" ]; then
-      ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/etc/httpd/conf/extra/directadmin-vhosts.conf#' ${DA_CONF_FILE}
-      directadmin_restart
-    fi
-
-    ## Verify: Backup Apache directory
-    mv -f ${APACHE_PATH} ${APACHE_PATH}.${OPT_APACHE_VER}.backup
-
-    ## Copy portsbuild/configure/ap2/conf files to etc/apache24
-    # CB2: cp -rf ${APCONFDIR} ${APACHE_PATH}
-    cp -rf "${PB_PATH}/configure/ap2/conf" ${APACHE_PATH}
-
-    ## Custom configuration files (portsbuild/custom/ap2/conf)
-    if [ "${APCUSTOMCONFDIR}" != "0" ]; then
-      cp -rf ${APCUSTOMCONFDIR} ${APACHE_PATH}
-    fi
-    cp -rf ${APACHE_PATH}.${OPT_APACHE_VER}.backup/ssl.key ${APACHE_PATH}
-    cp -rf ${APACHE_PATH}.${OPT_APACHE_VER}.backup/ssl.crt ${APACHE_PATH}
-    directadmin_restart
-  fi
-
-  ## CB2: copy the new configs if needed
-  if [ "$(grep -m1 -c 'Include' ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf)" = "0" ] || [ ! -e ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf ]; then
-    cp -rf "${PB_PATH}/configure/ap2/conf" ${APACHE_PATH}
-
-    HDC=httpd-directories-old.conf
-
-    ln -sf $HDC ${APACHE_EXTRA_PATH}/httpd-directories.conf
-
-    apache_host_conf
-
-    if [ "${APCUSTOMCONFDIR}" != "0" ]; then
-      cp -rf "${APCUSTOMCONFDIR}" ${APACHE_PATH}
-    fi
-  fi
-
-  create_httpd_nginx
-
-  ## CB2: hide frontpage from the interface to avoid confusion
-  hideFrontpage
-
-  ## CB2: ensure we have the correct apache_ver
-  if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE_FILE})" -eq "0" ]; then
-    echo "apache_ver=2.0" >> ${DA_CONF_TEMPLATE_FILE}
-    echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
-    directadmin_restart
-  elif [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE_FILE})" -ne "0" ]; then
-    ${PERL} -pi -e 's/$(grep -m1 apache_ver= ${DA_CONF_TEMPLATE_FILE})/apache_ver=2.0/' ${DA_CONF_TEMPLATE_FILE}
-  fi
-
-  if [ "${HAVE_DACONF}" = "1" ]; then
-    if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_FILE})" -eq "0" ]; then
-      echo "apache_ver=2.0" >> ${DA_CONF_FILE}
-      directadmin_restart
-      echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
-    elif [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_FILE})" -ne "0" ]; then
-      ${PERL} -pi -e 's/`grep -m1 apache_ver= ${DA_CONF_FILE})/apache_ver=2.0/' ${DA_CONF_FILE}
-      directadmin_restart
-      echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
-    fi
-  fi
-
-  fpmChecks
-  dovecotChecks
-
-  if [ "${HAVE_FPM_CGI}" = "YES" ]; then
-    ${PERL} -pi -e 's/nginx/apache/' ${DA_PATH}/data/templates/php-fpm.conf
-  fi
-
-  verify_server_ca
-
-  do_rewrite_httpd_alias
-
-  ## CB2: rewrite ips.conf if needed
-  echo "action=rewrite&value=ips" >> ${DA_TASK_QUEUE}
-  echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
-
-  run_dataskq
-
-  ## CB2: tokenize the IP and ports if needed
-  tokenize_IP
-  tokenize_ports
-
-  ## CB2: add all the Include lines if they do not exist
-  if [ "$(grep -m1 -c 'Include' ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf)" = "0" ] || [ ! -e "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf" ]; then
-    ## CB2: doVhosts
-    rewrite_vhosts
-  fi
-
-  if [ ! -s ${APACHE_SSL_KEY} ] || [ ! -s ${APACHE_SSL_CRT} ]; then
-    # cd ${WORKDIR}
-    # mkdir -p /etc/httpd/conf/ssl.key
-    # mkdir -p /etc/httpd/conf/ssl.crt
-
-    ${OPENSSL_BIN} req -x509 -newkey rsa:2048 -keyout ${APACHE_SSL_KEY} -out ${APACHE_SSL_CRT} -days 9999 -nodes -config ./${APCERTCONF}
-
-    chmod 600 ${APACHE_SSL_CRT}
-    chmod 600 ${APACHE_SSL_KEY}
-  fi
-
-  doApacheCheck
-
-  mkdir -p ${WWW_DIR}
-
-  ## Create default "blank" page
-  if [ ! -e ${WWW_DIR}/index.html ]; then
-    if [ -e ${WWW_DIR}/index.html.en ]; then
-      cp -f ${WWW_DIR}/index.html.en ${WWW_DIR}/index.html
-    else
-      printf "<html>\n<head>\n<title></title>\n</head>\n<body>\n<p>Apache is functioning normally</p>\n</body>\n</html>" > ${WWW_DIR}/index.html
-    fi
-  fi
-
-  ${PERL} -pi -e 's/Nginx/Apache/' ${WWW_DIR}/index.html
-
-  ## PB: Verify:
-  if [ ! -d /usr/local/safe-bin ]; then
-    mkdir -p /usr/local/safe-bin
-    chmod 511 /usr/local/safe-bin
-    chown ${APACHE_USER}:${APACHE_GROUP} /usr/local/safe-bin
-  fi
-
-  ## CB2: Make sure apr is linked correctly
-  ## PB: FreeBSD: /usr/local/bin/apr-1-config
-  ## PB: Needed?
-  # if [ -e /usr/bin/apr-1-config ]; then
-  #   ln -sf /usr/bin/apr-1-config /usr/bin/apr-config
-  # fi
+  # APXS=/usr/local/sbin/apxs
+  # $APXS -a -i -c mod_htscanner2.c
 
   PHPMODULES=${APACHE_EXTRA_PATH}/httpd-phpmodules.conf
 
   if [ -e ${PHPMODULES} ]; then
-    if [ "${OPT_MODSECURITY}" = "YES" ] && [ ! -e ${APACHE_LIB_PATH}/mod_security2.so ] && [ "${OPT_WEBSERVER}" = "apache" ]; then
-      # CB2: doModSecurity
-      ## PB: Todo:
-      modsecurity_install
-    fi
-
-    COUNT="$(grep -m1 -c 'httpd-modsecurity' ${PHPMODULES})"
-    if [ "${OPT_MODSECURITY}" = "YES" ] && [ "${OPT_WEBSERVER}" = "apache" ] && [ ${COUNT} -eq 0 ]; then
-      perl -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' ${APACHE_CONF}
-      echo "Include ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf" >> ${PHPMODULES}
-      cp -pf ${MODSECURITY_APACHE_INCLUDE} ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf
-    fi
-
-    if ! grep -m1 -q '${APACHE_LIB_PATH}/mod_mpm_' ${PHPMODULES}; then
-      ## CB2: Use event MPM for php-fpm and prefork for mod_php
-      if [ "${OPT_APACHE_MPM}" = "auto" ]; then
-        if [ "${HAVE_CLI}" = "NO" ]; then
-          # Add to httpd-phpmodules.conf
-          echo "LoadModule mpm_event_module ${APACHE_LIB_PATH}/mod_mpm_event.so" >> ${PHPMODULES}
-        else
-          # Add to httpd-phpmodules.conf
-          echo "LoadModule mpm_prefork_module ${APACHE_LIB_PATH}/mod_mpm_prefork.so" >> ${PHPMODULES}
-        fi
-      elif [ "${OPT_APACHE_MPM}" = "event" ]; then
-        echo "LoadModule mpm_event_module ${APACHE_LIB_PATH}/mod_mpm_event.so" >> ${PHPMODULES}
-      elif [ "${OPT_APACHE_MPM}" = "worker" ]; then
-        echo "LoadModule mpm_worker_module ${APACHE_LIB_PATH}/mod_mpm_worker.so" >> ${PHPMODULES}
-      else
-        echo "LoadModule mpm_prefork_module ${APACHE_LIB_PATH}/mod_mpm_prefork.so" >> ${PHPMODULES}
-      fi
-    fi
-
-    ## PB: Todo: Verify:
-    ## HTScanner
-    if [ "${OPT_HTSCANNER}" = "YES" ]; then
-      if [ "${OPT_WEBSERVER}" = "apache" ]  || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-        if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
-          if ! grep -m1 -c 'htscanner_module' ${PHPMODULES}; then
-            ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
-            echo "LoadModule htscanner_module ${APACHE_LIB_PATH}/mod_htscanner2.so" >> ${PHPMODULES}
-          else
-            ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
-            ${PERL} -pi -e 's|^LoadModule  htscanner_module|^#LoadModule htscanner_module' ${PHPMODULES}
-          fi
-          doModHtscanner
-        fi
-      fi
-    fi
-
-    ## suPHP
-    if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
-      if ! grep -m1 -q 'suphp_module' ${PHPMODULES}; then
-        ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' ${APACHE_CONF}
-        echo "LoadModule  suphp_module    ${APACHE_LIB_PATH}/mod_suphp.so" >> ${PHPMODULES}
-      fi
-    fi
-
-    ## PB: Needed?
-    if [ "${HAVE_FCGID}" = "YES" ]; then
-      if [ ! -s "${APACHE_LIB_PATH}/mod_fcgid.so" ]; then
-        install_mod_fcgid
-      fi
-      if ! grep -m1 -q 'fcgid_module' ${PHPMODULES}; then
-        ${PERL} -pi -e 's|^LoadModule  mod_fcgid|#LoadModule mod_fcgid|' ${APACHE_PATH}/httpd.conf
-        echo "LoadModule  fcgid_module    ${APACHE_LIB_PATH}/mod_fcgid.so" >> ${PHPMODULES}
-      fi
-      if ! grep -m1 -q 'httpd-fcgid.conf' ${PHPMODULES}; then
-        echo "Include ${APACHE_EXTRA_PATH}/httpd-fcgid.conf" >> ${PHPMODULES}
-      fi
-    fi
-
-    ## HTScanner
-    if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
-      if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-        if [ "${OPT_HTSCANNER}" = "YES" ] && [ ! -e "${APACHE_LIB_PATH}/mod_htscanner2.so" ]; then
-          doModHtscanner
-        fi
-      fi
+    ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_PATH}/httpd.conf
+    if ! grep -m1 -q 'htscanner_module' ${PHPMODULES}; then
+      echo "LoadModule  htscanner_module    /usr/local/libexec/apache24/mod_htscanner2.so" >> ${PHPMODULES}
     fi
   fi
 
-  ## CB2: Make sure there is no SSLMutex in /usr/local/etc/apache24/extra/httpd-ssl.conf
-  ## CB2: Make sure there is no LockFile in /usr/local/etc/apache24/extra/httpd-mpm.conf
-  # if [ "${OPT_APACHE_VER}" = "2.4" ]; then
-    ${PERL} -pi -e 's/^SSLMutex/#SSLMutex/' ${APACHE_EXTRA_PATH}/httpd-ssl.conf
-    ${PERL} -pi -e 's/^LockFile/#LockFile/' ${APACHE_EXTRA_PATH}/httpd-mpm.conf
-  # fi
+  echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
 
-  ## Disable UserDir access if userdir_access=no is set in the options.conf file
-  if [ "${OPT_USERDIR_ACCESS}" = "NO" ]; then
-    ${PERL} -pi -e 's#UserDir public_html#UserDir disabled#' ${APACHE_EXTRA_PATH}/httpd-vhosts.conf
-  else
-    ${PERL} -pi -e 's#UserDir disabled#UserDir public_html#' ${APACHE_EXTRA_PATH}/httpd-vhosts.conf
-  fi
+  run_dataskq
 
-  doModHostingLimits 0
-  doModLsapi 0
+  printf "mod_htscanner2 has been installed successfully.\n"
 
-  ## CB2: ldconfig
-
-  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    printf "Restarting Apache\n"
-    ${SERVICE} apache24 restart
-  fi
-
-  ## CB2: writeLog "Apache ${APACHE2_VER} installed"
-
+  return
 }
 
 ################################################################################################################################
 
 ## Verify:
-## do Mod FCGID (Copied from CB2: doModFCGID())
+## do Mod FCGID (from CB2: doModFCGID())
 install_mod_fcgid() {
 
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
@@ -5772,7 +5375,7 @@ apache_host_conf() {
 
 ################################################################################################################################
 
-## Add Alias Redirect (copied from CB2)
+## Add Alias Redirect (from CB2: add_alias_redirect())
 add_alias_redirect() {
   AF=$1
   A=$2
@@ -5820,8 +5423,7 @@ add_alias_redirect() {
 
 ################################################################################################################################
 
-## Verify: Todo:
-## Rewrite httpd Alias (copied from CB2: do_rewrite_httpd_alias)
+## Rewrite httpd Alias (from CB2: do_rewrite_httpd_alias())
 do_rewrite_httpd_alias() {
 
   ## Custom Configuration
@@ -5865,7 +5467,7 @@ do_rewrite_httpd_alias() {
     fi
 
     if [ -s "${WEBAPPS_LIST}" ]; then
-      # CB2: http://forum.directadmin.com/showthread.php?t=48203&p=247343#post247343
+      ## CB2: http://forum.directadmin.com/showthread.php?t=48203&p=247343#post247343
       printf "Adding custom webapps from %s\n" "${WEBAPPS_LIST}"
 
       ## Verify:
@@ -5874,19 +5476,19 @@ do_rewrite_httpd_alias() {
         app_path=$(echo "$l" | cut -d= -f2)
 
         if [ "${app}" = "" ] || [ "${app_path}" = "" ]; then
-          echo "Check your ${WEBAPPS_LIST}. A name or path is blank."
-          echo "name=$app"
-          echo "path=$app_path"
+          printf "Check your %s. A name or path is blank.\n" "${WEBAPPS_LIST}"
+          printf "name=%s\n" "$app"
+          printf "path=%s\n" "$app_path"
           continue
         fi
 
         if [ ! -e "${WWW_DIR}/${app_path}" ]; then
-          echo "Cannot find path ${WWW_DIR}/${app_path} for alias ${app}"
+          printf "Cannot find path %s for alias %s\n" "${WWW_DIR}/${app_path}" "${app}"
           continue
         fi
 
         add_alias_redirect ${HA} "${app}" "${app_path}"
-        echo "Added ${app} pointing to ${app_path}"
+        printf "Added %s pointing to %s\n" "${app}" "${app_path}"
       done
     fi
   fi
@@ -6080,7 +5682,7 @@ create_httpd_nginx() {
 
 ################################################################################################################################
 
-## Do Apache Check (Copied from CB2: doApacheCheck())
+## Do Apache Check (from CB2: doApacheCheck())
 doApacheCheck() {
 
   if [ ! -e "${APACHE_EXTRA_PATH}/httpd-includes.conf" ]; then
@@ -6102,7 +5704,7 @@ doApacheCheck() {
 
 ################################################################################################################################
 
-## Rewrite Confs (copied from CB2: doRewriteConfs)
+## Rewrite Confs (from CB2: doRewriteConfs())
 rewrite_confs() {
 
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
