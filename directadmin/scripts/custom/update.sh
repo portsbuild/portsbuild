@@ -24,9 +24,9 @@ if [ ! -d /usr/local/sysbk ]; then
   ./sysbk.sh
 fi
 
-grep "usertype=reseller" /usr/local/directadmin/data/users/*/user.conf | cut -d/ -f7 > /usr/local/directadmin/data/admin/reseller.list
-chown diradmin:diradmin /usr/local/directadmin/data/admin/reseller.list
-chmod 600 /usr/local/directadmin/data/admin/reseller.list
+grep "usertype=reseller" ${DA_PATH}/data/users/*/user.conf | cut -d/ -f7 > "${DA_PATH}/data/admin/reseller.list"
+chown diradmin:diradmin "${DA_PATH}/data/admin/reseller.list"
+chmod 600 "${DA_PATH}/data/admin/reseller.list"
 
 echo "action=addoptions" >> $DA_TQ
 
@@ -67,7 +67,7 @@ if [ -e /var/spool/virtual ]; then
 fi
 
 ${PERL} -pi -e "s/userlog \"%u %b\"/userlog \"%u %b %m\"/" /usr/local/etc/proftpd.conf
-echo "action=proftpd&value=restart" >> /usr/local/directadmin/data/task.queue
+echo "action=proftpd&value=restart" >> ${DA_PATH}/data/task.queue
 
 if [ ! -e /usr/local/bin/mysqld ] && [ -e /usr/local/libexec/mysqld ]; then
   ln -s ../libexec/mysqld /usr/local/bin/mysqld
@@ -89,7 +89,7 @@ COUNT=$(grep -c net.inet6.ip6.v6only /etc/sysctl.conf)
 if [ "$COUNT" -eq 0 ]; then
   ## PB: echo "net.inet6.ip6.v6only=0" >> /etc/sysctl.conf
   sysrc -f /etc/sysctl.conf net.inet6.ip6.v6only=0
-  #/etc/rc.d/sysctl restart
+  # /etc/rc.d/sysctl restart
   /usr/sbin/service sysctl restart
 fi
 

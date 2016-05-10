@@ -3,8 +3,8 @@
 ## Source: http://www.directadmin.com/features.php?id=450
 ## Created by PortsBuild
 
-if [ -x /usr/sbin/named ] || [ -x /usr/local/sbin/named ]; then
-  /usr/sbin/service named restart
-fi
+# if [ -x /usr/sbin/named ] || [ -x /usr/local/sbin/named ]; then
+#   /usr/sbin/service named restart
+# fi
 
-exit 0;
+exit 0

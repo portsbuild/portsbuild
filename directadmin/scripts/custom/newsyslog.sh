@@ -3,7 +3,7 @@
 CONF=/usr/local/etc/newsyslog.conf.d/directadmin.conf
 
 if [ ! -e $CONF ]; then
-  echo "Creating newsyslog configuration for DirectAdmin.";
+  printf "Creating newsyslog configuration for DirectAdmin.\n"
   touch ${CONF}
 fi
 
@@ -11,9 +11,9 @@ fi
 addLog() {
   COUNT=$(grep -c "$1" $CONF)
   if [ "$COUNT" -ne 0 ]; then
-          return;
+    return
   fi
-  echo -e "$1\t$2\t600\t4\t*\t@T00\t$3\t$4" >> $CONF
+  printf "%s\t%s\t600\t4\t*\t@T00\t%s\t%s\n" "$1" "$2" "$3" "$4" >> $CONF
 }
 
 #addLog /var/log/chrootshell.log '' -

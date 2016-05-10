@@ -1,0 +1,65 @@
+#!/bin/sh
+
+#################################################
+# ipfw Firewall Commands
+#################################################
+cmd="ipfw -q add"
+ipfw -q -f flush
+pif="em0"
+
+#################################################
+# Allow Loopback and Deny Loopback Spoofing
+#################################################
+$cmd allow all from any to any via lo0
+$cmd deny all from any to 127.0.0.0/8
+$cmd deny all from 127.0.0.0/8 to any
+$cmd deny tcp from any to any frag
+
+#################################################
+# Stateful rules
+#################################################
+$cmd check-state
+$cmd deny tcp from any to any established
+$cmd allow all from any to any out keep-state
+$cmd allow icmp from any to any
+
+#################################################
+# Table 10 for IP blocks
+#################################################
+ipfw -q table 10 add 127.0.0.2
+ipfw -q add 900 deny ip from 'table(10)' to any
+
+#################################################
+# Incoming/Outgoing Services
+#################################################
+$cmd 60001 allow tcp from any to any 21 setup limit src-addr 10
+$cmd 60002 allow tcp from any to any 22 setup limit src-addr 8
+$cmd 60003 allow tcp from any to any 25 setup limit src-addr 10
+$cmd 60004 allow tcp from any to any 587 setup limit src-addr 20
+$cmd 60005 allow tcp from any to any 53 setup limit src-addr 3
+$cmd 60006 allow udp from any to any 53 limit src-addr 3
+$cmd 60007 allow tcp from any to any 80 setup limit src-addr 20
+$cmd 60008 allow tcp from any to any 110 setup limit src-addr 20
+$cmd 60009 allow tcp from any to any 143 setup limit src-addr 10
+$cmd 60010 allow tcp from any to any 443 setup limit src-addr 10
+$cmd 60011 allow tcp from any to any 2222 setup limit src-addr 12
+$cmd 60012 allow tcp from any to any 35000-35999 in setup limit src-addr 10
+$cmd 60013 allow tcp from any to any 993 setup limit src-addr 10
+$cmd 60014 allow tcp from any to any 995 setup limit src-addr 10
+$cmd 60015 allow tcp from any to any 465 setup limit src-addr 10
+$cmd 60016 allow tcp from any to any 585 setup limit src-addr 10
+
+#################################################
+# Deny Port scanning (Nmap)
+#################################################
+$cmd 00600 deny log logamount 50 ip from any to any ipoptions rr
+$cmd 00610 deny log logamount 50 ip from any to any ipoptions ts
+$cmd 00620 deny log logamount 50 ip from any to any ipoptions lsrr
+$cmd 00630 deny log logamount 50 ip from any to any ipoptions ssrr
+$cmd 00640 deny log logamount 50 tcp from any to any tcpflags syn,fin
+$cmd 00650 deny log logamount 50 tcp from any to any tcpflags syn,rst
+
+#################################################
+# Deny and Log
+#################################################
+$cmd deny log all from any to any

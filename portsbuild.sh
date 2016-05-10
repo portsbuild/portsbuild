@@ -202,7 +202,7 @@ APACHE_PATH=/usr/local/etc/apache24
 # APACHE_DIR=${APACHE_PATH}
 # APACHE_HTTPD_BIN=/usr/local/sbin/httpd
 APACHE_EXTRA_PATH=${APACHE_PATH}/extra
-APACHE_LIB_PATH=${APACHE_LIB_PATH}
+APACHE_LIB_PATH=/usr/local/libexec/apache24
 APACHE_CONF=${APACHE_PATH}/httpd.conf
 APACHE_HOSTNAME_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
 APACHE_MIME_TYPES=${APACHE_PATH}/mime.types
@@ -278,8 +278,8 @@ EXIM_SSL_KEY=${EXIM_PATH}/ssl/exim.key
 EXIM_SSL_CRT=${EXIM_PATH}/ssl/exim.crt
 EXIM_SSL_CA=${EXIM_PATH}/ssl/exim.ca
 
-EXIM_BC_PATH=${EXIM_PATH}/blockcracking
-EXIM_ESF_PATH=${EXIM_PATH}/easyspamfigther
+EXIM_BC_PATH=${EXIM_PATH}/bc
+EXIM_ESF_PATH=${EXIM_PATH}/esf
 
 ## Dovecot
 DOVECOT_BIN=/usr/local/sbin/dovecot
@@ -367,18 +367,19 @@ fi
 
 ## Mod Security for Apache
 MODSECURITY_APACHE_INCLUDE=${PB_PATH}/configure/ap2/conf/extra/httpd-modsecurity.conf
-if [ -e ${PB_PATH}/custom/ap2/conf/extra/httpd-modsecurity.conf ]; then
+if [ -e "${PB_PATH}/custom/ap2/conf/extra/httpd-modsecurity.conf" ]; then
   MODSECURITY_APACHE_INCLUDE=${PB_PATH}/custom/ap2/conf/extra/httpd-modsecurity.conf
 fi
 
 ## Mod Security for Nginx
 MODSECURITY_NGINX_INCLUDE=${PB_PATH}/configure/nginx/conf/nginx-modsecurity.conf
-if [ -e ${PB_PATH}/custom/nginx/conf/nginx-modsecurity.conf ]; then
+if [ -e "${PB_PATH}/custom/nginx/conf/nginx-modsecurity.conf" ]; then
   MODSECURITY_NGINX_INCLUDE=${PB_PATH}/custom/nginx/conf/nginx-modsecurity.conf
 fi
+
 ## Mod Security for Apache+Nginx Reverse Proxy
 MODSECURITY_NGINX_REVERSE_INCLUDE=${PB_PATH}/configure/nginx_reverse/conf/nginx-modsecurity.conf
-if [ -e ${PB_PATH}/custom/nginx_reverse/conf/nginx-modsecurity.conf ]; then
+if [ -e "${PB_PATH}/custom/nginx_reverse/conf/nginx-modsecurity.conf" ]; then
   MODSECURITY_NGINX_REVERSE_INCLUDE=${PB_PATH}/custom/nginx_reverse/conf/nginx-modsecurity.conf
 fi
 
@@ -590,7 +591,8 @@ PUREFTPD_MAKE_UNSET=""
 
 ## Todo:
 # if [ ! -f options.conf ]; then
-# # recreate file # exit;
+# # recreate file
+# # exit
 # fi
 
 ## See if IPV6 is enabled in DirectAdmin:
@@ -990,7 +992,7 @@ backup_file() {
 
 ################################################################################################################################
 
-## Get System Timezone (copied from CB2)
+## Get System Timezone (from CB2)
 getTimezone() {
 
   if [ -d /usr/share/zoneinfo ] && [ -e /etc/localtime ]; then
@@ -1008,7 +1010,7 @@ getTimezone() {
 
 ################################################################################################################################
 
-## Add (new) User to (new) Group (copied from CB2)
+## Add (new) User to (new) Group (from CB2)
 addUserGroup() {
 
   ## $1 = user
@@ -1081,6 +1083,7 @@ global_setup() {
   if [ "${OPT_NAMED}" = "YES" ]; then ( printf ", Named" ); fi
   if [ "${OPT_EXIM}" = "YES" ]; then ( printf ", Exim" ); fi
   if [ "${OPT_DOVECOT}" = "YES" ]; then ( printf ", Dovecot" ); fi
+  if [ "${OPT_MAJORDOMO}" = "YES" ]; then ( printf ", Majordomo" ); fi
   if [ "${OPT_WEBSERVER}" = "apache" ]; then ( printf ", Apache" ); else ( printf ", Nginx"); fi
   if [ "${OPT_PHP1_RELEASE}" != "NO" ]; then ( printf ", %s %s" "${OPT_PHP1_MODE}" "${OPT_PHP1_VERSION}" ); fi
   if [ "${OPT_SQL_DB}" != "NO" ]; then ( printf ", %s" "${OPT_SQL_DB}" ); fi
@@ -1119,7 +1122,6 @@ global_setup() {
   # echo "PHP ini Type: ${OPT_PHP_INI_TYPE}"
   # echo "Webapps Inbox Prefix: ${OPT_WEBAPPS_INBOX_PREFIX}"
   # echo "Spam Inbox Prefix: ${OPT_SPAM_INBOX_PREFIX}"
-  # echo "Majordomo: ${OPT_MAJORDOMO}"
   # echo "Install CCache: ${OPT_INSTALL_CCACHE}"
   # echo "Install Synth: ${OPT_INSTALL_SYNTH}"
 
@@ -1196,6 +1198,7 @@ global_setup() {
 
     ## Symlink Perl for DA compat
     printf "Pre-Install Task: checking for /usr/bin/perl symlink\n"
+
     if [ ! -e /usr/bin/perl ]; then
       if [ -e ${PERL} ]; then
         ln -s ${PERL} /usr/bin/perl
@@ -1252,6 +1255,7 @@ global_setup() {
     if [ "${OPT_DOVECOT}" = "YES" ]; then ( dovecot_install ); fi
     if [ "${OPT_WEBSERVER}" = "apache" ]; then ( apache_install ); fi
     if [ "${OPT_PHP1_MODE}" != "NO" ]; then ( php_install ); fi
+    # if [ "${OPT_PHP2_MODE}" != "NO" ]; then ( php2_install ); fi
     if [ "${OPT_SQL_DB}" != "NO" ]; then ( install_app "${OPT_SQL_DB}" ); fi
     if [ "${OPT_PHPMYADMIN}" = "YES" ]; then ( phpmyadmin_install ); fi
     if [ "${OPT_ROUNDCUBE}" = "YES" ]; then ( roundcube_install ); fi
@@ -1275,7 +1279,7 @@ global_setup() {
     fi
 
     ## Replace templates/proftpd.conf with corrected version:
-    cp -f "${PB_PATH}/configure/proftpd/proftpd.conf" "${DA_PATH}/data/templates/proftpd.conf"
+    cp -f "${PB_PATH}/directadmin/data/templates/custom/proftpd.conf" "${DA_PATH}/data/templates/proftpd.conf"
 
     chown -f diradmin:diradmin ${CB_CONF}
     chmod 755 "${CB_CONF}"
@@ -2303,9 +2307,6 @@ spamassassin_utilities_uninstall() {
 ## Install Exim BlockCracking (BC)
 blockcracking_install() {
 
-  ## Check for Exim
-  # pkg query %n "exim"
-
   if [ -x ${EXIM_BIN} ]; then
 
     printf "Downloading BlockCracking\n"
@@ -2315,7 +2316,6 @@ blockcracking_install() {
     ## used to include: -${BLOCKCRACKING_VER}
 
     if [ -e "${PB_PATH}/files/exim.blockcracking.tar.gz" ]; then
-      ## Path was: ${EXIM_PATH}/exim.blockcracking
       mkdir -p ${EXIM_BC_PATH}
 
       printf "Extracting exim.blockcracking.tar.gz\n"
@@ -2349,9 +2349,6 @@ blockcracking_install() {
 ## Todo:
 ## Install Easy Spam Figter (ESF)
 easyspamfighter_install() {
-
-  ## Check for Exim
-  # pkg query %n "exim"
 
   if [ -x ${EXIM_BIN} ]; then
     ## See if SPF and SRS has been compiled in:
@@ -2882,7 +2879,7 @@ sql_post_install() {
 
   ## Remove /etc/my.cnf if it exists (not compliant with FreeBSD's hier(7)):
   if [ -e /etc/my.cnf ]; then
-      mv /etc/my.cnf /etc/my.cnf.disabled
+    mv /etc/my.cnf /etc/my.cnf.disabled
   fi
 
   printf "Updating /etc/rc.conf\n"
@@ -2993,7 +2990,7 @@ sql_post_install() {
 ################################################################################################################################
 
 ## Todo: Verify:
-## FPM Check (Copied from CB2: fpmCheck())
+## FPM Check (from CB2: fpmCheck())
 fpmCheck() {
 
   ARG=$1
@@ -3037,7 +3034,7 @@ fpmCheck() {
 ################################################################################################################################
 
 ## Todo: Verify:
-## FPM Checks (Copied from CB2: fpmChecks())
+## FPM Checks (from CB2: fpmChecks())
 fpmChecks() {
 
   for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
@@ -3083,8 +3080,9 @@ fpmChecks() {
 
 ################################################################################################################################
 
-## Dovecot Checks (copied from CB2: dovecotChecks())
+## Dovecot Checks (from CB2: dovecotChecks())
 dovecotChecks() {
+
   if [ -e ${DOVECOT_CONF} ]; then
     COUNT=$(grep -m1 -c '/usr/local/etc/apache24/' ${DOVECOT_CONF})
     if [ "${OPT_WEBSERVER}" = "nginx" ] && [ "${COUNT}" -gt 0 ]; then
@@ -3174,7 +3172,7 @@ php_install() {
           ;;
       fastcgi) echo "not done" ;;
       suphp) echo "not done"
-          # /usr/ports/www/suphp
+          pkgi ${PORT_SUPHP}
           ;;
       *) printf "*** Error: Wrong PHP version selected. (Script error?)\n"; exit ;;
     esac
@@ -3267,7 +3265,7 @@ php_install() {
     php_fpm_restart
   fi
 
-
+  return
 }
 
 ################################################################
@@ -3303,13 +3301,16 @@ php_fpm_restart() {
     printf "  service php-fpm restart\n"
   fi
 
-return
+  return
 }
 
 ################################################################
 
 ## Upgrade PHP and related components
 php_upgrade() {
+
+  printf "Upgrading PHP\n"
+
   pkg upgrade "$(pkg query %o | grep "php${OPT_PHP1_VERSION}")"
 
   #pkg query -i -x "%o %v" '(php)'
@@ -3320,6 +3321,7 @@ php_upgrade() {
 ## Have PHP System (copied from CB2)
 ## Needed?
 have_php_system() {
+
   ## Checks to see if we can use system() based on the disable_functions
   if [ ! -s "${PHP_INI}" ]; then
     echo 1
@@ -3349,7 +3351,7 @@ have_php_system() {
 phpmyadmin_install() {
 
   if [ "${OPT_PHPMYADMIN}" != "YES" ]; then
-    printf "***\n"
+    printf "*** Notice: PHPMYADMIN not enabled in options.conf\n"
     return
   fi
 
@@ -3360,10 +3362,9 @@ phpmyadmin_install() {
     pkgi ${PORT_PHPMYADMIN}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHPMYADMIN}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHPMYADMIN}" databases_phpmyadmin_SET="${PMA_MAKE_SET}" databases_phpmyadmin_UNSET"${PMA_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHPMYADMIN}" databases_phpmyadmin_SET="${PMA_MAKE_SET}" databases_phpmyadmin_UNSET"${PMA_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
   fi
-
-  ### Post-Installation Tasks
 
   ## Reference for virtualhost entry:
   # Alias /phpmyadmin/ "/usr/local/www/phpMyAdmin/"
@@ -3430,7 +3431,7 @@ phpmyadmin_install() {
   ln -s ${PMA_PATH} ${WWW_DIR}/pma
 
   ## Verify:
-  ## Disable/lockdown scripts directory (this might not even exist):
+  ## Disable/lockdown scripts directory (might not even exist):
   if [ -d "${PMA_PATH}/scripts" ]; then
     chmod 000 "${PMA_PATH}/scripts"
   fi
@@ -3458,6 +3459,9 @@ phpmyadmin_install() {
 
 ## Upgrade phpMyAdmin
 phpmyadmin_upgrade() {
+
+  pkgu ${PORT_PHPMYADMIN}
+
   return
 }
 
@@ -3906,11 +3910,11 @@ apache_install() {
     ## PB: Not needed?
     # ln -sf /var/www/build /etc/httpd/build
 
-    ## CustomBuild2 looking for Apache modules in ${APACHE_LIB_PATH}*
+    ## CustomBuild2 looking for Apache modules in ?*
     ## Symlink for backcomp (done):
     ## 2016-03-05: no longer needed?
     # mkdir -p ${APACHE_LIB_PATH}
-    # ln -s ${APACHE_LIB_PATH} ${APACHE_LIB_PATH}
+    # ln -s ${APACHE_LIB_PATH} xyz/usr/.../../
 
     ## Since DirectAdmin/CB2 reference /var/www/html often, we'll symlink for compat:
     mkdir -p /var/www
@@ -3987,7 +3991,7 @@ install_mod_htscanner() {
   if [ -e ${PHPMODULES} ]; then
     ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_PATH}/httpd.conf
     if ! grep -m1 -q 'htscanner_module' ${PHPMODULES}; then
-      echo "LoadModule  htscanner_module    /usr/local/libexec/apache24/mod_htscanner2.so" >> ${PHPMODULES}
+      echo "LoadModule  htscanner_module    ${APACHE_LIB_PATH}/mod_htscanner2.so" >> ${PHPMODULES}
     fi
   fi
 
@@ -4018,7 +4022,7 @@ install_mod_fcgid() {
   if [ -e ${PHPMODULES} ]; then
     if ! grep -m1 -q 'fcgid_module' ${PHPMODULES}; then
       perl -pi -e 's|^LoadModule  fcgid_module|#LoadModule  fcgid_module|' ${APACHE_PATH}/httpd.conf
-      echo "LoadModule fcgid_module /usr/local/libexec/apache24/mod_fcgid.so" >> ${PHPMODULES}
+      echo "LoadModule fcgid_module ${APACHE_LIB_PATH}/mod_fcgid.so" >> ${PHPMODULES}
     fi
 
     if ! grep -m1 -q 'httpd-fcgid.conf' ${PHPMODULES}; then
@@ -4134,11 +4138,11 @@ nginx_uninstall() {
 
 ################################################################################################################################
 
-## Majordomo Uninstall
+## Majordomo Install
 majordomo_install() {
 
   if [ "${OPT_MAJORDOMO}" = "NO" ]; then
-    printf "*** Error: Majordomo not enabled in options.conf\n"
+    printf "*** Notice: Majordomo not enabled in options.conf\n"
     return
   fi
 
@@ -4169,7 +4173,7 @@ majordomo_uninstall() {
 pureftpd_install() {
 
   if [ "${OPT_FTPD}" != "pureftpd" ]; then
-    printf "*** Error: PureFTPD not set in options.conf\n"
+    printf "*** Notice: PureFTPD not set in options.conf\n"
     return
   fi
 
@@ -4182,6 +4186,42 @@ pureftpd_install() {
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" ftp_pure_ftpd_SET="${PUREFTPD_MAKE_SET}" ftp_pure_ftpd_UNSET="${PUREFTPD_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
   fi
+
+  ## Todo:
+  ## Setup SSL Certificates
+
+  PUREFTPD_PEM=/usr/local/etc/pure-ftpd.pem
+
+  if [ ! -e ${PUREFTPD_PEM} ] && [ "${OPT_WEBSERVER}" = "nginx" ]; then
+    if [ -e ${NGINX_SSL_CRT} ] && [ -e ${NGINX_SSL_KEY} ]; then
+      cat ${NGINX_SSL_CRT} > ${PUREFTPD_PEM}
+      cat ${NGINX_SSL_KEY} >> ${PUREFTPD_PEM}
+    fi
+  fi
+
+  if [ ! -e ${PUREFTPD_PEM} ]; then
+    if [ -e ${APACHE_SSL_CRT} ] && [ -e ${APACHE_SSL_KEY} ]; then
+      cat ${APACHE_SSL_CRT} > ${PUREFTPD_PEM}
+      cat ${APACHE_SSL_KEY} >> ${PUREFTPD_PEM}
+    fi
+  fi
+
+  if [ ! -e ${PUREFTPD_PEM} ]; then
+    if [ -e ${EXIM_SSL_CRT} ] && [ -e ${EXIM_SSL_KEY} ]; then
+      cat ${EXIM_SSL_CRT} > ${PUREFTPD_PEM}
+      cat ${EXIM_SSL_KEY} >> ${PUREFTPD_PEM}
+    fi
+  fi
+
+  if [ ! -e /usr/local/etc/pure-ftpd-dhparams.pem ]; then
+    ${OPENSSL_BIN} dhparam -out /usr/local/etc/pure-ftpd-dhparams.pem 2048
+  fi
+
+  chmod 600 /usr/local/etc/pure-ftpd-dhparams.pem
+  chmod 600 ${PUREFTPD_PEM}
+
+  START_SCRIPT_UPLOADSCAN=1
+  PATH_TO_UPLOADSCAN=/usr/local/bin/pureftpd_uploadscan.sh
 
   if [ "${OPT_PUREFTPD_UPLOADSCAN}" = "YES" ] && [ "${OPT_CLAMAV}" = "YES" ]; then
     if [ ! -e ${CLAMDSCAN_BIN} ]; then
@@ -4208,7 +4248,7 @@ pureftpd_install() {
   return
 
   PUREFTPD_LOG=/var/log/pureftpd.log
-  PUREFTPD_DB=/etc/pureftpd.pdb
+  PUREFTPD_DB=/usr/local/etc/pureftpd.pdb
 
   sysrc pureftpd_enable="YES"
   sysrc pureftpd_flags="-B -A -C 15 -E -H -k 99 -L 10000:8 -O stats:${PUREFTPD_LOG} -l puredb:${PUREFTPD_DB} -p 35000:35999 -u 100 -U 133:022 -w -Z -Y 1 -J -S:HIGH:MEDIUM:+TLSv1:!SSLv2:+SSLv3"
@@ -4250,6 +4290,8 @@ pureftpd_uninstall() {
 
   ${SERVICE} pureftpd stop
 
+  pkg delete -f ${PORT_PUREFTPD}
+
   sysrc -x pureftpd_enable
   sysrc -x pureftpd_flags
   sysrc -x pureftpd_upload_enable
@@ -4266,7 +4308,7 @@ pureftpd_uninstall() {
 proftpd_install() {
 
   if [ "${OPT_FTPD}" != "proftpd" ]; then
-    printf "*** Error: ProFTPD not set in options.conf\n"
+    printf "*** Notice: ProFTPD not set in options.conf\n"
     return
   fi
 
@@ -4318,13 +4360,12 @@ proftpd_install() {
 
     ## Verify:
     if ! grep -m1 -q "^Include ${PROFTPD_CLAMAV_CONF}" /usr/local/etc/proftpd.conf; then
-      perl -pi -e 's#</Global>#</Global>\n\nInclude ${PROFTPD_CLAMAV_CONF}#' /usr/local/etc/proftpd.conf
+      ${PERL} -pi -e 's#</Global>#</Global>\n\nInclude ${PROFTPD_CLAMAV_CONF}#' /usr/local/etc/proftpd.conf
     fi
 
     /usr/local/bin/prxs -c -i -d mod_clamav.c
 
     {
-      #echo -n ''
       echo '<IfModule mod_dso.c>'
       echo '  LoadModule mod_clamav.c'
       echo '</IfModule>'
@@ -4364,7 +4405,8 @@ proftpd_uninstall() {
 
   ${SERVICE} proftpd stop
 
-  pkg delete -f proftpd
+  pkg delete -f ${PORT_PROFTPD}
+  pkg delete -f ${PORT_PROFTPD_CLAMAV}
 
   sysrc -x proftpd_enable
   sysrc -x proftpd_flags
@@ -5067,7 +5109,7 @@ modsecurity_install() {
     fi
   fi
 
-  doModSecurityRules norestart
+  update_modsecurity_rules norestart
 
   if [ "${OPT_WEBSERVER}" = "apache" ]; then
     ${SERVICE} apache24 restart
@@ -5088,123 +5130,124 @@ modsecurity_upgrade() {
 
 ################################################################
 
-## Do ModSecurity Rules (copied from CB2: doModSecurityRules())
-doModSecurityRules() {
-  cd ${CWD}
+## Todo:
+## Do ModSecurity Rules (from CB2: doModSecurityRules())
+update_modsecurity_rules() {
 
-  if [ ! -d /etc/modsecurity.d ]; then
-    mkdir -p /etc/modsecurity.d
+  printf "*** Error: update_modsecurity_rules(): Incomplete\n"
+  exit
+
+  if [ ! -d /usr/local/etc/modsecurity.d ]; then
+    mkdir -p /usr/local/etc/modsecurity.d
   fi
 
-  rm -f /etc/modsecurity.d/*
+  rm -f /usr/local/etc/modsecurity.d/*
 
   if [ "${OPT_MODSECURITY_RULESET}" = "comodo" ]; then
-    echo "Installing Comodo Rule Set for ModSecurity..."
+    printf "Installing the Comodo Ruleset for ModSecurity\n"
+
     if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-      getFileCWAF cwaf_rules_nginx-${CWAF_RULES_NGINX_VER}.tgz cwaf_rules_nginx
+      # getFileCWAF cwaf_rules_nginx-${CWAF_RULES_NGINX_VER}.tgz cwaf_rules_nginx
       CWAF_PLATFORM=Nginx
-    elif [ "${OPT_WEBSERVER}" = "litespeed" ]; then
-      getFileCWAF cwaf_rules_ls-${CWAF_RULES_LS_VER}.tgz cwaf_rules_ls
-      CWAF_PLATFORM=LiteSpeed
     else
-      getFileCWAF cwaf_rules-${CWAF_RULES_VER}.tgz cwaf_rules
+      # getFileCWAF cwaf_rules-${CWAF_RULES_VER}.tgz cwaf_rules
       CWAF_PLATFORM=Apache
     fi
+
     if [ ! -e /usr/local/cwaf/scripts/updater.pl ]; then
-      wget -O cwaf_client_install.sh https://waf.comodo.com/cpanel/cwaf_client_install.sh
+      ${WGET} -O cwaf_client_install.sh https://waf.comodo.com/cpanel/cwaf_client_install.sh
       chmod 700 cwaf_client_install.sh
       HOME=/root TERM=xterm ./cwaf_client_install.sh -- --batch --login=nologin --password=nopassword --platform=${CWAF_PLATFORM}
 
       #### plugin was not installed exit ###
       if [ $? -ne 0 ]; then
         rm -f cwaf_client_install.sh
-        do_exit 1 "Installation of Comodo WAF plugin failed"
+        printf "Installation of Comodo WAF plugin failed\n"
+        exit 1
       fi
 
-      cd ${WORKDIR}
       rm -f cwaf_client_install.sh
     else
-      echo 'Updating to latest CWAF client version'
+      printf "Updating to the latest CWAF client version\n"
       /usr/local/cwaf/scripts/update-client.pl
     fi
-    echo "IncludeOptional /etc/cwaf/cwaf.conf" > /etc/modsecurity.d/comodo_rules.conf.main
+
+    echo "IncludeOptional /usr/local/etc/cwaf/cwaf.conf" > /usr/local/etc/modsecurity.d/comodo_rules.conf.main
+
     if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-      perl -pi -e 's/cwaf_platform="Apache"/cwaf_platform="Nginx"/' /etc/cwaf/main.conf
-      perl -pi -e 's/cwaf_platform="LiteSpeed"/cwaf_platform="Nginx"/' /etc/cwaf/main.conf
-      /usr/local/cwaf/scripts/updater.pl -p /usr/local/directadmin/custombuild/cwaf_rules_nginx-${CWAF_RULES_NGINX_VER}.tgz
-      cd ${WORKDIR}
+      ${PERL} -pi -e 's/cwaf_platform="Apache"/cwaf_platform="Nginx"/' /usr/local/etc/cwaf/main.conf
+      ${PERL} -pi -e 's/cwaf_platform="LiteSpeed"/cwaf_platform="Nginx"/' /usr/local/etc/cwaf/main.conf
+      /usr/local/cwaf/scripts/updater.pl -p ${DA_PATH}/custombuild/cwaf_rules_nginx-${CWAF_RULES_NGINX_VER}.tgz
+
       rm -f cwaf_rules-${CWAF_RULES_NGINX_VER}.tgz
-    elif [ "${OPT_WEBSERVER}" = "litespeed" ]; then
-      perl -pi -e 's/cwaf_platform="Nginx"/cwaf_platform="LiteSpeed"/' /etc/cwaf/main.conf
-      perl -pi -e 's/cwaf_platform="Apache"/cwaf_platform="LiteSpeed"/' /etc/cwaf/main.conf
-      /usr/local/cwaf/scripts/updater.pl -p /usr/local/directadmin/custombuild/cwaf_rules_ls-${CWAF_RULES_LS_VER}.tgz
-      cd ${WORKDIR}
-      rm -f cwaf_rules-${CWAF_RULES_LS_VER}.tgz
     else
-      perl -pi -e 's/cwaf_platform="Nginx"/cwaf_platform="Apache"/' /etc/cwaf/main.conf
-      perl -pi -e 's/cwaf_platform="LiteSpeed"/cwaf_platform="Apache"/' /etc/cwaf/main.conf
-      /usr/local/cwaf/scripts/updater.pl -p /usr/local/directadmin/custombuild/cwaf_rules-${CWAF_RULES_VER}.tgz
-      cd ${WORKDIR}
+      ${PERL} -pi -e 's/cwaf_platform="Nginx"/cwaf_platform="Apache"/' /usr/local/etc/cwaf/main.conf
+      ${PERL} -pi -e 's/cwaf_platform="LiteSpeed"/cwaf_platform="Apache"/' /usr/local/etc/cwaf/main.conf
+      /usr/local/cwaf/scripts/updater.pl -p ${DA_PATH}/custombuild/cwaf_rules-${CWAF_RULES_VER}.tgz
+
       rm -f cwaf_rules-${CWAF_RULES_VER}.tgz
     fi
   fi
 
   if [ "${OPT_MODSECURITY_RULESET}" = "owasp" ]; then
-    echo "Installing OWASP Core Rule Set for ModSecurity..."
+    printf "Installing the OWASP Core Ruleset for ModSecurity\n"
     getFile SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz owasp_rules
-    tar xzf SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz -C /etc/modsecurity.d/ */modsecurity_crs_10_setup.conf.example --strip-components=1 --no-same-owner
-    tar xzf SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz -C /etc/modsecurity.d/ */base_rules --strip-components=2 --no-same-owner
-    echo ${OWASP_RULES_VER} > /etc/modsecurity.d/owasp_rules_version
-    if [ -e /etc/modsecurity.d/modsecurity_crs_10_setup.conf.example ]; then
-      mv -f /etc/modsecurity.d/modsecurity_crs_10_setup.conf.example /etc/modsecurity.d/modsecurity_crs_10_setup.conf.main
+    tar xzf SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz -C /usr/local/etc/modsecurity.d/ */modsecurity_crs_10_setup.conf.example --strip-components=1 --no-same-owner
+    tar xzf SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz -C /usr/local/etc/modsecurity.d/ */base_rules --strip-components=2 --no-same-owner
+
+    echo ${OWASP_RULES_VER} > /usr/local/etc/modsecurity.d/owasp_rules_version
+
+    if [ -e /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.example ]; then
+      mv -f /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.example /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.main
     fi
-    perl -pi -e 's|^SecDefaultAction|#SecDefaultAction|' /etc/modsecurity.d/modsecurity_crs_10_setup.conf.main
+    ${PERL} -pi -e 's|^SecDefaultAction|#SecDefaultAction|' /etc/modsecurity.d/modsecurity_crs_10_setup.conf.main
   fi
 
-  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "litespeed" ]; then
-    MODSECURITY_CONF_FILE=/etc/httpd/conf/extra/httpd-modsecurity.conf
+  if [ "${OPT_WEBSERVER}" = "apache" ]; then
+    MODSECURITY_CONF_FILE=${APACHE_EXTRA_PATH}/httpd-modsecurity.conf
   else
     MODSECURITY_CONF_FILE=/usr/local/etc/nginx/nginx-modsecurity.conf
   fi
 
-  if [ "${MODSECURITY_UPLOADSCAN_OPT}" = "yes" ] && [ "${OPT_CLAMAV}" = "yes" ]; then
+  if [ "${OPT_MODSECURITY_UPLOADSCAN}" = "yes" ] && [ "${OPT_CLAMAV}" = "yes" ]; then
     if [ ! -e /usr/local/bin/clamdscan ]; then
-      removeLockfile
-      doclamav
+      #removeLockfile
+      clamav_install
     fi
+
     if [ ! -e /usr/local/bin/clamdscan ]; then
-      do_exit 1 "Cannot enable upload scan in ProFTPd because there is no ClamAV (/usr/local/bin/clamdscan) on the system."
+      printf "*** Error: Cannot enable upload scan in ProFTPd because there is no ClamAV (/usr/local/bin/clamdscan) on the system.\n"
+      exit 1
     fi
+
     cp -pf ${RUNAV_PL} /usr/local/bin/runav.pl
     chmod 755 /usr/local/bin/runav.pl
-    cp -pf ${RUNAV_CONF} /etc/modsecurity.d/runav.conf
-    perl -pi -e 's#SecRequestBodyAccess Off#SecRequestBodyAccess On#' ${MODSECURITY_CONF_FILE}
+    cp -pf ${RUNAV_CONF} /usr/local/etc/modsecurity.d/runav.conf
+    ${PERL} -pi -e 's#SecRequestBodyAccess Off#SecRequestBodyAccess On#' ${MODSECURITY_CONF_FILE}
   else
     rm -f /usr/local/bin/runav.pl
     rm -f /etc/modsecurity.d/runav.conf
-    perl -pi -e 's#SecRequestBodyAccess On#SecRequestBodyAccess Off#' ${MODSECURITY_CONF_FILE}
+    ${PERL} -pi -e 's#SecRequestBodyAccess On#SecRequestBodyAccess Off#' ${MODSECURITY_CONF_FILE}
   fi
 
   if [ -d ${MODSECURITY_CUSTOM_RULES} ]; then
-    echo "Copying custom ModSecurity rules to /etc/modsecurity.d/..."
-    cp -Rpf ${MODSECURITY_CUSTOM_RULES}/* /etc/modsecurity.d/
+    printf "Copying custom ModSecurity rules to /usr/local/etc/modsecurity.d/\n"
+    cp -Rpf ${MODSECURITY_CUSTOM_RULES}/* /usr/local/etc/modsecurity.d/
   fi
 
-  echo "Installation of ModSecurity Rule Set has been finished."
+  printf "Installation of the ModSecurity Ruleset has finished.\n"
 
   if [ "$1" != "norestart" ]; then
     if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-      control_service httpd restart
+      ${SERVICE} apache24 restart
     fi
+
     if [ "${OPT_WEBSERVER}" = "nginx_apache" ] || [ "${OPT_WEBSERVER}" = "nginx" ]; then
-      control_service nginx restart
-    fi
-    if [ "${OPT_WEBSERVER}" = "litespeed" ]; then
-      control_service litespeed restart
+      ${SERVICE} nginx restart
     fi
   fi
 
-  cd ${CWD}
+  return
 }
 
 ################################################################################################################################
@@ -5812,7 +5855,7 @@ rewrite_confs() {
       ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' "${APACHE_CONF}"
       echo "Include ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf" >> "${PHPMODULES}"
       cp -pf "${MODSECURITY_APACHE_INCLUDE}" ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf
-      doModSecurityRules norestart
+      update_modsecurity_rules norestart
     fi
 
     ## HTScanner (not done):
@@ -5954,7 +5997,7 @@ rewrite_confs() {
 
     ## Todo:
     if [ "${OPT_MODSECURITY}" = "YES" ]; then
-      doModSecurityRules norestart
+      update_modsecurity_rules norestart
     fi
 
     # Rewrite ips.conf
@@ -6682,15 +6725,70 @@ bfm_setup() {
     ${WGET} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
   fi
 
-  #pure_pw=/usr/bin/pure-pw
+  # ipfw_enable
+
+  # pure_pw=/usr/bin/pure-pw
 }
 
 ################################################################
 
-## Todo: IPFW Setup
-ipfw_setup() {
+## Todo: IPFW Enable
+ipfw_enable() {
+
+  sysrc firewall_enable="YES"
+  sysrc firewall_type="simple"
+  sysrc firewall_script="/etc/ipfw.rules"
+  sysrc firewall_logging="YES"
+
+  ## IPFW enhancements:
+  sysrc -f /etc/sysctl.conf net.inet.ip.fw.verbose=1
+  sysrc -f /etc/sysctl.conf net.inet.ip.fw.verbose_limit=5
+  sysrc -f /etc/sysctl.conf net.inet.ip.fw.dyn_max=65536
+  sysrc -f /etc/sysctl.conf net.inet.ip.fw.dyn_keepalive=1
+
+  ## Recycle finwait2 connections faster:
+  sysrc -f /etc/sysctl.conf net.inet.tcp.fast_finwait2_recycle=1
+
+  ## Faster finwait2 timeouts:
+  sysrc -f /etc/sysctl.conf net.inet.tcp.finwait2_timeout=15000
+
+  ## Verify:
+  sysrc -f /etc/ipfw.rules pif="${ETH_DEV}"
+
   return
 }
+
+################################################################
+
+## Todo: Disable IPFW
+ipfw_disable() {
+
+  sysrc firewall_enable="NO"
+  sysrc firewall_logging="NO"
+
+  return
+}
+
+################################################################
+
+## Todo: Remove IPFW Settings
+ipfw_remove() {
+
+  sysrc -x firewall_enable
+  sysrc -x firewall_type
+  sysrc -x firewall_script
+  sysrc -x firewall_logging
+
+  sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.verbose
+  sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.verbose_limit
+  sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.dyn_max
+  sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.dyn_keepalive
+  sysrc -f /etc/sysctl.conf -x net.inet.tcp.fast_finwait2_recycle
+  sysrc -f /etc/sysctl.conf -x net.inet.tcp.finwait2_timeout
+
+  return
+}
+
 
 ################################################################################################################################
 
@@ -6768,6 +6866,7 @@ validate_options() {
 
   ## additional checks for PHP, then:
   ## OPT_PHP_ENABLE="YES"
+  ## DUAL_PHP_MODE="YES"
 
   case $(lc ${PHP_INI_XMAILHEADER}) in
     "yes") OPT_PHP_INI_XMAILHEADER="YES" ;;
@@ -7036,15 +7135,15 @@ install_app() {
     "apache"|"apache24") apache_install ;;
     "awstats") awstats_install ;;
     "bfm") bfm_setup ;;
-    "bind"|"named") bind_setup ;;
+    "bind"|"named"|"dns") bind_setup ;;
     "blockcracking"|"bc") blockcracking_install ;;
-    "directadmin") directadmin_install ;;
+    "directadmin"|"da") directadmin_install ;;
     "dkim") pkgi ${PORT_LIBDKIM} ;;
-    "easy_spam_fighter"|"esf") easyspamfighter_install ;;
+    "easy_spam_fighter"|"easyspamfighter"|"esf") easyspamfighter_install ;;
     "exim") exim_install ;;
-    "ioncube") pkgi "${PORT_IONCUBE}" ;;
-    "ipfw") ipfw_setup ;;
-    "libspf2"|"libspf") pkgi ${PORT_LIBSPF2} ;;
+    "ioncube"|"ic") pkgi "${PORT_IONCUBE}" ;;
+    "ipfw") ipfw_enable ;;
+    "libspf2"|"libspf"|"spf") pkgi ${PORT_LIBSPF2} ;;
     "mariadb55")
       pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
       sql_post_install ;;
@@ -7063,17 +7162,18 @@ install_app() {
     "mysql57")
       pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
       sql_post_install ;;
-    "modsecurity"|"mod_security") modsecurity_install ;;
+    "mariadb") echo "oops" ;;
+    "modsecurity"|"modsec"|"mod_security") modsecurity_install ;;
     "nginx") nginx_install ;;
-    "php"|"php55"|"php56"|"php70") php_install ;;
+    "php"|"ftm"|"php55"|"php56"|"php70") php_install ;;
     "phpmyadmin"|"pma") phpmyadmin_install ;;
-    "proftpd") proftpd_install ;;
-    "pureftpd") pureftpd_install ;;
-    "roundcube") roundcube_install ;;
-    "spamassassin") spamassassin_install ;;
+    "proftpd"|"proftp") proftpd_install ;;
+    "pureftpd"|"pureftp") pureftpd_install ;;
+    "roundcube"|"rc") roundcube_install ;;
+    "spamassassin"|"sa") spamassassin_install ;;
     "suhosin") suhosin_install ;;
     "webalizer") webalizer_install ;;
-    *) show_install ;;
+    "") show_install ;;
   esac
 
   return
@@ -7097,13 +7197,14 @@ uninstall_app() {
 
 ## Todo: Update PortsBuild Script
 update() {
+
   printf "PortsBuild update script\n"
   # wget -O portsbuild.sh ${PB_MIRROR}/portsbuild.sh
 
   ## Backup configuration file
   cp -f "${PB_CONF}" "${PB_CONF}.backup"
 
-  #fetch -o ./${PORTSBUILD_NAME}.tar.gz "${PB_MIRROR}/${PORTSBUILD_NAME}.tar.gz"
+  # fetch -o ./${PORTSBUILD_NAME}.tar.gz "${PB_MIRROR}/${PORTSBUILD_NAME}.tar.gz"
 
   if [ -s "${PORTSBUILD_NAME}.tar.gz" ]; then
     printf "Extracting %s.tar.gz...\n" "${PORTSBUILD_NAME}"
@@ -7129,7 +7230,7 @@ update() {
 upgrade() {
 
   case $2 in
-  *) show_menu_upgrade ;;
+    "") show_menu_upgrade ;;
   esac
 
   return
@@ -7141,29 +7242,29 @@ upgrade() {
 upgrade_app() {
 
   case $2 in
-    apache) apache_upgrade ;;
-    awstats) awstats_upgrade ;;
-    blockcracking) blockcracking_upgrade ;;
-    directadmin) directadmin_upgrade ;;
-    dovecot) dovecot_upgrade ;;
-    easyspamfighter) easyspamfighter_upgrade ;;
-    exim) exim_upgrade ;;
-    ioncube) ioncube_upgrade ;;
-    mariadb) mariadb_upgrade ;;
-    modsecurity) modsecurity_upgrade ;;
-    mysql) mysql_upgrade ;;
-    nginx) nginx_upgrade ;;
-    php) php_upgrade ;;
-    phpmyadmin) phpmyadmin_upgrade ;;
-    pigeonhole) pigeonhole_upgrade ;;
-    portsbuild) portsbuild_upgrade ;;
-    proftpd) proftpd_upgrade ;;
-    pureftpd) pureftpd_upgrade ;;
-    roundcube) roundcube_upgrade ;;
-    spamassassin) spamassassin_upgrade ;;
-    suhosin) suhosin_upgrade ;;
-    webalizer) webalizer_upgrade ;;
-    *) show_menu_upgrade ;;
+    "apache"|"httpd") apache_upgrade ;;
+    "awstats") awstats_upgrade ;;
+    "blockcracking"|"bc") blockcracking_upgrade ;;
+    "directadmin"|"da") directadmin_upgrade ;;
+    "dovecot"|"dc") dovecot_upgrade ;;
+    "easyspamfighter"|"esf") easyspamfighter_upgrade ;;
+    "exim") exim_upgrade ;;
+    "ioncube") ioncube_upgrade ;;
+    "mariadb"|"maria") mariadb_upgrade ;;
+    "modsecurity"|"modsec"|"mod_security") modsecurity_upgrade ;;
+    "mysql"|"sql") mysql_upgrade ;;
+    "nginx") nginx_upgrade ;;
+    "php"|"fpm") php_upgrade ;;
+    "phpmyadmin"|"pma") phpmyadmin_upgrade ;;
+    "pigeonhole"|"ph") pigeonhole_upgrade ;;
+    "portsbuild"|"pb") portsbuild_upgrade ;;
+    "proftpd"|"proftp") proftpd_upgrade ;;
+    "pureftpd"|"pureftp") pureftpd_upgrade ;;
+    "roundcube"|"rc") roundcube_upgrade ;;
+    "spamassassin"|"sa") spamassassin_upgrade ;;
+    "suhosin") suhosin_upgrade ;;
+    "webalizer") webalizer_upgrade ;;
+    "") show_menu_upgrade ;;
   esac
 
   return
@@ -7171,10 +7272,11 @@ upgrade_app() {
 
 ################################################################################################################################
 
-## Show Menu for Upgrades
+## Todo:Show Menu for Upgrades
 show_menu_upgrade() {
 
-  printf "Listing possible upgrades:\n"
+  printf "\n  Listing possible upgrades:\n"
+
   return
 }
 
@@ -7185,6 +7287,7 @@ show_menu_setup() {
 
   printf "To setup PortsBuild and DirectAdmin for the first time, run:\n"
   printf "  ./portsbuild setup <USER_ID> <LICENSE_ID> <SERVER_FQDN> <ETH_DEV> <IP_ADDRESS> <IP_NETMASK>\n\n"
+
   return
 }
 ################################################################################################################################
@@ -7192,8 +7295,8 @@ show_menu_setup() {
 ## Show Configuration Values
 show_config() {
 
-  printf "Configured Option Values\n"
-  printf "========================\n"
+  printf "\nConfigured Option Values\n"
+  printf "=====================================\n"
   {
     echo "PHP1 Version: ${OPT_PHP1_VERSION}"
     echo "PHP1 Mode: ${OPT_PHP1_MODE}"
@@ -7236,7 +7339,7 @@ show_config() {
 ## Show Debugging Information
 show_debug() {
 
-  printf "Debugging Information\n\n"
+  printf "  Debugging Information\n\n"
   printf "===[PB]========================\n"
   show_version
   # printf "PortsBuild Version/Build: %s / %s\n" ${PB_VER} ${PB_BUILD_DATE}
@@ -7257,7 +7360,6 @@ show_debug() {
 }
 
 ################################################################
-
 
 ## Verify: Rewrite Menu
 rewrite_app() {
@@ -7282,15 +7384,15 @@ rewrite_app() {
 ## Show Rewrite Menu
 show_rewrite_menu() {
 
-  printf "Rewrite Configuration Files\n"
+  printf "\n  Rewrite Configuration Files:\n"
   {
-    printf "apache: Rewrite Apache configuration files and virtual hosts\n"
-    printf "exim: Rewrite Exim configuration files\n"
-    printf "dovecot: Rewrite Dovecot configuration files\n"
-    printf "named: Rewrite Named (Bind) DNS files\n"
-    printf "nginx: Rewrite Nginx configuration files and virtual hosts\n"
-    printf "php: Rewrite PHP configuration files\n"
-    printf "virtual: Rewrite /etc/virtual directory\n"
+    printf "\tapache: Rewrite Apache configuration files and virtual hosts\n"
+    printf "\tdovecot: Rewrite Dovecot configuration files\n"
+    printf "\texim: Rewrite Exim configuration files\n"
+    printf "\tnamed: Rewrite Named (Bind) DNS files\n"
+    printf "\tnginx: Rewrite Nginx configuration files and virtual hosts\n"
+    printf "\tphp: Rewrite PHP configuration files\n"
+    printf "\tvirtual: Rewrite Mail (/etc/virtual) directory\n"
   } | column -t -s:
 
   return
@@ -7382,6 +7484,7 @@ show_logo() {
 
 ## Show version
 show_version() {
+
   printf "  PortsBuild version %s build %s\n" "${PB_VER}" "${PB_BUILD_DATE}"
   return
 }
@@ -7399,6 +7502,7 @@ show_versions() {
 
 ## Show outdated versions of (select) packages
 show_outdated() {
+
   printf "List of installed packages that are out of date:\n"
   ( printf "Package Outdated\n" ; pkg version -l '<' -x '(www/apache24|www/nginx|lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim|mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin|ftp/wget)' ) | column -t
   return
@@ -7408,6 +7512,7 @@ show_outdated() {
 
 ## Show Audit
 show_audit() {
+
   ${PKG} audit
 }
 
@@ -7415,6 +7520,7 @@ show_audit() {
 
 ## About PortsBuild
 show_about() {
+
   show_logo
   show_version
   printf "Visit portsbuild.org or github.com/portsbuild/portsbuild\n"
@@ -7425,6 +7531,7 @@ show_about() {
 
 ## Show the main menu
 show_main_menu() {
+
   show_logo
   show_version
   show_menu
@@ -7475,21 +7582,14 @@ show_menu() {
 
   printf "\n"
 
-# menu_command
-# menu_command_desc
-# menu_command_option
-# menu_command_option_desc
-
-# menu_update_update = "update"
-# menu_update_desc = "Update an application or service"
-
   return
 }
-
 
 ################################################################
 
 validate_options
+
+################################################################
 
 ## ./portsbuild selection screen
 case "$1" in
