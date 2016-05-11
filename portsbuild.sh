@@ -1260,10 +1260,15 @@ global_setup() {
     cp -f "${PB_PATH}/directadmin/data/templates/custom/proftpd.conf" "${DA_PATH}/data/templates/proftpd.conf"
     cp -f "${PB_PATH}/directadmin/data/templates/custom/proftpd.conf" "${DA_PATH}/data/templates/custom/proftpd.conf"
 
-    ## Todo: Copy DA startup file to .usr/local/etc/rc.d/
-
     chown -f diradmin:diradmin ${CB_CONF}
     chmod 755 "${CB_CONF}"
+
+    ## Copy DA startup file to .usr/local/etc/rc.d/
+    cp -f "${PB_PATH}/etc/rc.d/directadmin" "${INITD_DIR}/directadmin"
+    chmod 755 "${INITD_DIR}/directadmin"
+
+    ## Update /etc/rc.conf:
+    sysrc directadmin_enable="YES"
 
     ## DirectAdmin Install
     ## This is where directadmin.conf gets created for the first time (copy of the template)
