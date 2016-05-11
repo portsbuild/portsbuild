@@ -159,12 +159,11 @@ DA_PATH=/usr/local/directadmin
 DA_BIN=${DA_PATH}/directadmin
 DA_SCRIPTS_PATH=${DA_PATH}/scripts
 DA_CRON_FILE=${DA_SCRIPTS}/directadmin_cron
-DA_CONF_FILE=${DA_PATH}/conf/directadmin.conf
-DA_CONF_TEMPLATE_FILE=${DA_PATH}/data/templates/directadmin.conf
+DA_CONF=${DA_PATH}/conf/directadmin.conf
+DA_CONF_TEMPLATE=${DA_PATH}/data/templates/directadmin.conf
 DA_MYSQL_CONF=${DA_PATH}/conf/mysql.conf
 DA_MYSQL_CNF=${DA_PATH}/conf/my.cnf
 DA_LICENSE_FILE=${DA_PATH}/conf/license.key
-# DA_CONF=${DA_CONF_FILE}
 # DA_MY_CNF=${DA_MYSQL_CNF}
 
 DA_ADMIN_EMAIL=${DA_ADMIN_USER}@${SERVER_DOMAIN}
@@ -611,8 +610,8 @@ fi
 if [ -x /usr/local/bin/openssl ] && [ "$(uc "$(getVal WITH_OPENSSL_PORT /etc/make.conf)")" = "YES" ]; then
   OPENSSL_BIN=/usr/local/bin/openssl
   # GLOBAL_MAKE_VARIABLES="${GLOBAL_MAKE_VARIABLES} WITH_OPENSSL_PORT=YES"
-  setVal openssl ${OPENSSL_BIN} ${DA_CONF_TEMPLATE_FILE}
-  setVal openssl ${OPENSSL_BIN} ${DA_CONF_FILE}
+  setVal openssl ${OPENSSL_BIN} ${DA_CONF_TEMPLATE}
+  setVal openssl ${OPENSSL_BIN} ${DA_CONF}
 elif [ -x /usr/bin/openssl ]; then
   OPENSSL_BIN=/usr/bin/openssl
   # GLOBAL_MAKE_VARIABLES="${GLOBAL_MAKE_VARIABLES} WITH_OPENSSL_BASE=YES"
@@ -641,7 +640,7 @@ getDA_Opt() {
   ## $2 is default value
 
   ## Make sure directadmin.conf exists and is greater than zero bytes.
-  if [ ! -s "${DA_CONF_FILE}" ]; then
+  if [ ! -s "${DA_CONF}" ]; then
     echo "$2"
     return
   fi
@@ -733,7 +732,7 @@ setOpt() {
 ## Set Value ($1) to ($2) in file ($3) (from CB2)
 setVal() {
 
-  if [ "${3}" = "${DA_CONF_FILE}" ] && [ ! -e "${DA_CONF_FILE}" ]; then
+  if [ "${3}" = "${DA_CONF}" ] && [ ! -e "${DA_CONF}" ]; then
     return
   fi
 
@@ -1500,8 +1499,8 @@ bind_setup() {
     ${RNDC_BIN} -a -s "${DA_SERVER_IP}"
   fi
 
-  setVal namedconfig "${NAMEDB_CONF}" "${DA_CONF_TEMPLATE_FILE}"
-  setVal nameddir "${NAMEDB_PATH}" "${DA_CONF_TEMPLATE_FILE}"
+  setVal namedconfig "${NAMEDB_CONF}" "${DA_CONF_TEMPLATE}"
+  setVal nameddir "${NAMEDB_PATH}" "${DA_CONF_TEMPLATE}"
 
   printf "Updating /etc/rc.conf with named_enable=YES\n"
   sysrc named_enable="YES"
@@ -1611,15 +1610,15 @@ directadmin_install() {
   # fi
 
   # echo "Setting custom addip= in DirectAdmin's Configuration Template File "
-  # setVal addip "${DA_PATH}/scripts/custom/addip" "${DA_CONF_TEMPLATE_FILE}"
-  # # setVal addip "${DA_PATH}/scripts/custom/addip" "${DA_CONF_FILE}"
+  # setVal addip "${DA_PATH}/scripts/custom/addip" "${DA_CONF_TEMPLATE}"
+  # # setVal addip "${DA_PATH}/scripts/custom/addip" "${DA_CONF}"
 
   ## The following lines were in DA's install/setup do_checks():
   ## Check for a separate /home partition (for quota support)
   HOME_YES=$(grep -c /home /etc/fstab)
   if [ "$HOME_YES" -lt "1" ]; then
     printf "Setting quota_partition=/ in DirectAdmin's Configuration Template File\n"
-    setVal quota_partition "/" "${DA_CONF_TEMPLATE_FILE}"
+    setVal quota_partition "/" "${DA_CONF_TEMPLATE}"
   fi
 
   ## Detect the ethernet interfaces that are available on the system, or use the one supplied by the user from first time setup
@@ -1627,15 +1626,15 @@ directadmin_install() {
   if [ "${ETHERNET_DEV}" = "" ]; then
     RC_ETH_DEV="$(grep ifconfig /etc/rc.conf | cut -d= -f1 | cut -d_ -f2)"
     if [ "${RC_ETH_DEV}" != "" ]; then
-      ETH_COUNT=$(grep -c ethernet_dev ${DA_CONF_TEMPLATE_FILE})
+      ETH_COUNT=$(grep -c ethernet_dev ${DA_CONF_TEMPLATE})
       if [ "${ETH_COUNT}" -eq 0 ]; then
         printf "Setting ethernet_dev=%s in DirectAdmin's Configuration Template File\n" "${RC_ETH_DEV}"
-        setVal ethernet_dev "${ETH_DEV}" "${DA_CONF_TEMPLATE_FILE}"
+        setVal ethernet_dev "${ETH_DEV}" "${DA_CONF_TEMPLATE}"
       fi
     fi
   else
     printf "Setting ethernet_dev=%s in DirectAdmin's Configuration Template File\n" "${ETHERNET_DEV}"
-    setVal ethernet_dev "${ETHERNET_DEV}" "${DA_CONF_TEMPLATE_FILE}"
+    setVal ethernet_dev "${ETHERNET_DEV}" "${DA_CONF_TEMPLATE}"
   fi
 
   DA_ADMIN_EMAIL=${DA_ADMIN_EMAIL:=${DA_ADMIN_USER}@${SERVER_DOMAIN}}
@@ -1850,8 +1849,8 @@ basic_system_security() {
   printf "Setting security.bsd.see_other_gids to 0\n"
   sysrc -f /etc/sysctl.conf security.bsd.see_other_gids=0
 
-# setVal enforce_difficult_passwords 1 ${DA_CONF_TEMPLATE_FILE}
-# setVal enforce_difficult_passwords 1 ${DA_CONF_FILE}
+# setVal enforce_difficult_passwords 1 ${DA_CONF_TEMPLATE}
+# setVal enforce_difficult_passwords 1 ${DA_CONF}
 
   printf "\n *** Heads up! *** \n"
   printf "Please note that 'AllowUsers root' was added to /etc/ssh/sshd_config as a precautionary step (in case you get locked out).\n"
@@ -2085,10 +2084,10 @@ exim_install() {
   ${SERVICE} exim start
 
   printf "Updating mq_exim_bin paths in DirectAdmin template + configuration files\n"
-  setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_TEMPLATE_FILE}
+  setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_TEMPLATE}
 
-  if [ -e "${DA_CONF_FILE}" ]; then
-    setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_FILE}
+  if [ -e "${DA_CONF}" ]; then
+    setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF}
   fi
 
   ## Todo: Cleaner version
@@ -2395,15 +2394,15 @@ dovecot_install() {
   ## 2016-03-26: Check to see if we need to convert instead of a fresh install
 
   DOVECOT_CHECK=0
-  if [ -e ${DA_CONF_FILE} ]; then
-    DOVECOT_CHECK=$(grep -m1 -c -e '^dovecot=1' ${DA_CONF_FILE})
+  if [ -e ${DA_CONF} ]; then
+    DOVECOT_CHECK=$(grep -m1 -c -e '^dovecot=1' ${DA_CONF})
   fi
 
-  if [ "${DOVECOT_CHECK}" -eq 0 ] || [ ! -e ${DA_CONF_FILE} ]; then
-    setVal dovecot 1 ${DA_CONF_TEMPLATE_FILE}
+  if [ "${DOVECOT_CHECK}" -eq 0 ] || [ ! -e ${DA_CONF} ]; then
+    setVal dovecot 1 ${DA_CONF_TEMPLATE}
   fi
 
-  # if [ "${DOVECOT_COUNT}" -eq 0 ] || [ ! -e ${DA_CONF_FILE} ]; then
+  # if [ "${DOVECOT_COUNT}" -eq 0 ] || [ ! -e ${DA_CONF} ]; then
   #   echo "Converting to Dovecot"
 
   #   ## PB: Verify: moved contents of function below
@@ -2416,20 +2415,20 @@ dovecot_install() {
   #   fi
 
   #   ## Existing installs
-  #   if [ -e ${DA_CONF_FILE} ]; then
-  #     if ! grep -m1 -q -e '^dovecot=1' ${DA_CONF_FILE}; then
-  #       echo "Adding dovecot=1 to ${DA_CONF_FILE}"
-  #       setVal dovecot 1 ${DA_CONF_FILE}
+  #   if [ -e ${DA_CONF} ]; then
+  #     if ! grep -m1 -q -e '^dovecot=1' ${DA_CONF}; then
+  #       echo "Adding dovecot=1 to ${DA_CONF}"
+  #       setVal dovecot 1 ${DA_CONF}
   #       set_service dovecot ON
   #       directadmin_restart
   #     fi
   #   fi
 
   #   ## Existing + New installs
-  #   if [ -e ${DA_CONF_TEMPLATE_FILE} ]; then
-  #     if ! grep -m1 -q -e '^dovecot=1' ${DA_CONF_TEMPLATE_FILE}; then
-  #       echo "Adding dovecot=1 to template ${DA_CONF_TEMPLATE_FILE}"
-  #       setVal dovecot 1 ${DA_CONF_TEMPLATE_FILE}
+  #   if [ -e ${DA_CONF_TEMPLATE} ]; then
+  #     if ! grep -m1 -q -e '^dovecot=1' ${DA_CONF_TEMPLATE}; then
+  #       echo "Adding dovecot=1 to template ${DA_CONF_TEMPLATE}"
+  #       setVal dovecot 1 ${DA_CONF_TEMPLATE}
   #       set_service dovecot ON
   #     fi
   #   fi
@@ -2472,11 +2471,11 @@ dovecot_install() {
 
   ## Update directadmin.conf:
   QUOTA_COUNT=0
-  if [ -e "${DA_CONF_FILE}" ]; then
-    QUOTA_COUNT="$(grep -m1 -c -e '^add_userdb_quota=1' ${DA_CONF_FILE})"
+  if [ -e "${DA_CONF}" ]; then
+    QUOTA_COUNT="$(grep -m1 -c -e '^add_userdb_quota=1' ${DA_CONF})"
     if [ "${QUOTA_COUNT}" = "0" ]; then
-      # printf "Adding add_userdb_quota=1 to the %s file to enable Dovecot quota support\n" ${DA_CONF_FILE}
-      setVal add_userdb_quota 1 ${DA_CONF_FILE}
+      # printf "Adding add_userdb_quota=1 to the %s file to enable Dovecot quota support\n" ${DA_CONF}
+      setVal add_userdb_quota 1 ${DA_CONF}
       directadmin_restart
       echo "action=rewrite&value=email_passwd" >> ${DA_TASK_QUEUE}
       run_dataskq d
@@ -2484,10 +2483,10 @@ dovecot_install() {
   fi
 
   ## Update directadmin.conf (template):
-  COUNT_TEMPLATE="$(grep -m1 -c -e '^add_userdb_quota=1' ${DA_CONF_TEMPLATE_FILE})"
-  if [ "${COUNT_TEMPLATE}" = "0" ] && [ -e ${DA_CONF_TEMPLATE_FILE} ]; then
-    # echo "Adding add_userdb_quota=1 to the ${DA_CONF_TEMPLATE_FILE} (template) file"
-    setVal add_userdb_quota 1 ${DA_CONF_TEMPLATE_FILE}
+  COUNT_TEMPLATE="$(grep -m1 -c -e '^add_userdb_quota=1' ${DA_CONF_TEMPLATE})"
+  if [ "${COUNT_TEMPLATE}" = "0" ] && [ -e ${DA_CONF_TEMPLATE} ]; then
+    # echo "Adding add_userdb_quota=1 to the ${DA_CONF_TEMPLATE} (template) file"
+    setVal add_userdb_quota 1 ${DA_CONF_TEMPLATE}
   fi
 
   ## Prepare Dovecot directories:
@@ -2689,11 +2688,11 @@ webalizer_install() {
   ### Post-Installation Tasks
 
   if [ "${OPT_AWSTATS}" = "NO" ]; then
-    setVal awstats 0 ${DA_CONF_TEMPLATE_FILE}
-    setVal awstats 0 ${DA_CONF_FILE}
+    setVal awstats 0 ${DA_CONF_TEMPLATE}
+    setVal awstats 0 ${DA_CONF}
   else
-    setVal awstats 1 ${DA_CONF_TEMPLATE_FILE}
-    setVal awstats 1 ${DA_CONF_FILE}
+    setVal awstats 1 ${DA_CONF_TEMPLATE}
+    setVal awstats 1 ${DA_CONF}
   fi
 
   directadmin_restart
@@ -2726,15 +2725,15 @@ awstats_install() {
   ### Post-Installation Tasks
 
   ## Setup directadmin.conf
-  setVal awstats 1 ${DA_CONF_TEMPLATE_FILE}
-  setVal awstats 1 ${DA_CONF_FILE}
+  setVal awstats 1 ${DA_CONF_TEMPLATE}
+  setVal awstats 1 ${DA_CONF}
 
   if [ "${OPT_WEBALIZER}" = "NO" ]; then
-    setVal webalizer 0 ${DA_CONF_TEMPLATE_FILE}
-    setVal webalizer 0 ${DA_CONF_FILE}
+    setVal webalizer 0 ${DA_CONF_TEMPLATE}
+    setVal webalizer 0 ${DA_CONF}
   else
-    setVal webalizer 1 ${DA_CONF_TEMPLATE_FILE}
-    setVal webalizer 1 ${DA_CONF_FILE}
+    setVal webalizer 1 ${DA_CONF_TEMPLATE}
+    setVal webalizer 1 ${DA_CONF}
   fi
 
   directadmin_restart
@@ -2879,7 +2878,7 @@ sql_post_install() {
 
   ## From CB2 (skipped, 5.1 is outdated):
   # if [ -e /usr/local/mysql/bin/mysqlcheck ] && [ "${OPT_MYSQL}" = "5.1" ] && [ "${OPT_MYSQL_INST}" != "mariadb" ]; then
-  #   /usr/local/mysql/bin/mysqlcheck --defaults-extra-file=${DA_MY_CNF} --fix-db-names --fix-table-names -A
+  #   /usr/local/mysql/bin/mysqlcheck --defaults-extra-file=${DA_MYSQL_CNF} --fix-db-names --fix-table-names -A
   # fi
 
   ## Manual/CLI method:
@@ -3533,29 +3532,29 @@ apache_install() {
   chmod 710 ${APACHE_PATH}
 
   ## Update directadmin.conf (template) with new paths:
-  setVal apache_ver 2.0 ${DA_CONF_TEMPLATE_FILE}
-  setVal apacheconf ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf ${DA_CONF_TEMPLATE_FILE}
-  setVal apacheips ${APACHE_PATH}/ips.conf ${DA_CONF_TEMPLATE_FILE}
-  setVal apachemimetypes ${APACHE_PATH}/mime.types ${DA_CONF_TEMPLATE_FILE}
-  setVal apachecert ${APACHE_SSL_CRT} ${DA_CONF_TEMPLATE_FILE}
-  setVal apachekey ${APACHE_SSL_KEY} ${DA_CONF_TEMPLATE_FILE}
-  setVal apacheca ${APACHE_SSL_CA} ${DA_CONF_TEMPLATE_FILE}
-  setVal htpasswd /usr/local/bin/htpasswd ${DA_CONF_TEMPLATE_FILE}
-  setVal cloud_cache 0 ${DA_CONF_TEMPLATE_FILE}
-  setVal nginx 0 ${DA_CONF_TEMPLATE_FILE}
+  setVal apache_ver 2.0 ${DA_CONF_TEMPLATE}
+  setVal apacheconf ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf ${DA_CONF_TEMPLATE}
+  setVal apacheips ${APACHE_PATH}/ips.conf ${DA_CONF_TEMPLATE}
+  setVal apachemimetypes ${APACHE_PATH}/mime.types ${DA_CONF_TEMPLATE}
+  setVal apachecert ${APACHE_SSL_CRT} ${DA_CONF_TEMPLATE}
+  setVal apachekey ${APACHE_SSL_KEY} ${DA_CONF_TEMPLATE}
+  setVal apacheca ${APACHE_SSL_CA} ${DA_CONF_TEMPLATE}
+  setVal htpasswd /usr/local/bin/htpasswd ${DA_CONF_TEMPLATE}
+  setVal cloud_cache 0 ${DA_CONF_TEMPLATE}
+  setVal nginx 0 ${DA_CONF_TEMPLATE}
 
   ## Update existing directadmin.conf file if present
-  if [ -s ${DA_CONF_FILE} ]; then
-    setVal apache_ver 2.0 ${DA_CONF_FILE}
-    setVal apacheconf ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf ${DA_CONF_FILE}
-    setVal apacheips ${APACHE_PATH}/ips.conf ${DA_CONF_FILE}
-    setVal apachemimetypes ${APACHE_PATH}/mime.types ${DA_CONF_FILE}
-    setVal apachecert ${APACHE_SSL_CRT} ${DA_CONF_FILE}
-    setVal apachekey ${APACHE_SSL_KEY} ${DA_CONF_FILE}
-    setVal apacheca ${APACHE_SSL_CA} ${DA_CONF_FILE}
-    setVal htpasswd /usr/local/bin/htpasswd ${DA_CONF_FILE}
-    setVal cloud_cache 0 ${DA_CONF_FILE}
-    setVal nginx 0 ${DA_CONF_FILE}
+  if [ -s ${DA_CONF} ]; then
+    setVal apache_ver 2.0 ${DA_CONF}
+    setVal apacheconf ${APACHE_EXTRA_PATH}/directadmin-vhosts.conf ${DA_CONF}
+    setVal apacheips ${APACHE_PATH}/ips.conf ${DA_CONF}
+    setVal apachemimetypes ${APACHE_PATH}/mime.types ${DA_CONF}
+    setVal apachecert ${APACHE_SSL_CRT} ${DA_CONF}
+    setVal apachekey ${APACHE_SSL_KEY} ${DA_CONF}
+    setVal apacheca ${APACHE_SSL_CA} ${DA_CONF}
+    setVal htpasswd /usr/local/bin/htpasswd ${DA_CONF}
+    setVal cloud_cache 0 ${DA_CONF}
+    setVal nginx 0 ${DA_CONF}
   fi
 
   ## Setup initial httpd.conf for user 'admin'
@@ -3578,19 +3577,19 @@ apache_install() {
   backupHttp
 
   if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    setVal nginx_proxy 1 ${DA_CONF_TEMPLATE_FILE}
-    setVal nginx_proxy 1 ${DA_CONF_FILE}
-    setVal litespeed 0 ${DA_CONF_TEMPLATE_FILE}
-    setVal litespeed 0 ${DA_CONF_FILE}
+    setVal nginx_proxy 1 ${DA_CONF_TEMPLATE}
+    setVal nginx_proxy 1 ${DA_CONF}
+    setVal litespeed 0 ${DA_CONF_TEMPLATE}
+    setVal litespeed 0 ${DA_CONF}
     set_service litespeed delete
     killall litespeed >/dev/null 2>&1
     killall -9 litespeed >/dev/null 2>&1
     directadmin_restart
   elif [ "${OPT_WEBSERVER}" = "apache" ]; then
-    setVal nginx_proxy 0 ${DA_CONF_TEMPLATE_FILE}
-    setVal nginx_proxy 0 ${DA_CONF_FILE}
-    setVal litespeed 0 ${DA_CONF_TEMPLATE_FILE}
-    setVal litespeed 0 ${DA_CONF_FILE}
+    setVal nginx_proxy 0 ${DA_CONF_TEMPLATE}
+    setVal nginx_proxy 0 ${DA_CONF}
+    setVal litespeed 0 ${DA_CONF_TEMPLATE}
+    setVal litespeed 0 ${DA_CONF}
     killall nginx >/dev/null 2>&1
     killall litespeed >/dev/null 2>&1
     directadmin_restart
@@ -3628,21 +3627,21 @@ apache_install() {
   ${SERVICE} apache24 start
 
   HAVE_DACONF=0
-  if [ -s ${DA_CONF_FILE} ]; then
+  if [ -s ${DA_CONF} ]; then
     HAVE_DACONF=1
   fi
 
   ## PB: not needed
   ## Use directadmin-vhosts.conf instead of httpd.conf
   ## CB2: Check directadmin.conf (template) file
-  # if [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_TEMPLATE_FILE})" = "1" ]; then
-  #   ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/usr/local/etc/apache24/extra/directadmin-vhosts.conf#' ${DA_CONF_TEMPLATE_FILE}
+  # if [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_TEMPLATE})" = "1" ]; then
+  #   ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/usr/local/etc/apache24/extra/directadmin-vhosts.conf#' ${DA_CONF_TEMPLATE}
   # fi
 
   ## PB: Existing DA install with directadmin.conf present (and referencing httpd.conf)
-  # if [ "${HAVE_DACONF}" = "1" ] && [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_FILE})" = "1" ]; then
-  #   if [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_FILE})" = "1" ]; then
-  #     ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/usr/local/etc/apache24/extra/directadmin-vhosts.conf#' ${DA_CONF_FILE}
+  # if [ "${HAVE_DACONF}" = "1" ] && [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF})" = "1" ]; then
+  #   if [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF})" = "1" ]; then
+  #     ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/usr/local/etc/apache24/extra/directadmin-vhosts.conf#' ${DA_CONF}
   #     directadmin_restart
   #   fi
   #
@@ -3682,35 +3681,35 @@ apache_install() {
   create_httpd_nginx
 
   ## Hide frontpage (from CB2: hideFrontpage())
-  if [ -e ${DA_CONF_TEMPLATE_FILE} ] && [ "$(grep -m1 -c frontpage_on ${DA_CONF_TEMPLATE_FILE})" = "0" ]; then
-    echo "frontpage_on=0" >> ${DA_CONF_TEMPLATE_FILE}
+  if [ -e ${DA_CONF_TEMPLATE} ] && [ "$(grep -m1 -c frontpage_on ${DA_CONF_TEMPLATE})" = "0" ]; then
+    echo "frontpage_on=0" >> ${DA_CONF_TEMPLATE}
   fi
 
   ## Existing DirectAdmin installation
-  if [ -e ${DA_CONF_FILE} ] && [ "$(grep -m1 -c frontpage_on ${DA_CONF_FILE})" = "0" ]; then
-    echo "frontpage_on=0" >> ${DA_CONF_FILE}
+  if [ -e ${DA_CONF} ] && [ "$(grep -m1 -c frontpage_on ${DA_CONF})" = "0" ]; then
+    echo "frontpage_on=0" >> ${DA_CONF}
     if [ -e ${DA_PATH}/data ]; then
       echo "action=directadmin&value=reload" >> ${DA_TASK_QUEUE}
     fi
   fi
 
   ## CB2: Make sure the correct apache_ver is set in directadmin.conf
-  if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE_FILE})" -eq "0" ]; then
-    echo "apache_ver=2.0" >> ${DA_CONF_TEMPLATE_FILE}
+  if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE})" -eq "0" ]; then
+    echo "apache_ver=2.0" >> ${DA_CONF_TEMPLATE}
     echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
     directadmin_restart
-  elif [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE_FILE})" -ne "0" ]; then
-    ${PERL} -pi -e 's/$(grep -m1 apache_ver= ${DA_CONF_TEMPLATE_FILE})/apache_ver=2.0/' ${DA_CONF_TEMPLATE_FILE}
+  elif [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE})" -ne "0" ]; then
+    ${PERL} -pi -e 's/$(grep -m1 apache_ver= ${DA_CONF_TEMPLATE})/apache_ver=2.0/' ${DA_CONF_TEMPLATE}
   fi
 
   ## Existing DirectAdmin installation
   if [ "${HAVE_DACONF}" = "1" ]; then
-    if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_FILE})" -eq "0" ]; then
-      echo "apache_ver=2.0" >> ${DA_CONF_FILE}
+    if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF})" -eq "0" ]; then
+      echo "apache_ver=2.0" >> ${DA_CONF}
       directadmin_restart
       echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
-    elif [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_FILE})" -ne "0" ]; then
-      ${PERL} -pi -e 's/$(grep -m1 apache_ver= ${DA_CONF_FILE})/apache_ver=2.0/' ${DA_CONF_FILE}
+    elif [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF})" -ne "0" ]; then
+      ${PERL} -pi -e 's/$(grep -m1 apache_ver= ${DA_CONF})/apache_ver=2.0/' ${DA_CONF}
       directadmin_restart
       echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
     fi
@@ -4053,27 +4052,27 @@ nginx_install() {
   ### Post-Installation Tasks
 
 
-  # setVal nginx 1 ${DA_CONF_FILE}
-  # setVal apache 0 ${DA_CONF_FILE}
+  # setVal nginx 1 ${DA_CONF}
+  # setVal apache 0 ${DA_CONF}
 
   ## Update directadmin.conf (template)
-  setVal nginxconf ${NGINX_PATH}/directadmin-vhosts.conf ${DA_CONF_TEMPLATE_FILE}
-  setVal nginxips ${NGINX_PATH}/directadmin-ips.conf ${DA_CONF_TEMPLATE_FILE}
-  setVal nginxlogdir /var/log/nginx/domains ${DA_CONF_TEMPLATE_FILE}
-  setVal nginx_pid /var/run/nginx.pid ${DA_CONF_TEMPLATE_FILE}
-  setVal nginx_cert ${NGINX_PATH}/ssl/server.crt ${DA_CONF_TEMPLATE_FILE}
-  setVal nginx_key ${NGINX_PATH}/ssl/server.key ${DA_CONF_TEMPLATE_FILE}
-  setVal nginx_ca ${NGINX_PATH}/ssl/server.ca ${DA_CONF_TEMPLATE_FILE}
+  setVal nginxconf ${NGINX_PATH}/directadmin-vhosts.conf ${DA_CONF_TEMPLATE}
+  setVal nginxips ${NGINX_PATH}/directadmin-ips.conf ${DA_CONF_TEMPLATE}
+  setVal nginxlogdir /var/log/nginx/domains ${DA_CONF_TEMPLATE}
+  setVal nginx_pid /var/run/nginx.pid ${DA_CONF_TEMPLATE}
+  setVal nginx_cert ${NGINX_PATH}/ssl/server.crt ${DA_CONF_TEMPLATE}
+  setVal nginx_key ${NGINX_PATH}/ssl/server.key ${DA_CONF_TEMPLATE}
+  setVal nginx_ca ${NGINX_PATH}/ssl/server.ca ${DA_CONF_TEMPLATE}
 
   ## Update directadmin.conf with new paths
-  if [ -e "${DA_CONF_FILE}" ]; then
-    setVal nginxconf ${NGINX_PATH}/directadmin-vhosts.conf ${DA_CONF_FILE}
-    setVal nginxips ${NGINX_PATH}/directadmin-ips.conf ${DA_CONF_FILE}
-    setVal nginxlogdir /var/log/nginx/domains ${DA_CONF_FILE}
-    setVal nginx_pid /var/run/nginx.pid ${DA_CONF_FILE}
-    setVal nginx_cert ${NGINX_PATH}/ssl/server.crt ${DA_CONF_FILE}
-    setVal nginx_key ${NGINX_PATH}/ssl/server.key ${DA_CONF_FILE}
-    setVal nginx_ca ${NGINX_PATH}/ssl/server.ca ${DA_CONF_FILE}
+  if [ -e "${DA_CONF}" ]; then
+    setVal nginxconf ${NGINX_PATH}/directadmin-vhosts.conf ${DA_CONF}
+    setVal nginxips ${NGINX_PATH}/directadmin-ips.conf ${DA_CONF}
+    setVal nginxlogdir /var/log/nginx/domains ${DA_CONF}
+    setVal nginx_pid /var/run/nginx.pid ${DA_CONF}
+    setVal nginx_cert ${NGINX_PATH}/ssl/server.crt ${DA_CONF}
+    setVal nginx_key ${NGINX_PATH}/ssl/server.key ${DA_CONF}
+    setVal nginx_ca ${NGINX_PATH}/ssl/server.ca ${DA_CONF}
   fi
 
   ## Update /etc/rc.conf
@@ -4230,15 +4229,15 @@ pureftpd_install() {
   sysrc pureftpd_flags="-B -A -C 15 -E -H -k 99 -L 10000:8 -O stats:${PUREFTPD_LOG} -l puredb:${PUREFTPD_DB} -p 35000:35999 -u 100 -U 133:022 -w -Z -Y 1 -J -S:HIGH:MEDIUM:+TLSv1:!SSLv2:+SSLv3"
 
   ## Update directadmin.conf
-  setVal pureftp 1 ${DA_CONF_TEMPLATE_FILE}
-  setVal pureftp 1 ${DA_CONF_FILE}
+  setVal pureftp 1 ${DA_CONF_TEMPLATE}
+  setVal pureftp 1 ${DA_CONF}
 
-  setVal pure_pw /usr/local/bin/pure-pw ${DA_CONF_TEMPLATE_FILE}
-  setVal pure_pw /usr/local/bin/pure-pw ${DA_CONF_FILE}
+  setVal pure_pw /usr/local/bin/pure-pw ${DA_CONF_TEMPLATE}
+  setVal pure_pw /usr/local/bin/pure-pw ${DA_CONF}
 
   ## Verify:
-  setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF_TEMPLATE_FILE}
-  setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF_FILE}
+  setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF_TEMPLATE}
+  setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF}
 
   # ${SERVICE} directadmin restart
   directadmin_restart
@@ -4304,18 +4303,18 @@ proftpd_install() {
   sysrc -x pureftpd_enable
 
   ## Update directadmin.conf + template
-  setVal pureftp 0 ${DA_CONF_TEMPLATE_FILE}
-  setVal ftpconfig ${PROFTPD_CONF} ${DA_CONF_TEMPLATE_FILE}
-  setVal ftppasswd /usr/local/etc/proftpd.passwd ${DA_CONF_TEMPLATE_FILE}
-  setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf ${DA_CONF_TEMPLATE_FILE}
-  setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF_TEMPLATE_FILE}
+  setVal pureftp 0 ${DA_CONF_TEMPLATE}
+  setVal ftpconfig ${PROFTPD_CONF} ${DA_CONF_TEMPLATE}
+  setVal ftppasswd /usr/local/etc/proftpd.passwd ${DA_CONF_TEMPLATE}
+  setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf ${DA_CONF_TEMPLATE}
+  setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF_TEMPLATE}
 
-  if [ -e "${DA_CONF_FILE}" ]; then
-    setVal pureftp 0 ${DA_CONF_FILE}
-    setVal ftpconfig ${PROFTPD_CONF} ${DA_CONF_FILE}
-    setVal ftppasswd /usr/local/etc/proftpd.passwd ${DA_CONF_FILE}
-    setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF_FILE}
-    setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf ${DA_CONF_FILE}
+  if [ -e "${DA_CONF}" ]; then
+    setVal pureftp 0 ${DA_CONF}
+    setVal ftpconfig ${PROFTPD_CONF} ${DA_CONF}
+    setVal ftppasswd /usr/local/etc/proftpd.passwd ${DA_CONF}
+    setVal ftppasswd_db /usr/local/etc/pureftpd.pdb ${DA_CONF}
+    setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf ${DA_CONF}
   fi
 
   ## Update services.status
@@ -4511,7 +4510,6 @@ roundcube_install() {
   ## PB: Todo: Move to top:
   ## Defaults:
   ROUNDCUBE_CONFIG=${PB_CUSTOM}/roundcube/config.inc.php
-  ROUNDCUBE_CONFIG_DB=${ROUNDCUBE_CONFIG}
 
   ## Custom configuration overrides:
   ROUNDCUBE_PLUGINS=${PB_CUSTOM}/roundcube/plugins
@@ -4546,12 +4544,12 @@ roundcube_install() {
     if [ -d "${ROUNDCUBE_PATH}/SQL" ]; then
       printf "Creating the database and user account for RoundCube + inserting data.\n"
 
-      ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "CREATE DATABASE ${ROUNDCUBE_DB};" --host=${MYSQL_HOST} 2>&1
-      ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
+      ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "CREATE DATABASE ${ROUNDCUBE_DB};" --host=${MYSQL_HOST} 2>&1
+      ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
 
       if [ "${MYSQL_HOST}" != "localhost" ]; then
-        for access_host_ip in $(grep '^access_host.*=' ${DA_MYSQL} | cut -d= -f2); do {
-          ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
+        for access_host_ip in $(grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2); do {
+          ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
         }; done
       fi
 
@@ -4568,25 +4566,25 @@ roundcube_install() {
     fi
   else
     ## PB: Existing RoundCube installation
-    if [ -e "${ROUNDCUBE_CONFIG_DB}" ]; then
-      COUNT_MYSQL=$(grep -m1 -c 'mysql://' ${ROUNDCUBE_CONFIG_DB})
+    if [ -e "${ROUNDCUBE_CONFIG}" ]; then
+      COUNT_MYSQL=$(grep -m1 -c 'mysql://' ${ROUNDCUBE_CONFIG})
       if [ "${COUNT_MYSQL}" -gt 0 ]; then
-        PART1="$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONFIG_DB} | awk '{print $3}' | cut -d\@ -f1 | cut -d'/' -f3)"
+        PART1="$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONFIG} | awk '{print $3}' | cut -d\@ -f1 | cut -d'/' -f3)"
         ROUNDCUBE_DB_USER="$(echo ${PART1} | cut -d\: -f1)"
         ROUNDCUBE_DB_PASS="$(echo ${PART1} | cut -d\: -f2)"
-        PART2="$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONFIG_DB} | awk '{print $3}' | cut -d\@ -f2 | cut -d\' -f1)"
+        PART2="$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONFIG} | awk '{print $3}' | cut -d\@ -f2 | cut -d\' -f1)"
         MYSQL_ACCESS_HOST="$(echo ${PART2} | cut -d'/' -f1)"
         ROUNDCUBE_DB="$(echo ${PART2} | cut -d'/' -f2)"
       fi
     fi
 
-    ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
-    ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST} 2>&1
+    ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
+    ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST} 2>&1
 
     if [ "${MYSQL_HOST}" != "localhost" ]; then
-      for access_host_ip in $(grep '^access_host.*=' ${DA_MYSQL} | cut -d= -f2); do {
-        ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
-        ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST} 2>&1
+      for access_host_ip in $(grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2); do {
+        ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
+        ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST} 2>&1
       }; done
     fi
 
@@ -4600,6 +4598,7 @@ roundcube_install() {
   ## CB2: Cleanup config
   rm -f "${EDIT_CONFIG}"
 
+  ## PB: Todo: Verify:
   ## CB2: install the proper configuration file:
   if [ -d ../roundcube ]; then
     printf "Editing RoundCube configuration\n"
@@ -4612,9 +4611,9 @@ roundcube_install() {
       cp -f "${ROUNDCUBE_CONFIG}" "${EDIT_CONFIG}"
     fi
 
-    if [ -e "${ROUNDCUBE_CONFIG_DB}" ]; then
+    if [ -e "${ROUNDCUBE_CONFIG}" ]; then
       if [ ! -e "${EDIT_CONFIG}" ]; then
-        cp -f "${ROUNDCUBE_CONFIG_DB}" "${EDIT_CONFIG}"
+        cp -f "${ROUNDCUBE_CONFIG}" "${EDIT_CONFIG}"
       fi
       if [ "${COUNT_MYSQL}" -eq 0 ]; then
         echo "\$config['db_dsnw'] = 'mysql://${ROUNDCUBE_DB_USER}:${ROUNDCUBE_DB_PASS}@${MYSQL_HOST}/${ROUNDCUBE_DB}';" >> "${EDIT_CONFIG}"
@@ -4695,6 +4694,7 @@ roundcube_install() {
       # if [ ! -s mime.types ]; then
       #   ${WGET} ${WGET_CONNECT_OPTIONS} -O mime.types http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
       # fi
+
       echo "\$config['mime_types'] = '${ROUNDCUBE_PATH}/config/mime.types';" >> "${EDIT_CONFIG}"
 
       ##### Password Plugin Configuration #####
@@ -5260,7 +5260,7 @@ get_webmail_link() {
     WEBMAIL_LINK=squirrelmail
   fi
 
-  if [ -s ${DA_CONF_FILE} ] && [ -s ${DA_PATH}/directadmin ]; then
+  if [ -s ${DA_CONF} ] && [ -s ${DA_PATH}/directadmin ]; then
     WEBMAIL_LINK=$(/usr/local/directadmin/directadmin c | grep -m1 '^webmail_link' | cut -d= -f2)
   fi
 
@@ -5748,17 +5748,17 @@ rewrite_confs() {
     verify_server_ca
 
     # Verify we have the correct apache_ver
-    if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE_FILE})" -eq "0" ]; then
-      printf "apache_ver=2.0\n" >> ${DA_CONF_TEMPLATE_FILE}
-    elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_TEMPLATE_FILE})" -ne "0" ]; then
-      ${PERL} -pi -e "s/$(grep apache_ver= ${DA_CONF_TEMPLATE_FILE})/apache_ver=2.0/" ${DA_CONF_TEMPLATE_FILE}
+    if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE})" -eq "0" ]; then
+      printf "apache_ver=2.0\n" >> ${DA_CONF_TEMPLATE}
+    elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_TEMPLATE})" -ne "0" ]; then
+      ${PERL} -pi -e "s/$(grep apache_ver= ${DA_CONF_TEMPLATE})/apache_ver=2.0/" ${DA_CONF_TEMPLATE}
     fi
 
-    if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_FILE})" -eq "0" ]; then
-      printf "apache_ver=2.0\n" >> ${DA_CONF_FILE}
+    if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF})" -eq "0" ]; then
+      printf "apache_ver=2.0\n" >> ${DA_CONF}
       echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
-    elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_FILE})" -ne "0" ]; then
-      ${PERL} -pi -e "s/$(grep apache_ver= ${DA_CONF_FILE})/apache_ver=2.0/" ${DA_CONF_FILE}
+    elif [ "$(grep -m1 -c apache_ver= ${DA_CONF})" -ne "0" ]; then
+      ${PERL} -pi -e "s/$(grep apache_ver= ${DA_CONF})/apache_ver=2.0/" ${DA_CONF}
       echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
     fi
 
@@ -6018,10 +6018,10 @@ rewrite_confs() {
   fi
 
   if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    setVal nginx 0 ${DA_CONF_TEMPLATE_FILE}
-    setVal nginx 0 ${DA_CONF_FILE}
-    setVal nginx_proxy 1 ${DA_CONF_TEMPLATE_FILE}
-    setVal nginx_proxy 1 ${DA_CONF_FILE}
+    setVal nginx 0 ${DA_CONF_TEMPLATE}
+    setVal nginx 0 ${DA_CONF}
+    setVal nginx_proxy 1 ${DA_CONF_TEMPLATE}
+    setVal nginx_proxy 1 ${DA_CONF}
   fi
 
   verify_webapps_tmp
@@ -6036,7 +6036,7 @@ run_dataskq() {
   ## $1 = argument (e.g. "d" for debug)
 
   local DATASKQ_OPT=$1
-  if [ -s "${DA_CONF_FILE}" ]; then
+  if [ -s "${DA_CONF}" ]; then
     ${DA_PATH}/dataskq "${DATASKQ_OPT}" --custombuild
   fi
 }
@@ -6674,14 +6674,14 @@ php_conf() {
 ## Todo: Setup Brute-Force Monitor
 bfm_setup() {
 
-  setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF_TEMPLATE_FILE}
-  setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" ${DA_CONF_TEMPLATE_FILE}
-  setVal brute_force_squirrelmail_log "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" ${DA_CONF_TEMPLATE_FILE}
+  setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF_TEMPLATE}
+  setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" ${DA_CONF_TEMPLATE}
+  setVal brute_force_squirrelmail_log "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" ${DA_CONF_TEMPLATE}
 
-  if [ -e "${DA_CONF_FILE}" ]; then
-    setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF_FILE}
-    setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" ${DA_CONF_FILE}
-    setVal brute_force_squirrelmail_log "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" ${DA_CONF_FILE}
+  if [ -e "${DA_CONF}" ]; then
+    setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF}
+    setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" ${DA_CONF}
+    setVal brute_force_squirrelmail_log "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" ${DA_CONF}
   fi
 
   ## Todo:
@@ -6959,7 +6959,7 @@ validate_options() {
 
   ## Todo: Verify: Copied from CB2:
   if [ "${OPT_FTPD}" = "pureftpd" ]; then
-    if [ -s "${DA_CONF_FILE}" ]; then
+    if [ -s "${DA_CONF}" ]; then
       UNIFIED_FTP="$(${DA_BIN} c | grep -m1 unified_ftp_password_file | cut -d= -f2)"
       if [ "${UNIFIED_FTP}" != "1" ]; then
         echo "  unified_ftp_password_file is not set to 1. You must convert before you can use PureFTPD."
@@ -6978,8 +6978,8 @@ validate_options() {
         exit 1
       fi
     # else
-    #   setVal unified_ftp_password_file 1 ${DA_CONF_TEMPLATE_FILE}
-    #   setVal unified_ftp_password_file 1 ${DA_CONF_FILE}
+    #   setVal unified_ftp_password_file 1 ${DA_CONF_TEMPLATE}
+    #   setVal unified_ftp_password_file 1 ${DA_CONF}
     fi
   fi
 
