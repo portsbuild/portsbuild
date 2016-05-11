@@ -42,7 +42,7 @@
 #  - Rewrite: ./portsbuild.sh rewrite <configuration>
 #  - Verify : ./portsbuild.sh verify
 #
-#  Changelog/History: see CHANGELOG for more details
+#  TODO: Changelog/History: see CHANGELOG for more details
 #
 # *************************************************************************************************
 #
@@ -50,10 +50,8 @@
 #
 ################################################################################################
 
-### PortsBuild ###
-
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160510
+PB_BUILD_DATE=20160511
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -101,6 +99,7 @@ if [ ! -e ${PB_PATH} ] || [ "$(pwd)" != "${PB_PATH}" ]; then
 fi
 
 PB_CONF="${PB_PATH}/options.conf"
+PB_CUSTOM="${PB_PATH}/custom"
 
 ## PortsBuild Remote File Repository
 PB_MIRROR="http://s3.amazonaws.com/portsbuild/files"
@@ -114,8 +113,6 @@ PB_MIRROR="http://s3.amazonaws.com/portsbuild/files"
 ## System & User Accounts
 DA_ADMIN_USER=admin
 DA_SQLDB_USER=da_admin
-# DA_SRV_USER=diradmin
-# DA_SRV_GROUP=diradmin
 APACHE_USER=apache ## www
 APACHE_GROUP=apache ## www
 NGINX_USER=nginx ## www
@@ -124,9 +121,14 @@ WEBAPPS_USER=webapps
 WEBAPPS_GROUP=webapps
 EXIM_USER="mail" ## mailnull
 EXIM_GROUP="mail" ## mail
+# DA_SRV_USER=diradmin
+# DA_SRV_GROUP=diradmin
 
 ## System Binary/Application paths and variables
+# UB=/usr/bin
+# US=/usr/sbin
 # ULB=/usr/local/bin
+# ULS=/usr/local/sbin
 # ULE=/usr/local/etc
 CHOWN=/usr/sbin/chown
 CHMOD=/bin/chmod
@@ -138,11 +140,13 @@ PERL=/usr/local/bin/perl
 PKG=/usr/sbin/pkg
 PKGI="${PKG} install -y"
 PKGU="${PKG} upgrade -y"
+PKGD="${PKG} delete -f"
 PW=/usr/sbin/pw
 PORTSNAP=/usr/sbin/portsnap
 PORTMASTER=/usr/local/sbin/portmaster
 SERVICE=/usr/sbin/service
 SYNTH=/usr/local/bin/synth
+SYSRC=/usr/sbin/sysrc
 SYSCTL=/sbin/sysctl
 WGET=/usr/local/bin/wget
 WGET_CONNECT_OPTIONS="--connect-timeout=5 --read-timeout=10 --tries=3"
@@ -192,11 +196,6 @@ CB_CONF=${CB_PATH}/options.conf
 ## Virtual Mail Directory (keeping this path as-is for simplicity)
 VIRTUAL_PATH=/etc/virtual
 
-## Custom SSL Certificates
-CUSTOM_SSL_KEY=/usr/local/etc/ssl/server.key
-CUSTOM_SSL_CRT=/usr/local/etc/ssl/server.crt
-CUSTOM_SSL_CA=/usr/local/etc/ssl/server.ca
-
 ## Apache 2.4
 APACHE_PATH=/usr/local/etc/apache24
 APACHE_EXTRA_PATH=${APACHE_PATH}/extra
@@ -239,10 +238,10 @@ ROUNDCUBE_CONF=${ROUNDCUBE_PATH}/config/config.inc.php
 ROUNDCUBE_CONFIG_CUSTOM=${ROUNDCUBE_CONF}
 
 ## Custom configuration files from CB2
-ROUNDCUBE_PLUGINS=${PB_PATH}/custom/roundcube/plugins
-ROUNDCUBE_SKINS=${PB_PATH}/custom/roundcube/skins
-ROUNDCUBE_PROGRAM=${PB_PATH}/custom/roundcube/program
-ROUNDCUBE_HTACCESS=${PB_PATH}/custom/roundcube/.htaccess
+ROUNDCUBE_PLUGINS="${PB_CUSTOM}/roundcube/plugins"
+ROUNDCUBE_SKINS="${PB_CUSTOM}/roundcube/skins"
+ROUNDCUBE_PROGRAM="${PB_CUSTOM}/roundcube/program"
+ROUNDCUBE_HTACCESS="${PB_CUSTOM}/roundcube/.htaccess"
 
 ## phpMyAdmin
 PMA_PATH=${WWW_DIR}/phpMyAdmin
@@ -332,6 +331,11 @@ MYSQLSHOW=${MYSQLSHOW_BIN}
 MYSQLUPGRADE=${MYSQLUPGRADE_BIN}
 
 OPENSSL_BIN=/usr/bin/openssl
+
+## Custom SSL Certificates
+CUSTOM_SSL_KEY=/usr/local/etc/ssl/server.key
+CUSTOM_SSL_CRT=/usr/local/etc/ssl/server.crt
+CUSTOM_SSL_CA=/usr/local/etc/ssl/server.ca
 
 NEWSYSLOG_FILE=/usr/local/etc/newsyslog.d/directadmin.conf
 NEWSYSLOG_DAYS=10
@@ -4481,11 +4485,11 @@ clamav_uninstall() {
 
 ################################################################################################
 
-## RoundCube Installation
+## Install RoundCube (from CB2: doroundcube())
 roundcube_install() {
 
   if [ "${OPT_ROUNDCUBE}" = "NO" ]; then
-    printf "*** Error: RoundCube not enabled in options.conf\n"
+    printf "*** Notice: RoundCube not enabled in options.conf\n"
     return
   fi
 
@@ -4496,179 +4500,154 @@ roundcube_install() {
     ${PKGI} ${PORT_ROUNDCUBE}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" mail_roundcube_SET="${ROUNDCUBE_MAKE_SET}" mail_roundcube_UNSET="${ROUNDCUBE_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" mail_roundcube_SET="${ROUNDCUBE_MAKE_SET}" mail_roundcube_UNSET="${ROUNDCUBE_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
   fi
 
-  ### Post-Installation Tasks
-
-  ## Clarifications
-  # _CONF = RC's config.inc.php
-  # _CNF  = RC's SQL settings
-  # _PATH = path to RC
-
-  ## PB: Verify:
   verify_webapps_logrotate
 
-  ## Fetch MySQL Settings from directadmin/conf/my.cnf
   get_sql_settings
 
-  ## ROUNDCUBE_ALIAS_PATH=${WWW_DIR}/roundcube
-  ## ROUNDCUBE_CONFIG_DB= custom config from CB2
-  #ROUNDCUBE_PATH=${WWW_DIR}/roundcube
+  ## PB: Todo: Move to top:
+  ## Defaults:
+  ROUNDCUBE_CONFIG=${PB_CUSTOM}/roundcube/config.inc.php
+  ROUNDCUBE_CONFIG_DB=${ROUNDCUBE_CONFIG}
 
-  ## Generate new credentials for the database:
+  ## Custom configuration overrides:
+  ROUNDCUBE_PLUGINS=${PB_CUSTOM}/roundcube/plugins
+  ROUNDCUBE_SKINS=${PB_CUSTOM}/roundcube/skins
+  ROUNDCUBE_PROGRAM=${PB_CUSTOM}/roundcube/program
+  ROUNDCUBE_HTACCESS=${PB_CUSTOM}/roundcube/.htaccess
+  ## End PB: Todo: Move to top:
+
+  ROUNDCUBE_PATH="${WWW_DIR}/roundcube"
+
+  ## CB2: Variables for the database:
   ROUNDCUBE_DB=da_roundcube
   ROUNDCUBE_DB_USER=da_roundcube
-  ROUNDCUBE_DB_PASS=$(random_pass 12)
+  ROUNDCUBE_DB_PASS=$(random_pass)
   ROUNDCUBE_DES_KEY=$(random_pass 24)
   ROUNDCUBE_MY_CNF=${ROUNDCUBE_PATH}/config/my.cnf
-  ROUNDCUBE_CONF_SAMPLE=${ROUNDCUBE_PATH}/config/config.inc.php.sample
 
-  if [ ! -e "${ROUNDCUBE_PATH}" ]; then
-    printf "*** Error: RoundCube does not exist at: %s\n" "${ROUNDCUBE_PATH}"
-    exit 1
-  fi
+  ## PB: NOTE: All paths are relative!
+  EDIT_CONFIG=config.inc.php
+  CONFIG_DIST=config.inc.php.sample
+  # EDIT_CONFIG=${ROUNDCUBE_PATH}/config/config.inc.php
+  # CONFIG_DIST=${ROUNDCUBE_PATH}/config/config.inc.php.sample
 
-  ## PB: Verify:
-  ## Copy log files and temp directory from Alias to Real path
-  # if [ -e ${ROUNDCUBE_PATH_ALIAS} ]; then
-  #     if [ -d ${ROUNDCUBE_PATH_ALIAS}/logs ]; then
-  #         cp -fR ${ROUNDCUBE_PATH_ALIAS}/logs ${ROUNDCUBE_PATH} >/dev/null 2>&1
-  #     fi
-  #     if [ -d ${ROUNDCUBE_PATH_ALIAS}/temp ]; then
-  #         cp -fR ${ROUNDCUBE_PATH_ALIAS}/temp ${ROUNDCUBE_PATH} >/dev/null 2>&1
-  #     fi
-  # fi
+  ## PB: NOTE: Directory change:
+  cd "${ROUNDCUBE_PATH}" || exit
 
-  ## PB: 2016-03-12: not needed since ports/pkg always installs RC in the same place
-  ## CB2: Delete alias (symlink) and relink it from a fake (new alias) path:
-  # /bin/rm -f ${ALIASPATH}
-  # /bin/ln -sf roundcubemail-${ROUNDCUBE_VER} ${ALIASPATH}
+  ##### Database Configuration #####
 
-  ## Set permissions (use -h on alias path):
-  chown ${WEBAPPS_USER}:${WEBAPPS_USER} ${ROUNDCUBE_PATH}
-
-  cd ${ROUNDCUBE_PATH} || exit
-
-  #EDIT_CONFIG=config.inc.php
-  # Use: ${ROUNDCUBE_CONF}
-  #CONFIG_DIST=config.inc.php.sample
-  # EDIT_DB=${EDIT_CONFIG}
-  # DB_DIST=${CONFIG_DIST}
-
-  ## New installations of RoundCube
-  if ! ${MYSQLSHOW} --defaults-extra-file=${DA_MYSQL_CNF} --host=${MYSQL_HOST} | grep -m1 -q ' da_roundcube '; then
-    ## Insert data to SQL DB and create RoundCube database and user
+  ## CB2: Insert data into MySQL and create the  database and user account for RoundCube:
+  if ! ${MYSQLSHOW} --defaults-extra-file=${DA_PATH}/conf/my.cnf --host=${MYSQL_HOST} | grep -m1 -q ' da_roundcube '; then
+    ## PB: New RoundCube installation
     if [ -d "${ROUNDCUBE_PATH}/SQL" ]; then
-      printf "Creating RoundCube SQL user and database.\n"
-      ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "CREATE DATABASE ${ROUNDCUBE_DB};" --host=${MYSQL_HOST} 2>&1
-      ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
+      printf "Creating the database and user account for RoundCube + inserting data.\n"
 
-      ## External SQL server
+      ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "CREATE DATABASE ${ROUNDCUBE_DB};" --host=${MYSQL_HOST} 2>&1
+      ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
+
       if [ "${MYSQL_HOST}" != "localhost" ]; then
-        grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2 | while IFS= read -r access_host_ip
-        do
-          ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
-        done
+        for access_host_ip in $(grep '^access_host.*=' ${DA_MYSQL} | cut -d= -f2); do {
+          ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
+        }; done
       fi
 
-      ## PB: Needed?
-      ## Recreate RoundCube sql.cnf
-      rm -f ${ROUNDCUBE_MY_CNF}
-      verify_my_cnf ${ROUNDCUBE_MY_CNF} "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
+      rm -f "${ROUNDCUBE_MY_CNF}"
 
-      ## Import RoundCube's initial.sql file to initialize the necessary database tables
-      ${MYSQL} --defaults-extra-file=${ROUNDCUBE_MY_CNF} -e "use ${ROUNDCUBE_DB}; source ${ROUNDCUBE_PATH}/SQL/mysql.initial.sql;" --host=${MYSQL_HOST} 2>&1
+      verify_my_cnf "${ROUNDCUBE_MY_CNF}" "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
 
-      printf "Database created, ${ROUNDCUBE_DB_USER} password is %s\n" "${ROUNDCUBE_DB_PASS}"
+      ${MYSQL} --defaults-extra-file=${ROUNDCUBE_MY_CNF} -e "use ${ROUNDCUBE_DB}; source SQL/mysql.initial.sql;" --host=${MYSQL_HOST} 2>&1
+
+      printf "Database created: %s password: %s\n" "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
     else
-      printf "*** Error: Cannot find the SQL directory in %s\n" "${ROUNDCUBE_PATH}"
-      exit 1
+      printf "*** Error: Cannot find the 'SQL' directory in %s\n" "${ROUNDCUBE_PATH}"
+      exit 0
     fi
-  else ## Existing RoundCube database found
-    ## RoundCube config & database already exists, so fetch existing values (from custom configuration?):
-    if [ -e "${ROUNDCUBE_CONF}" ]; then
-      COUNT_MYSQL=$(grep -m1 -c 'mysql://' ${ROUNDCUBE_CONF})
+  else
+    ## PB: Existing RoundCube installation
+    if [ -e "${ROUNDCUBE_CONFIG_DB}" ]; then
+      COUNT_MYSQL=$(grep -m1 -c 'mysql://' ${ROUNDCUBE_CONFIG_DB})
       if [ "${COUNT_MYSQL}" -gt 0 ]; then
-          PART1=$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONF} | awk '{print $3}' | cut -d\@ -f1 | cut -d'/' -f3)
-          ROUNDCUBE_DB_USER=$(echo "${PART1}" | cut -d\: -f1)
-          ROUNDCUBE_DB_PASS=$(echo "${PART1}" | cut -d\: -f2)
-          PART2=$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONF} | awk '{print $3}' | cut -d\@ -f2 | cut -d\' -f1)
-          MYSQL_ACCESS_HOST=$(echo "${PART2}" | cut -d'/' -f1)
-          ROUNDCUBE_DB=$(echo "${PART2}" | cut -d'/' -f2)
+        PART1="$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONFIG_DB} | awk '{print $3}' | cut -d\@ -f1 | cut -d'/' -f3)"
+        ROUNDCUBE_DB_USER="$(echo ${PART1} | cut -d\: -f1)"
+        ROUNDCUBE_DB_PASS="$(echo ${PART1} | cut -d\: -f2)"
+        PART2="$(grep -m1 "\$config\['db_dsnw'\]" ${ROUNDCUBE_CONFIG_DB} | awk '{print $3}' | cut -d\@ -f2 | cut -d\' -f1)"
+        MYSQL_ACCESS_HOST="$(echo ${PART2} | cut -d'/' -f1)"
+        ROUNDCUBE_DB="$(echo ${PART2} | cut -d'/' -f2)"
       fi
     fi
 
-    ## Grant access and set password
-    ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
-    ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST}
+    ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
+    ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${MYSQL_ACCESS_HOST}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST} 2>&1
 
-    ## External SQL server
     if [ "${MYSQL_HOST}" != "localhost" ]; then
-      grep '^access_host.*=' ${DA_MYSQL_CONF} | cut -d= -f2 | while IFS= read -r access_host_ip
-      do
-        ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
-        ${MYSQL} --defaults-extra-file=${DA_MYSQL_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST} 2>&1
-      done
+      for access_host_ip in $(grep '^access_host.*=' ${DA_MYSQL} | cut -d= -f2); do {
+        ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,LOCK TABLES,INDEX ON ${ROUNDCUBE_DB}.* TO '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' IDENTIFIED BY '${ROUNDCUBE_DB_PASS}';" --host=${MYSQL_HOST} 2>&1
+        ${MYSQL} --defaults-extra-file=${DA_MY_CNF} -e "SET PASSWORD FOR '${ROUNDCUBE_DB_USER}'@'${access_host_ip}' = PASSWORD('${ROUNDCUBE_DB_PASS}');" --host=${MYSQL_HOST} 2>&1
+      }; done
     fi
 
-    ## PB: needed?
-    ## Recreate RoundCube sql.cnf
-    ## CB2: delete existing file, in case anyone uses it for backups
-    rm -f ${ROUNDCUBE_MY_CNF}
-    verify_my_cnf ${ROUNDCUBE_MY_CNF} "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
+    ## CB2: in case anyone uses it for backups
+    rm -f "${ROUNDCUBE_MY_CNF}"
+    verify_my_cnf "${ROUNDCUBE_MY_CNF}" "${ROUNDCUBE_DB_USER}" "${ROUNDCUBE_DB_PASS}"
   fi
 
-  ## PB2: Verify:
-  ## CB2: Cleanup editing config
-  #rm -f ${ROUNDCUBE_CONF}
+  ##### RoundCube Configuration #####
 
-  ## Install the proper config (e.g. stock or custom):
-  if [ -d "${ROUNDCUBE_PATH}" ]; then
-    printf "Editing roundcube configuration...\n"
+  ## CB2: Cleanup config
+  rm -f "${EDIT_CONFIG}"
 
-    cd ${ROUNDCUBE_PATH}/config || exit
+  ## CB2: install the proper configuration file:
+  if [ -d ../roundcube ]; then
+    printf "Editing RoundCube configuration\n"
 
-    ## PB: Todo: RoundCube Custom Configuration
-    if [ -e "${CUSTOM_ROUNDCUBE_CONFIG}" ]; then
-      printf "Installing custom RoundCube configuration file: %s\n" "${CUSTOM_ROUNDCUBE_CONFIG}"
-     cp -f "${CUSTOM_ROUNDCUBE_CONFIG}" ${ROUNDCUBE_CONF}
+    ## PB: NOTE: Directory change:
+    cd "${ROUNDCUBE_PATH}/config" || exit
+
+    if [ -e "${ROUNDCUBE_CONFIG}" ]; then
+      printf "Installing custom RoundCube Config: %s\n" "${ROUNDCUBE_CONFIG}"
+      cp -f "${ROUNDCUBE_CONFIG}" "${EDIT_CONFIG}"
     fi
 
     if [ -e "${ROUNDCUBE_CONFIG_DB}" ]; then
-      if [ ! -e ${ROUNDCUBE_CONF} ]; then
-        /bin/cp -f "${ROUNDCUBE_CONFIG_DB}" ${ROUNDCUBE_CONF}
+      if [ ! -e "${EDIT_CONFIG}" ]; then
+        cp -f "${ROUNDCUBE_CONFIG_DB}" "${EDIT_CONFIG}"
       fi
-
-      if [ "${COUNT_MYSQL}" -eq 0 ]; then ## if no "mysql://"" is found (tested above)
-        echo "\$config['db_dsnw'] = 'mysql://${ROUNDCUBE_DB_USER}:${ROUNDCUBE_DB_PASS}@${MYSQL_HOST}/${ROUNDCUBE_DB}';" >> ${ROUNDCUBE_CONF}
+      if [ "${COUNT_MYSQL}" -eq 0 ]; then
+        echo "\$config['db_dsnw'] = 'mysql://${ROUNDCUBE_DB_USER}:${ROUNDCUBE_DB_PASS}@${MYSQL_HOST}/${ROUNDCUBE_DB}';" >> "${EDIT_CONFIG}"
       fi
     else
-      if [ ! -e ${ROUNDCUBE_CONF} ]; then
-        /bin/cp -f ${ROUNDCUBE_CONF_SAMPLE} ${ROUNDCUBE_CONF}
-        ${PERL} -pi -e "s|mysql://roundcube:pass\@localhost/roundcubemail|mysql://${ROUNDCUBE_DB_USER}:\\Q${ROUNDCUBE_DB_PASS}\\E\@${MYSQL_HOST}/${ROUNDCUBE_DB}|" ${ROUNDCUBE_CONF} > /dev/null
-        ${PERL} -pi -e "s/\'mdb2\'/\'db\'/" ${ROUNDCUBE_CONF} > /dev/null
+      if [ ! -e "${EDIT_CONFIG}" ]; then
+        cp -f "${CONFIG_DIST}" "${EDIT_CONFIG}"
+        ${PERL} -pi -e "s|mysql://roundcube:pass\@localhost/roundcubemail|mysql://${ROUNDCUBE_DB_USER}:\\Q${ROUNDCUBE_DB_PASS}\\E\@${MYSQL_HOST}/${ROUNDCUBE_DB}|" "${EDIT_CONFIG}" > /dev/null
+        ${PERL} -pi -e "s/\'mdb2\'/\'db\'/" "${EDIT_CONFIG}" > /dev/null
       fi
     fi
 
-    SPAM_INBOX_PREFIX=$(getDA_Opt spam_inbox_prefix 1)
+    OPT_SPAM_INBOX_PREFIX=$(getDA_Opt spam_inbox_prefix 1)
     SPAM_FOLDER="INBOX.spam"
-
-    if [ "${SPAM_INBOX_PREFIX}" = "0" ]; then
+    if [ "${OPT_SPAM_INBOX_PREFIX}" = "0" ]; then
       SPAM_FOLDER="Junk"
     fi
 
-    ${PERL} -pi -e "s|rcmail-\!24ByteDESkey\*Str|\\Q${ROUNDCUBE_DES_KEY}\\E|" ${ROUNDCUBE_CONF}
+    ${PERL} -pi -e "s|rcmail-\!24ByteDESkey\*Str|\\Q${ROUNDCUBE_DES_KEY}\\E|" "${EDIT_CONFIG}"
 
-    if [ ! -e "${ROUNDCUBE_CONF}" ]; then
+    ## PB: New Installation:
+    if [ ! -e "${ROUNDCUBE_CONFIG}" ]; then
+      ## PB: Newer version of RoundCube (1.x+)
+      ## CB2: default_host is set to localhost by default in RC 1.0.0, so we don't echo it to the file
       ## CB2: These ones are already in config.inc.php.sample file, so we just use perl-regex to change them
-      ${PERL} -pi -e "s|\['smtp_port'] = 25|\['smtp_port'] = 587|" ${ROUNDCUBE_CONF} > /dev/null
-      ${PERL} -pi -e "s|\['smtp_server'] = ''|\['smtp_server'] = 'localhost'|" ${ROUNDCUBE_CONF} > /dev/null
-      ${PERL} -pi -e "s|\['smtp_user'] = ''|\['smtp_user'] = '%u'|" ${ROUNDCUBE_CONF} > /dev/null
-      ${PERL} -pi -e "s|\['smtp_pass'] = ''|\['smtp_pass'] = '%p'|" ${ROUNDCUBE_CONF} > /dev/null
+      ${PERL} -pi -e "s|\['smtp_port'] = 25|\['smtp_port'] = 587|" "${EDIT_CONFIG}" > /dev/null
+      ${PERL} -pi -e "s|\['smtp_server'] = ''|\['smtp_server'] = 'localhost'|" "${EDIT_CONFIG}" > /dev/null
+      ${PERL} -pi -e "s|\['smtp_user'] = ''|\['smtp_user'] = '%u'|" "${EDIT_CONFIG}" > /dev/null
+      ${PERL} -pi -e "s|\['smtp_pass'] = ''|\['smtp_pass'] = '%p'|" "${EDIT_CONFIG}" > /dev/null
 
-      ## CB2: Changing default options that are set in defaults.inc.php
-      ## Add "Inbox" prefix to IMAP folders (if requested)
+      ## CB2: Changing default options, override the ones set in defaults.inc.php
+
+      ## CB2: IMAP folders
       if [ "${OPT_WEBAPPS_INBOX_PREFIX}" = "YES" ]; then
         {
           echo "\$config['drafts_mbox'] = 'INBOX.Drafts';"
@@ -4676,15 +4655,15 @@ roundcube_install() {
           echo "\$config['sent_mbox'] = 'INBOX.Sent';"
           echo "\$config['trash_mbox'] = 'INBOX.Trash';"
           echo "\$config['default_folders'] = array('INBOX', 'INBOX.Drafts', 'INBOX.Sent', '${SPAM_FOLDER}', 'INBOX.Trash');"
-        } >> ${ROUNDCUBE_CONF}
+        } >> "${EDIT_CONFIG}"
       else
-        echo "\$config['junk_mbox'] = '${SPAM_FOLDER}';" >> ${ROUNDCUBE_CONF}
-        echo "\$config['default_folders'] = array('INBOX', 'Drafts', 'Sent', '${SPAM_FOLDER}', 'Trash');" >> ${ROUNDCUBE_CONF}
+        {
+          echo "\$config['junk_mbox'] = '${SPAM_FOLDER}';"
+          echo "\$config['default_folders'] = array('INBOX', 'Drafts', 'Sent', '${SPAM_FOLDER}', 'Trash');"
+        } >> "${EDIT_CONFIG}"
       fi
 
-      ## Hostname used for SMTP helo host:
       HN_T=$(hostname)
-
       {
         echo "\$config['smtp_helo_host'] = '${HN_T}';"
         echo "\$config['smtp_auth_type'] = 'LOGIN';"
@@ -4694,163 +4673,171 @@ roundcube_install() {
         echo "\$config['quota_zero_as_unlimited'] = true;"
         echo "\$config['enable_spellcheck'] = false;"
         echo "\$config['email_dns_check'] = true;"
-      } >> ${ROUNDCUBE_CONF}
+      } >> "${EDIT_CONFIG}"
 
-      ## Get recipients_max from exim.conf
+      ## CB2: Grab settings from exim.conf
       if grep -q '^recipients_max' ${EXIM_CONF}; then
-        EXIM_RECIPIENTS_MAX="$(grep -m1 '^recipients_max' ${EXIM_CONF} | cut -d= -f2 | tr -d ' ')"
-        echo "\$config['max_recipients'] = ${EXIM_RECIPIENTS_MAX};" >> ${ROUNDCUBE_CONF}
-        echo "\$config['max_group_members'] = ${EXIM_RECIPIENTS_MAX};" >> ${ROUNDCUBE_CONF}
+        RECIPIENTS_MAX="$(grep -m1 '^recipients_max' ${EXIM_CONF} | cut -d= -f2 | tr -d ' ')"
+        echo "\$config['max_recipients'] = ${RECIPIENTS_MAX};" >> "${EDIT_CONFIG}"
+        echo "\$config['max_group_members'] = ${RECIPIENTS_MAX};" >> "${EDIT_CONFIG}"
       fi
 
-      ## mime.types
-      if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
-        if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "litespeed" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-          if [ -s ${APACHE_MIME_TYPES} ]; then
-            if grep -m1 -q 'application/java-archive' ${APACHE_MIME_TYPES}; then
-              cp -f ${APACHE_MIME_TYPES} ${ROUNDCUBE_PATH}/config/mime.types
+      if [ ! -s mime.types ]; then
+        if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+          if [ -s "${APACHE_PATH}/mime.types" ]; then
+            if grep -m1 -q 'application/java-archive' "${APACHE_PATH}/mime.types"; then
+              cp -f "${APACHE_PATH}/mime.types" "${ROUNDCUBE_PATH}/mime.types"
             fi
           fi
         fi
       fi
 
-      ## Download a fresh copy of mime.types from Apache's repo
-      if [ ! -s "${ROUNDCUBE_PATH}/config/mime.types" ]; then
-        ${WGET} -O "${ROUNDCUBE_PATH}/config/mime.types" http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
-      fi
+      # if [ ! -s mime.types ]; then
+      #   ${WGET} ${WGET_CONNECT_OPTIONS} -O mime.types http://svn.apache.org/repos/asf/httpd/httpd/trunk/docs/conf/mime.types 2> /dev/null
+      # fi
+      echo "\$config['mime_types'] = '${ROUNDCUBE_PATH}/config/mime.types';" >> "${EDIT_CONFIG}"
 
-      echo "\$config['mime_types'] = '${ROUNDCUBE_PATH}/config/mime.types';" >> ${ROUNDCUBE_CONF}
+      ##### Password Plugin Configuration #####
 
-      ## DirectAdmin Password plugin
-      if [ -e ${ROUNDCUBE_PATH}/plugins/password ]; then
-        ${PERL} -pi -e "s|\['plugins'] = array\(\n|\['plugins'] = array\(\n    'password',\n|" ${ROUNDCUBE_CONF} > /dev/null
+      ## CB2: Password plugin
+      if [ -e "${ROUNDCUBE_PATH}/plugins/password" ]; then
+        ${PERL} -pi -e "s|\['plugins'] = array\(\n|\['plugins'] = array\(\n    'password',\n|" "${EDIT_CONFIG}" > /dev/null
 
-        cd ${ROUNDCUBE_PATH}/plugins/password || exit
+        ## PB: NOTE: Directory change:
+        cd "${ROUNDCUBE_PATH}/plugins/password" || exit
 
         if [ ! -e config.inc.php ]; then
           cp config.inc.php.dist config.inc.php
         fi
 
-        ${PERL} -pi -e "s|\['password_driver'] = 'sql'|\['password_driver'] = 'directadmin'|" ${ROUNDCUBE_CONF} > /dev/null
+        ${PERL} -pi -e "s|\['password_driver'] = 'sql'|\['password_driver'] = 'directadmin'|" config.inc.php > /dev/null
 
-        if [ -e ${DA_BIN} ]; then
-          DA_PORT=$(/usr/local/directadmin/directadmin c | grep -m1 -e '^port=' | cut -d= -f2)
-          ${PERL} -pi -e "s|\['password_directadmin_port'] = 2222|\['password_directadmin_port'] = $DA_PORT|" ${ROUNDCUBE_CONF} > /dev/null
+        if [ -e "${DA_PATH}/directadmin" ]; then
+          DAPORT=$(/usr/local/directadmin/directadmin c | grep -m1 -e '^port=' | cut -d= -f2)
+          ${PERL} -pi -e "s|\['password_directadmin_port'] = 2222|\['password_directadmin_port'] = $DAPORT|" config.inc.php > /dev/null
 
-          DA_SSL=$(/usr/local/directadmin/directadmin c | grep -m1 -e '^ssl=' | cut -d= -f2)
-          if [ "$DA_SSL" -eq 1 ]; then
-            ${PERL} -pi -e "s|\['password_directadmin_host'] = 'tcp://localhost'|\['password_directadmin_host'] = 'ssl://localhost'|" ${ROUNDCUBE_CONF} > /dev/null
+          DASSL=$(${DA_PATH}/directadmin c | grep -m1 -e '^ssl=' | cut -d= -f2)
+          if [ "$DASSL" -eq 1 ]; then
+            ${PERL} -pi -e "s|\['password_directadmin_host'] = 'tcp://localhost'|\['password_directadmin_host'] = 'ssl://localhost'|" config.inc.php > /dev/null
           fi
         fi
-        cd ${ROUNDCUBE_PATH}/config || exit
+
+        ## PB: NOTE: Directory change:
+        cd "${ROUNDCUBE_PATH}/config" || exit
       fi
 
-      ## Pigeonhole plugin (untested):
-      if [ "${OPT_PIGEONHOLE}" = "YES" ]; then
-        if [ -d ${ROUNDCUBE_PATH}/plugins/managesieve ]; then
+      ##### PigeonHole Configuration #####
 
-          if [ "$(grep -m1 -c "'managesieve'" ${ROUNDCUBE_CONF})" -eq 0 ]; then
-              ${PERL} -pi -e "s|\['plugins'] = array\(\n|\['plugins'] = array\(\n    'managesieve',\n|" ${ROUNDCUBE_CONF} > /dev/null
+      ## PB: Todo:
+      ## CB2: Pigeonhole plugin
+      if [ "${OPT_PIGEONHOLE}" = "YES" ]; then
+        if [ -d "${ROUNDCUBE_PATH}/plugins/managesieve" ]; then
+          if [ $(grep -m1 -c "'managesieve'" ${EDIT_CONFIG}) -eq 0 ]; then
+            ${PERL} -pi -e "s|\['plugins'] = array\(\n|\['plugins'] = array\(\n    'managesieve',\n|" "${EDIT_CONFIG}" > /dev/null
           fi
 
-          cd ${ROUNDCUBE_PATH}/plugins/managesieve || exit
+          ## PB: NOTE: Directory change:
+          cd "${ROUNDCUBE_PATH}/plugins/managesieve" || exit
 
           if [ ! -e config.inc.php ]; then
             cp config.inc.php.dist config.inc.php
           fi
-
           ${PERL} -pi -e "s|\['managesieve_port'] = null|\['managesieve_port'] = 4190|" config.inc.php > /dev/null
 
-          cd ${ROUNDCUBE_PATH}/config || exit
+          ## PB: NOTE:
+          cd "${ROUNDCUBE_PATH}/config" || exit
         fi
       fi
     fi
 
-    ## Custom configurations for RoundCube:
+    ##### Custom Configuration Files #####
+
+    ## Custom Configurations
     if [ -d "${ROUNDCUBE_PLUGINS}" ]; then
-      echo "Copying files from ${ROUNDCUBE_PLUGINS} to ${ROUNDCUBE_PATH}/plugins"
-      cp -Rp "${ROUNDCUBE_PLUGINS}/*" ${ROUNDCUBE_PATH}/plugins
+      printf "Copying files from %s to %s\n" "${ROUNDCUBE_PLUGINS}" "${ROUNDCUBE_PATH}/plugins"
+      cp -Rp "${ROUNDCUBE_PLUGINS}/*" "${ROUNDCUBE_PATH}/plugins"
     fi
 
     if [ -d "${ROUNDCUBE_SKINS}" ]; then
-      echo "Copying files from ${ROUNDCUBE_SKINS} to ${ROUNDCUBE_PATH}/skins"
-      cp -Rp "${ROUNDCUBE_SKINS}/*" ${ROUNDCUBE_PATH}/skins
+      printf "Copying files from %s to %s\n" "${ROUNDCUBE_SKINS}" "${ROUNDCUBE_PATH}/skins"
+      cp -Rp "${ROUNDCUBE_SKINS}/*" "${ROUNDCUBE_PATH}/skins"
     fi
 
     if [ -d "${ROUNDCUBE_PROGRAM}" ]; then
-      echo "Copying files from ${ROUNDCUBE_PROGRAM} to ${ROUNDCUBE_PATH}/program"
-      cp -Rp "${ROUNDCUBE_PROGRAM}/*" ${ROUNDCUBE_PATH}/program
+      printf "Copying files from %s to %s\n" "${ROUNDCUBE_PROGRAM}" "${ROUNDCUBE_PATH}/program"
+      cp -Rp "${ROUNDCUBE_PROGRAM}/*" "${ROUNDCUBE_PATH}/program"
     fi
 
     if [ -e "${ROUNDCUBE_HTACCESS}" ]; then
-      echo "Copying .htaccess file from ${ROUNDCUBE_HTACCESS} to ${ROUNDCUBE_PATH}/.htaccess"
-      cp -pf "${ROUNDCUBE_HTACCESS}" ${ROUNDCUBE_PATH}/.htaccess
+      printf "Copying .htaccess file from %s to %s\n" "${ROUNDCUBE_HTACCESS}" "${ROUNDCUBE_PATH}/.htaccess"
+      cp -pf "${ROUNDCUBE_HTACCESS}" "${ROUNDCUBE_PATH}/.htaccess"
     fi
 
-    #echo "Roundcube ${ROUNDCUBE_VER} has been installed successfully."
+    printf "RoundCube has been configured successfully.\n"
   fi
 
-  ## CB2: systems with "system()" in disable_functions need to use no php.ini:
+  ## CB2: Systems with "system()" in disable_functions need to use no php.ini:
   if [ "$(have_php_system)" = "0" ]; then
     ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' "${ROUNDCUBE_PATH}/bin/update.sh"
   fi
 
-  ## Systems with suhosin cannot have PHP memory_limit set to -1. Must prevent suhosin from loading for RoundCube's .sh scripts
+  ## CB2: Systems with Suhosin cannot have PHP memory_limit set to -1
+  ##      We need to not load Suhosin for RoundCube .sh scripts
   if [ "${OPT_SUHOSIN}" = "YES" ]; then
-    ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/msgimport.sh
-    ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/indexcontacts.sh
-    ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' ${ROUNDCUBE_PATH}/bin/msgexport.sh
+    ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' "${ROUNDCUBE_PATH}/bin/msgimport.sh"
+    ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' "${ROUNDCUBE_PATH}/bin/indexcontacts.sh"
+    ${PERL} -pi -e 's#^\#\!/usr/bin/env php#\#\!/usr/local/bin/php \-n#' "${ROUNDCUBE_PATH}/bin/msgexport.sh"
   fi
 
-  ## Update if needed:
-  # ${ROUNDCUBE_PATH}/bin/update.sh '--version=?'
+  ## CB2: Update if needed:
+  "${ROUNDCUBE_PATH}/bin/update.sh" '--version=?'
 
-  ## Cleanup:
-  rm -rf ${ROUNDCUBE_PATH}/installer
+  ## CB2: Cleanup:
+  rm -rf "${ROUNDCUBE_PATH}/installer"
 
-  ## Set the permissions:
-  chown -R ${WEBAPPS_USER}:${WEBAPPS_USER} ${ROUNDCUBE_PATH}
+  ## CB2: Set the permissions:
+  chown -R "${WEBAPPS_USER}:${WEBAPPS_GROUP}" "${ROUNDCUBE_PATH}"
 
-  ## PB: Verify this (770 compatible with FPM?):
   if [ "${WEBAPPS_GROUP}" = "apache" ]; then
-    chown -R apache ${ROUNDCUBE_PATH}/temp ${ROUNDCUBE_PATH}/logs
-    /bin/chmod -R 770 ${ROUNDCUBE_PATH}/temp
-    /bin/chmod -R 770 ${ROUNDCUBE_PATH}/logs
+    chown -R apache "${ROUNDCUBE_PATH}/temp" "${ROUNDCUBE_PATH}/logs"
+    chmod -R 770 "${ROUNDCUBE_PATH}/temp"
+    chmod -R 770 "${ROUNDCUBE_PATH}/logs"
   fi
 
-  ## Secure the configuration file:
-  if [ -s ${ROUNDCUBE_CONF} ]; then
-    chmod 440 ${ROUNDCUBE_CONF}
+  ## CB2: Secure the configuration file
+  if [ -s "${EDIT_CONFIG}" ]; then
+    chmod 440 "${EDIT_CONFIG}"
+    if [ "${WEBAPPS_GROUP}" = "apache" ]; then
+      echo "**********************************************************************"
+      echo "*"
+      echo "* SECURITY: ${EDIT_CONFIG} is readable by Apache."
+      echo "* Recommendation: Use a PHP type that runs PHP scripts as the User, then re-install roundcube."
+      echo "*"
+      echo "**********************************************************************"
+    fi
 
-    # if [ "${WEBAPPS_GROUP}" = "apache" ]; then
-    #   echo "**********************************************************************"
-    #   echo "* "
-    #   echo "* SECURITY: ${ROUNDCUBE_PATH}/config/${EDIT_DB} is readable by apache."
-    #   echo "* Recommended: use a php type that runs php scripts as the User, then re-install roundcube."
-    #   echo "*"
-    #   echo "**********************************************************************"
-    # fi
-
-    chown ${WEBAPPS_USER}:${WEBAPPS_GROUP} ${ROUNDCUBE_CONF}
+    chown "${WEBAPPS_USER}:${WEBAPPS_GROUP}" "${EDIT_CONFIG}"
 
     if [ "${WEBAPPS_GROUP}" = "apache" ]; then
-      ls -la ${ROUNDCUBE_PATH}/config/${ROUNDCUBE_CONF}
+      ls -la "${EDIT_CONFIG}"
       sleep 5
     fi
   fi
 
-  RC_HTACCESS=${ROUNDCUBE_PATH}/.htaccess
-
+  RC_HTACCESS="${ROUNDCUBE_PATH}/.htaccess"
   if [ -s "${RC_HTACCESS}" ]; then
-    if grep -m1 -q upload_max_filesize ${RC_HTACCESS}; then
-      ${PERL} -pi -e 's/^php_value\supload_max_filesize/#php_value       upload_max_filesize/' ${RC_HTACCESS}
-      ${PERL} -pi -e 's/^php_value\spost_max_size/#php_value       post_max_size/' ${RC_HTACCESS}
+    if grep -m1 -q upload_max_filesize "${RC_HTACCESS}"; then
+      ${PERL} -pi -e 's/^php_value   upload_max_filesize/#php_value   upload_max_filesize/' "${RC_HTACCESS}"
+      ${PERL} -pi -e 's/^php_value   post_max_size/#php_value   post_max_size/' "${RC_HTACCESS}"
+      ${PERL} -pi -e 's/^php_value   memory_limit/#php_value   memory_limit/' "${RC_HTACCESS}"
     fi
 
-    ${PERL} -pi -e 's/FollowSymLinks/SymLinksIfOwnerMatch/' ${RC_HTACCESS}
+    ${PERL} -pi -e 's/FollowSymLinks/SymLinksIfOwnerMatch/' "${RC_HTACCESS}"
   fi
 
   verify_webapps_tmp
+
+  return
 }
 
 ################################################################################################
