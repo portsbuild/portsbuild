@@ -8,6 +8,10 @@ Automation and integration is achieved by using simple shell scripts, along with
 
 The source code for this project will be open source. A distribution & copyright license has not been chosen yet at this time.
 
+### Supported Operating Systems
+* FreeBSD 10.3 x64 (primary focus)
+* FreeBSD 9.3 x64 (working)
+
 ### Supported Software Stacks
 
 Service 		| Versions      | Status
@@ -27,11 +31,13 @@ proftpd         | 1.3.5a        | Supported
 pure-FTPd       | 1.0.42        | Supported
 Majordomo       | 1.94.5        | Supported (via DA source copy)
 nginx           | 1.8.x         | Untested (www/nginx)
+suphp           |               | Untested (www/suphp)
+fastcgi         |               | Untested (www/mod_fastcgi)
 AwStats         |               | Untested (www/awstats)
 Webalizer       |               | Untested (www/webalizer)
 suhosin         |               | Untested (security/php-suhosin)
-suphp           |               | Untested (www/suphp)
 mod_security    |               | Untested (www/mod_security)
+htscanner       |               | Untested (devel/pecl-htscanner)
 Mailman         |               | Untested (mail/mailman)
 PigeonHole      |               | Untested (mail/pigeonhole)
 
@@ -40,10 +46,6 @@ PortsBuild will NOT support:
 * SquirrelMail - last release in 2011, however a fork exists in CB2 (1.4.22-20140402_0200)
 * ZendOptimizer - unsupported on FreeBSD
 * mod_ruid2 - unsupported on FreeBSD
-
-### Supported Operating Systems
-* FreeBSD 10.3 x64 (primary focus)
-* FreeBSD 9.3 x64 (working)
 
 
 ### Currently known issues and limitations
