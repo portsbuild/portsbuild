@@ -122,10 +122,12 @@ NGINX_USER=nginx ## www
 NGINX_GROUP=nginx ## www
 WEBAPPS_USER=webapps
 WEBAPPS_GROUP=webapps
-EXIM_USER=mail ## mailnull
-EXIM_GROUP=mail ## mail
+EXIM_USER="mail" ## mailnull
+EXIM_GROUP="mail" ## mail
 
 ## System Binary/Application paths and variables
+# ULB=/usr/local/bin
+# ULE=/usr/local/etc
 CHOWN=/usr/sbin/chown
 CHMOD=/bin/chmod
 INITD_DIR=/usr/local/etc/rc.d
@@ -172,8 +174,8 @@ DA_SSL_KEY=${DA_PATH}/conf/cakey.pem
 DA_SSL_CRT=${DA_PATH}/conf/cacert.pem
 DA_SSL_CA=${DA_PATH}/conf/carootcert.pem
 
-DA_LAN=${DA_LAN:=0}
-DA_INSECURE=${DA_INSECURE:=0}
+: "${DA_LAN:=0}"
+: "${DA_INSECURE:=0}"
 LAN_IP=""
 HTTP=https
 EXTRA_VALUE=""
@@ -184,8 +186,8 @@ CB_PATH=${DA_PATH}/custombuild
 CB_CONF=${CB_PATH}/options.conf
 
 ## Min and Max password lengths when used by random_pass()
-MIN_PASS_LENGTH=12
-MAX_PASS_LENGTH=16
+: "${MIN_PASS_LENGTH:=12}"
+: "${MAX_PASS_LENGTH:=16}"
 
 ## Virtual Mail Directory (keeping this path as-is for simplicity)
 VIRTUAL_PATH=/etc/virtual
@@ -266,7 +268,7 @@ PHP_INI_DIRECTADMIN=${PHP_ETC_PATH}/10-directadmin.ini
 EXIM_BIN=/usr/local/sbin/exim
 EXIM_PATH=/usr/local/etc/exim
 EXIM_CONF=${EXIM_PATH}/configure ## required_files in rc.d/exim
-EXIM_RECIPIENTS_MAX=150
+: ${EXIM_RECIPIENTS_MAX:=150}
 
 EXIM_SSL_KEY=${EXIM_PATH}/ssl/exim.key
 EXIM_SSL_CRT=${EXIM_PATH}/ssl/exim.crt
@@ -398,8 +400,6 @@ PORTS_BASE=/usr/ports
 ## Ports: Dependencies
 PORT_PORTMASTER=ports-mgmt/portmaster
 PORT_SYNTH=ports-mgmt/synth
-PORT_GCC6=lang/gcc6-aux
-PORT_NCURSES=devel/ncurses
 PORT_PERL=lang/perl5.20
 PORT_AUTOCONF=devel/autoconf
 PORT_AUTOMAKE=devel/automake
@@ -421,6 +421,8 @@ PORT_GD=graphics/gd
 PORT_SASL2=security/cyrus-sasl2
 PORT_MAILX=mail/mailx
 PORT_BIND=dns/bind99
+PORT_GCC6=lang/gcc6-aux
+PORT_NCURSES=devel/ncurses
 
 PORT_DEPS="${PORT_GMAKE} ${PORT_PERL} ${PORT_WGET} ${PORT_BISON} ${PORT_FLEX} ${PORT_GD} ${PORT_SASL2} ${PORT_CMAKE} ${PORT_PYTHON} ${PORT_AUTOCONF} ${PORT_LIBTOOL} ${PORT_LIBARCHIVE} ${PORT_MAILX}"
 PORT_DEPS_100="${PORT_DEPS} ${PORT_BIND}"
@@ -458,9 +460,9 @@ PORT_DOVECOT2=mail/dovecot2
 PORT_PIGEONHOLE=mail/dovecot2-pigeonhole
 PORT_CLAMAV=security/clamav
 PORT_ROUNDCUBE=mail/roundcube
-PORT_MAILMAN=mail/mailman
 PORT_LIBSPF2=mail/libspf2
 PORT_LIBDKIM=mail/libdkim
+PORT_MAILMAN=mail/mailman
 
 ## Ports: FTPd
 PORT_PUREFTPD="ftp/pure-ftpd"
@@ -494,12 +496,6 @@ PORT_WEBALIZER=www/webalizer
 ###
 
 ### Global (default) make options
-
-# DEFAULT_VERSIONS= apache=2.4 php=56
-# APACHE_PORT= www/apache24
-# USE_APACHE=24
-# DEFAULT_PHP_VER=56
-# PHP1_VER=56
 
 ## These variables are included every time 'make' is called.
 ## Default is to source /etc/make.conf
@@ -661,7 +657,8 @@ getDA_Opt() {
 ## Emulate ${!variable} (from CB2)
 eval_var() {
 
-  local var="${1}"
+  local var
+  var="${1}"
 
   if [ -z "${var}" ]; then
     printf "\n"
@@ -829,7 +826,8 @@ getfile() {
 
   ## $2 = source (input, from PB mirror)
   ## $3 = target (output)
-  ## $4 = (optional)
+
+  printf "Downloading %s to %s\n" "${2}" "${3}"
 
   "${WGET}" "${WGET_CONNECT_OPTIONS}" -O "${3}" "${PB_MIRROR}/${2}"
 
@@ -871,13 +869,8 @@ ask_user() {
   ## not done: $2 = expected answer: "yn", "custom", etc. (optional)
   ## not done: $3 = execute command (optional)
 
-  RESPONSE=""
-
-  if [ "${1}" = "" ]; then
-    ASK_QUESTION="Do you want to continue?"
-  else
-    ASK_QUESTION=${1}
-  fi
+  local RESPONSE=""
+  local ASK_QUESTION="${1:="Do you want to continue?"}"
 
   while true; do
     read -p "${ASK_QUESTION} (y/n): " -r RESPONSE
@@ -901,16 +894,14 @@ pkg_update() {
 ################################################################
 
 ## Install packages without prompts
-pkgi() {
-
-  ${PKG} install -y "$@"
-}
+# pkgi() {
+#   ${PKG} install -y "$@"
+# }
 
 ################################################################
 
 ## Upgrade packages without prompts
 # pkgu() {
-
 #   ${PKG} upgrade -y "$@"
 # }
 
@@ -981,14 +972,6 @@ update_hosts() {
   fi
 }
 
-################################################################
-
-## Backup a file before performing an operation.
-backup_file() {
-
-  return
-}
-
 ################################################################################################
 
 ## Get System Timezone (from CB2)
@@ -1014,11 +997,11 @@ addUserGroup() {
   ## $2 = group
 
   if ! /usr/bin/grep -q "^${2}:" < /etc/group; then
-    /usr/sbin/pw groupadd "${2}"
+    ${PW} groupadd "${2}"
   fi
 
   if ! /usr/bin/id "${1}" > /dev/null; then
-    /usr/sbin/pw useradd -g "${2}" -n "${1}" -s /sbin/nologin
+    ${PW} useradd -g "${2}" -n "${1}" -s /sbin/nologin
   fi
 }
 
@@ -1027,15 +1010,10 @@ addUserGroup() {
 ## Random Password Generator (from CB2)
 random_pass() {
 
-  local min_pass_length="${1}"
+  # local min_pass_length="${1}"
+  # MIN_PASS_LENGTH=${min_pass_length:=12}
 
-  MIN_PASS_LENGTH=${min_pass_length:=12}
-
-  # if [ "$1" = "" ]; then
-  #   MIN_PASS_LENGTH=12
-  # else
-  #   MIN_PASS_LENGTH=$1
-  # fi
+  MIN_PASS_LENGTH="${1:=12}"
 
   ${PERL} -le"print map+(A..Z,a..z,0..9)[rand 62],0..${MIN_PASS_LENGTH}"
 }
@@ -1074,14 +1052,29 @@ global_setup() {
     DA_INSECURE=$9
   fi
 
-  printf "Global System Setup Initiated\n"
-  printf "About to setup PortsBuild and install DirectAdmin for the first time.\n\n"
-  printf "Setup arguments received:\n User ID: %s\n License ID: %s\n Server FQDN: %s\n Ethernet Device: %s\n Server IP Address: %s\n Server IP Netmask: %s\n\n" $2 $3 $4 $5 $6 $7
-  printf "Please make sure these values are correct and that they match the records in your DirectAdmin Client License Portal.\n"
-  printf "If in doubt, visit: https://www.directadmin.com/clients/\n\n"
-  printf "PortsBuild will install, setup and configure the following services:\n"
+  printf "\n"
+  printf "  Global System Setup Initiated\n\n"
+  printf "  About to setup PortsBuild and install DirectAdmin for the first time.\n\n"
+  printf "  Setup arguments received:\n"
+  {
+    printf "\tUser ID: %s\n\tLicense ID: %s\n\tServer FQDN: %s\n\tEthernet Device: %s\n\tServer IP Address: %s\n\tServer IP Netmask: %s\n" "$2" "$3" "$4" "$5" "$6" "$7"
 
-  printf "  DirectAdmin"
+    if [ "${LAN_IP}" != "" ]; then
+      printf "\tLAN IP: %s\n" "${LAN_IP}"
+      printf "\tLAN Mode: Enabled\n"
+    fi
+
+    if [ "${DA_INSECURE}" = 1 ]; then
+      printf "\tInsecure Mode: Enabled\n"
+    fi
+  } | column -t -s:
+
+  printf "\n"
+  printf "  Please make sure these values are correct\n  and that they match the records in your DirectAdmin Client License Portal.\n"
+  printf "  If in doubt, visit: https://www.directadmin.com/clients/\n\n"
+  printf "  PortsBuild will install, setup and configure the following services:\n"
+  printf "\t"
+  printf "DirectAdmin"
   if [ "${OPT_NAMED}" = "YES" ]; then ( printf ", Named" ); fi
   if [ "${OPT_EXIM}" = "YES" ]; then ( printf ", Exim" ); fi
   if [ "${OPT_DOVECOT}" = "YES" ]; then ( printf ", Dovecot" ); fi
@@ -1096,7 +1089,7 @@ global_setup() {
   if [ "${OPT_FTPD}" != "NO" ]; then ( printf ", %s" "${OPT_FTPD}" ); fi
   printf "\n\n"
 
-  printf "The following features will be enabled: \n  "
+  printf "  The following features will be enabled: \n\t"
   if [ "${OPT_CLAMAV_WITH_EXIM}" = "YES" ]; then ( printf "Exim w/ClamAV" ); fi
   if [ "${OPT_BLOCKCRACKING}" = "YES" ]; then ( printf ", BlockCracking" ); fi
   if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ]; then ( printf ", Easy Spam Fighter" ); fi
@@ -1110,17 +1103,6 @@ global_setup() {
   if [ "${OPT_MODSECURITY}" = "YES" ]; then ( printf ", ModSecurity" ); fi
   if [ "${OPT_HTSCANNER}" = "YES" ]; then ( printf ", HTScanner" ); fi
   printf "\n\n"
-
-  if [ "${LAN_IP}" != "" ]; then
-    printf "LAN Mode: Enabled\n"
-    printf "LAN IP: %s\n" "${LAN_IP}"
-  fi
-
-  if [ "${DA_INSECURE}" = 1 ]; then
-    printf "Insecure Mode: Enabled\n"
-  fi
-
-  printf "\n"
 
   # echo "PHP ini Type: ${OPT_PHP_INI_TYPE}"
   # echo "Webapps Inbox Prefix: ${OPT_WEBAPPS_INBOX_PREFIX}"
@@ -1148,11 +1130,9 @@ global_setup() {
     ## Install Dependencies
     printf "Installing required dependencies and compatibility libraries (misc/compats)\n"
     if [ "${OS_MAJ}" -eq 10 ]; then
-      pkgi "${PORT_DEPS_100}"
-      pkgi misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
+      ${PKGI} "${PORT_DEPS_100}" misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
     elif [ "${OS_MAJ}" -eq 9 ]; then
-      pkgi "${PORT_DEPS}"
-      pkgi misc/compat4x misc/compat5x misc/compat6x misc/compat8x
+      ${PKGI} "${PORT_DEPS}" misc/compat4x misc/compat5x misc/compat6x misc/compat8x
     fi
 
     ## Check for /etc/rc.conf
@@ -1169,7 +1149,7 @@ global_setup() {
 
     if [ "${OPT_INSTALL_CCACHE}" = "YES" ]; then
       printf "Installing devel/ccache\n"
-      pkgi ${PORT_CCACHE}
+      ${PKGI} ${PORT_CCACHE}
 
       if [ $? = 0 ]; then
         ## sysrc -f /etc/make.conf WITH_CCACHE_BUILD=yes
@@ -1178,11 +1158,11 @@ global_setup() {
     fi
 
     printf "Installing %s\n" ${PORT_PORTMASTER}
-    pkgi ${PORT_PORTMASTER}
+    ${PKGI} ${PORT_PORTMASTER}
 
     if [ "${OPT_INSTALL_SYNTH}" = "YES" ] && [ ! -e "${SYNTH}" ]; then
       printf "Installing ports-mgmt/synth\n"
-      pkgi ${PORT_SYNTH}
+      ${PKGI} ${PORT_SYNTH}
 
       ## Todo: Configure synth (copy a default/stock Live system profile?)
       # synth configure
@@ -1195,9 +1175,9 @@ global_setup() {
       if [ -e ${PERL} ]; then
         ln -s ${PERL} /usr/bin/perl
       else
-        pkgi ${PORT_PERL}
+        ${PKGI} ${PORT_PERL}
         if [ $? -eq 0 ]; then
-            ln -s ${PERL} /usr/bin/perl
+          ln -s ${PERL} /usr/bin/perl
         fi
       fi
     fi
@@ -1256,6 +1236,9 @@ global_setup() {
     if [ "${OPT_FTPD}" != "NO" ]; then ( install_app "${OPT_FTPD}" ); fi
     if [ "${OPT_BLOCKCRACKING}" = "YES" ]; then ( blockcracking_install ); fi
     if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ]; then ( easyspamfighter_install ); fi
+    if [ "${OPT_MODSECURITY}" = "YES" ]; then ( modsecurity_install ); fi
+    if [ "${OPT_HTSCANNER}" = "YES" ]; then ( install_mod_htscanner ); fi
+
     ## mod_security
     ## htscanner
 
@@ -1277,6 +1260,8 @@ global_setup() {
     cp -f "${PB_PATH}/directadmin/data/templates/custom/proftpd.conf" "${DA_PATH}/data/templates/proftpd.conf"
     cp -f "${PB_PATH}/directadmin/data/templates/custom/proftpd.conf" "${DA_PATH}/data/templates/custom/proftpd.conf"
 
+    ## Todo: Copy DA startup file to .usr/local/etc/rc.d/
+
     chown -f diradmin:diradmin ${CB_CONF}
     chmod 755 "${CB_CONF}"
 
@@ -1292,12 +1277,12 @@ global_setup() {
     ./directadmin p
 
     ## From DA's scripts/install.sh
-    COUNT=$(grep -c -e '^admin:' /etc/group)
-    if [ "$COUNT" -eq 0 ]; then
-      COUNT=$(grep -c -e '^admin:' /etc/passwd)
-      if [ "$COUNT" -eq 1 ]; then
-        # We have a user, but no admin group.
-        /usr/sbin/pw groupadd admin
+    ADMIN_GROUP_COUNT=$(grep -c -e '^admin:' /etc/group)
+    if [ "$ADMIN_GROUP_COUNT" -eq 0 ]; then
+      ADMIN_PASS_COUNT=$(grep -c -e '^admin:' /etc/passwd)
+      if [ "$ADMIN_PASS_COUNT" -eq 1 ]; then
+        ## DA: We have a user, but no admin group.
+        ${PW} groupadd admin
       fi
     fi
 
@@ -1315,7 +1300,7 @@ global_setup() {
     global_post_install
 
   else
-    printf "PortsBuild installation canceled\n\n"
+    printf "PortsBuild installation canceled.\n\n"
     # show_main_menu
   fi
 }
@@ -1872,26 +1857,21 @@ basic_system_security() {
 ## Install DA cron (from: scripts/install.sh)
 install_cron() {
 
-  ## Need to add:
-  # * * * * * root /usr/local/directadmin/dataskq
-  # 2 0-23/6 * * * root echo 'action=vacation&value=all' >> /usr/local/directadmin/data/task.queue;
-  # 5 0 * * * root /usr/sbin/quotaoff -a; /sbin/quotacheck -aug; /usr/sbin/quotaon -a;
-  # 30 0 * * * root echo 'action=tally&value=all' >> /usr/local/directadmin/data/task.queue
-  # 40 1 1 * * root echo 'action=reset&value=all' >> /usr/local/directadmin/data/task.queue
-  # 0 4 * * * root echo 'action=check&value=license' >> /usr/local/directadmin/data/task.queue
-
+  local COUNT
   COUNT=$(grep -c dataskq < /etc/crontab)
+
   if [ "$COUNT" = 0 ]; then
     if [ -s "${DA_CRON_FILE}" ]; then
       printf "Updating /etc/crontab with required DirectAdmin schedules\n"
       # cat "${DA_CRON_FILE}" >> /etc/crontab
       {
-        printf "*\t*\t*\t*\t*\troot\t/usr/local/directadmin/dataskq"
-        printf "2\t0-23/6\t*\t*\t*\troot\techo 'action=vacation&value=all' >> /usr/local/directadmin/data/task.queue;"
-        printf "5\t0\t*\t*\t*\troot\t/usr/sbin/quotaoff -a; /sbin/quotacheck -aug; /usr/sbin/quotaon -a;"
-        printf "30\t0\t*\t*\t*\troot\techo 'action=tally&value=all' >> /usr/local/directadmin/data/task.queue"
-        printf "40\t1\t1\t*\t*\troot\techo 'action=reset&value=all' >> /usr/local/directadmin/data/task.queue"
-        printf "0\t4\t*\t*\t*\troot\techo 'action=check&value=license' >> /usr/local/directadmin/data/task.queue"
+        printf "\n"
+        printf "*\t*\t*\t*\t*\troot\t/usr/local/directadmin/dataskq\n"
+        printf "2\t0-23/6\t*\t*\t*\troot\techo 'action=vacation&value=all' >> /usr/local/directadmin/data/task.queue;\n"
+        printf "5\t0\t*\t*\t*\troot\t/usr/sbin/quotaoff -a; /sbin/quotacheck -aug; /usr/sbin/quotaon -a;\n"
+        printf "30\t0\t*\t*\t*\troot\techo 'action=tally&value=all' >> /usr/local/directadmin/data/task.queue\n"
+        printf "40\t1\t1\t*\t*\troot\techo 'action=reset&value=all' >> /usr/local/directadmin/data/task.queue\n"
+        printf "0\t4\t*\t*\t*\troot\techo 'action=check&value=license' >> /usr/local/directadmin/data/task.queue\n"
       } >> /etc/crontab
     else
       printf "*** Error: Could not find %s or the file is empty.\n" "${DA_CRON_FILE}"
@@ -1907,7 +1887,7 @@ install_cron() {
 ## <include> /usr/local/etc/newsyslog.conf.d/*
 setup_newsyslog() {
 
-  ## Fix this
+  ## Todo:
   # cp /etc/newsyslog.conf.d/directadmin.conf /usr/local/etc/newsyslog.conf.d/
 
   ## See what's enabled/installed on the system and update the newsyslog with the appropriate services
@@ -1993,7 +1973,7 @@ exim_install() {
 
   ### Main Installation
   if [ "${EXIM_MAKE_SET}" = "" ] && [ "${EXIM_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_EXIM}
+    ${PKGI} ${PORT_EXIM}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_EXIM}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_EXIM}" mail_exim_SET="${EXIM_MAKE_SET}" mail_exim_UNSET="${EXIM_MAKE_UNSET}" \
@@ -2177,22 +2157,14 @@ spamassassin_install() {
 
   printf "Installing SpamAssassin optional and required Perl modules first\n"
 
-  pkgi security/p5-Digest-SHA1
-  pkgi net/p5-Geo-IP
-  pkgi net/p5-Net-CIDR-Lite
-  pkgi mail/razor-agents
-  pkgi net/p5-IO-Socket-INET6
-  pkgi www/p5-LWP-UserAgent-WithCache
+  ${PKGI} security/p5-Digest-SHA1 net/p5-Geo-IP net/p5-Net-CIDR-Lite mail/razor-agents net/p5-IO-Socket-INET6 www/p5-LWP-UserAgent-WithCache net/p5-Net-Patricia mail/p5-Mail-DKIM mail/p5-Mail-SPF
   # pkgi www/p5-LWP-UserAgent-Determined
-  pkgi net/p5-Net-Patricia
-  pkgi mail/p5-Mail-DKIM
-  pkgi mail/p5-Mail-SPF
 
   printf "Starting SpamAssassin installation\n"
 
   ### Main Installation
   if [ "${SPAMASSASSIN_MAKE_SET}" = "" ] && [ "${SPAMASSASSIN_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_SPAMASSASSIN}
+    ${PKGI} ${PORT_SPAMASSASSIN}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" mail_spamassassin_SET="${SPAMASSASSIN_MAKE_SET}" mail_spamassassin_UNSET="${SPAMASSASSIN_MAKE_UNSET}" \
@@ -2262,7 +2234,7 @@ spamassassin_utilities_install() {
 
   ### Main Installation
   if [ "${SPAMASSASSIN_UTILITIES_MAKE_SET}" = "" ] && [ "${SPAMASSASSIN_UTILITIES_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_SPAMASSASSIN_UTILITIES}
+    ${PKGI} ${PORT_SPAMASSASSIN_UTILITIES}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN_UTILITIES}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN_UTILITIES}" mail_sa-utils_SET="${SPAMASSASSIN_UTILITIES_MAKE_SET}" mail_sa-utils_UNSET="${SPAMASSASSIN_UTILITIES_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -2482,7 +2454,7 @@ dovecot_install() {
 
   ### Main Installation
   if [ "${DOVECOT2_MAKE_SET}" = "" ] && [ "${DOVECOT2_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_DOVECOT2}
+    ${PKGI} ${PORT_DOVECOT2}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" mail_dovecot2_SET="${DOVECOT2_MAKE_SET}" mail_dovecot2_UNSET="${DOVECOT2_MAKE_UNSET}" \
@@ -2654,7 +2626,7 @@ dovecot_uninstall() {
 
   sysrc -x dovecot_enable
 
-  pkg delete -f ${PORT_DOVECOT2}
+  ${PKG} delete -f ${PORT_DOVECOT2}
 
   return
 }
@@ -2674,7 +2646,7 @@ pigeonhole_install() {
 
   ### Main Installation
   if [ "${PIGEONHOLE_MAKE_SET}" = "" ] && [ "${PIGEONHOLE_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_WEBALIZER}
+    ${PKGI} ${PORT_WEBALIZER}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PIGEONHOLE}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PIGEONHOLE}" mail_dovecot2_pigeonhole_SET="${PIGEONHOLE_MAKE_SET}" mail_dovecot2_pigeonhole_UNSET="${PIGEONHOLE_MAKE_UNSET}" \
@@ -2699,7 +2671,7 @@ webalizer_install() {
 
   ### Main Installation
   if [ "${WEBALIZER_MAKE_SET}" = "" ] && [ "${WEBALIZER_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_WEBALIZER}
+    ${PKGI} ${PORT_WEBALIZER}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" www_webalizer_SET="${WEBALIZER_MAKE_SET}" www_webalizer_UNSET="${WEBALIZER_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -2737,7 +2709,7 @@ awstats_install() {
 
   ### Main Installation
   if [ "${AWSTATS_MAKE_SET}" = "" ] && [ "${AWSTATS_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_AWSTATS}
+    ${PKGI} ${PORT_AWSTATS}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" www_awstats_SET="${AWSTATS_MAKE_SET}" www_awstats_UNSET="${AWSTATS_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -3152,14 +3124,14 @@ php_install() {
 
   if [ "${PHP_MAKE_SET}" = "" ] && [ "${PHP_MAKE_UNSET}" = "" ] ; then
     case ${OPT_PHP1_MODE} in
-      fpm) pkgi ${PORT_PHP} "${PHP_EXT_LIST}"
+      fpm) ${PKGI} ${PORT_PHP} "${PHP_EXT_LIST}"
         ;;
-      mod_php) pkgi ${PORT_MOD_PHP}
+      mod_php) ${PKGI} ${PORT_MOD_PHP}
         ;;
       fastcgi) echo "not done"
         ;;
       suphp) echo "not done"
-        pkgi ${PORT_SUPHP}
+        ${PKGI} ${PORT_SUPHP}
         ;;
     esac
   else
@@ -3177,7 +3149,7 @@ php_install() {
           ;;
       fastcgi) echo "not done" ;;
       suphp) echo "not done"
-          pkgi ${PORT_SUPHP}
+          ${PKGI} ${PORT_SUPHP}
           ;;
       *) printf "*** Error: Wrong PHP version selected. (Script error?)\n"; exit ;;
     esac
@@ -3289,13 +3261,13 @@ php_fpm_restart() {
 
   if [ $? = "0" ]; then
     if [ -x /usr/local/etc/rc.d/php-fpm55 ]; then
-      /usr/sbin/service php-fpm55 reload
+      ${SERVICE} php-fpm55 reload
     elif [ -x /usr/local/etc/rc.d/php-fpm56 ]; then
-      /usr/sbin/service php-fpm56 reload
+      ${SERVICE} php-fpm56 reload
     elif [ -x /usr/local/etc/rc.d/php-fpm70 ]; then
-      /usr/sbin/service php-fpm70 reload
+      ${SERVICE} php-fpm70 reload
     else
-      /usr/sbin/service php-fpm reload
+      ${SERVICE} php-fpm reload
     fi
   else
     printf "*** Warning: Aborting automatic PHP-FPM restart due to configuration verification failure.\n"
@@ -3316,7 +3288,7 @@ php_upgrade() {
 
   printf "Upgrading PHP\n"
 
-  pkg upgrade "$(pkg query %o | grep "php${OPT_PHP1_VERSION}")"
+  ${PKGI} upgrade "$(pkg query %o | grep "php${OPT_PHP1_VERSION}")"
 
   #pkg query -i -x "%o %v" '(php)'
 }
@@ -3364,7 +3336,7 @@ phpmyadmin_install() {
 
   ### Main Installation
   if [ "${PMA_MAKE_SET}" = "" ] && [ "${PMA_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_PHPMYADMIN}
+    ${PKGI} ${PORT_PHPMYADMIN}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHPMYADMIN}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHPMYADMIN}" databases_phpmyadmin_SET="${PMA_MAKE_SET}" databases_phpmyadmin_UNSET"${PMA_MAKE_UNSET}" \
@@ -3522,7 +3494,7 @@ apache_install() {
 
   ### Main Installation
   if [ "${APACHE24_MAKE_SET}" = "" ] && [ "${APACHE24_MAKE_UNSET}" = "" ] && [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "NO" ]; then
-    pkgi ${PORT_APACHE24}
+    ${PKGI} ${PORT_APACHE24}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" www_apache24_SET="${APACHE24_MAKE_SET}" www_apache24_UNSET="${APACHE24_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -3967,7 +3939,7 @@ apache_uninstall() {
 
   ${SERVICE} apache24 stop
 
-  pkg -f delete apache24
+  ${PKG} delete -f apache24
 
   sysrc -x apache24_enable
   sysrc -x apache24_http_accept_enable
@@ -4020,7 +3992,7 @@ install_mod_fcgid() {
     exit 1
   fi
 
-  getFile fcgid.sh fcgid_sh
+  # Todo: getFile fcgid.sh fcgid_sh
 
   PHPMODULES=${APACHE_EXTRA_PATH}/httpd-phpmodules.conf
 
@@ -4063,7 +4035,7 @@ nginx_install() {
 
   ### Main Installation
   if [ "${NGINX_MAKE_SET}" = "" ] && [ "${NGINX_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_NGINX}
+    ${PKGI} ${PORT_NGINX}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" www_nginx_SET="${NGINX_MAKE_SET}" www_nginx_UNSET="${NGINX_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -4124,7 +4096,7 @@ nginx_uninstall() {
 
   ${SERVICE} nginx stop
 
-  pkg -f delete nginx
+  ${PKG} delete -f nginx
 
   sysrc -x nginx_enable
 
@@ -4176,7 +4148,7 @@ pureftpd_install() {
 
   ### Main Installation
   if [ "${PUREFTPD_MAKE_SET}" = "" ] && [ "${PUREFTPD_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_PUREFTPD}
+    ${PKGI} ${PORT_PUREFTPD}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" ftp_pure_ftpd_SET="${PUREFTPD_MAKE_SET}" ftp_pure_ftpd_UNSET="${PUREFTPD_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -4285,7 +4257,7 @@ pureftpd_uninstall() {
 
   ${SERVICE} pureftpd stop
 
-  pkg delete -f ${PORT_PUREFTPD}
+  ${PKG} delete -f ${PORT_PUREFTPD}
 
   sysrc -x pureftpd_enable
   sysrc -x pureftpd_flags
@@ -4311,7 +4283,7 @@ proftpd_install() {
 
   ### Main Installation
   if [ "${PROFTPD_MAKE_SET}" = "" ] && [ "${PROFTPD_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_PROFTPD}
+    ${PKGI} ${PORT_PROFTPD}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" ftp_proftpd_SET="${PROFTPD_MAKE_SET}" ftp_proftpd_UNSET="${PROFTPD_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -4351,7 +4323,7 @@ proftpd_install() {
       exit 1
     fi
 
-    pkgi ${PORT_PROFTPD_CLAMAV}
+    ${PKGI} ${PORT_PROFTPD_CLAMAV}
 
     ## Verify:
     if ! grep -m1 -q "^Include ${PROFTPD_CLAMAV_CONF}" "${PROFTPD_CONF}"; then
@@ -4400,8 +4372,8 @@ proftpd_uninstall() {
 
   ${SERVICE} proftpd stop
 
-  pkg delete -f ${PORT_PROFTPD}
-  pkg delete -f ${PORT_PROFTPD_CLAMAV}
+  ${PKG} delete -f ${PORT_PROFTPD}
+  ${PKG} delete -f ${PORT_PROFTPD_CLAMAV}
 
   sysrc -x proftpd_enable
   sysrc -x proftpd_flags
@@ -4423,7 +4395,7 @@ clamav_install() {
 
   ### Main Installation
   if [ "${CLAMAV_MAKE_SET}" = "" ] && [ "${CLAMAV_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_CLAMAV}
+    ${PKGI} ${PORT_CLAMAV}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_CLAMAV}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_CLAMAV}" security_clamav_SET="${CLAMAV_MAKE_SET}" security_clamav_UNSET="${CLAMAV_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -4516,7 +4488,7 @@ roundcube_install() {
 
   ### Main Installation
   if [ "${ROUNDCUBE_MAKE_SET}" = "" ] && [ "${ROUNDCUBE_MAKE_UNSET}" = "" ] ; then
-    pkgi ${PORT_ROUNDCUBE}
+    ${PKGI} ${PORT_ROUNDCUBE}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" mail_roundcube_SET="${ROUNDCUBE_MAKE_SET}" mail_roundcube_UNSET="${ROUNDCUBE_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -4874,8 +4846,6 @@ roundcube_install() {
   fi
 
   verify_webapps_tmp
-
-  #cd ${CWD}
 }
 
 ################################################################################################
@@ -4883,11 +4853,9 @@ roundcube_install() {
 ## Webapps Installation
 webapps_install() {
 
-  ### Pre-Installation Tasks
-
   ## Create user and group:
-  /usr/sbin/pw groupadd ${WEBAPPS_GROUP}
-  /usr/sbin/pw useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
+  ${PW} groupadd ${WEBAPPS_GROUP}
+  ${PW} useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
 
   ## Set permissions on temp directory:
   if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
@@ -4905,11 +4873,6 @@ webapps_install() {
   chown -R ${APACHE_USER}:${WEBAPPS_GROUP} ${WWW_DIR}/webmail/tmp
   printf "Deny from All\n" >> ${WWW_DIR}/webmail/tmp/.htaccess
 
-  ### Main Installation
-
-
-
-  ### Post-Installation Tasks
 
   ## Increase the timeout from 10 minutes to 24
   ${PERL} -pi -e 's/idle_timeout = 10/idle_timeout = 24/' "${WWW_DIR}/webmail/inc/config.security.php"
@@ -5043,7 +5006,7 @@ configure_php_ini() {
 ## ModSecurity Installation
 modsecurity_install() {
 
-  pkgi www/mod_security
+  ${PKGI} www/mod_security
 
   ## CB2: For nginx we need to rebuild it, because ModSecurity is added as a static module
   if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
@@ -5095,7 +5058,6 @@ modsecurity_install() {
   run_dataskq
 
   printf "ModSecurity has been installed successfully.\n"
-  ## CB2: writeLog "ModSecurity ${MODSECURITY_VER} installed"
 
   ## CB2: For initial Comodo ruleset installation, we need to restart webserver
   ##      so that it detects installation of modsecurity
@@ -5218,17 +5180,17 @@ update_modsecurity_rules() {
       exit 1
     fi
 
-    cp -pf ${RUNAV_PL} /usr/local/bin/runav.pl
+    cp -pf "${RUNAV_PL}" /usr/local/bin/runav.pl
     chmod 755 /usr/local/bin/runav.pl
-    cp -pf ${RUNAV_CONF} /usr/local/etc/modsecurity.d/runav.conf
+    cp -pf "${RUNAV_CONF}" /usr/local/etc/modsecurity.d/runav.conf
     ${PERL} -pi -e 's#SecRequestBodyAccess Off#SecRequestBodyAccess On#' ${MODSECURITY_CONF_FILE}
   else
     rm -f /usr/local/bin/runav.pl
-    rm -f /etc/modsecurity.d/runav.conf
+    rm -f /usr/local/etc/modsecurity.d/runav.conf
     ${PERL} -pi -e 's#SecRequestBodyAccess On#SecRequestBodyAccess Off#' ${MODSECURITY_CONF_FILE}
   fi
 
-  if [ -d ${MODSECURITY_CUSTOM_RULES} ]; then
+  if [ -d "${MODSECURITY_CUSTOM_RULES}" ]; then
     printf "Copying custom ModSecurity rules to /usr/local/etc/modsecurity.d/\n"
     cp -Rpf ${MODSECURITY_CUSTOM_RULES}/* /usr/local/etc/modsecurity.d/
   fi
@@ -5257,11 +5219,11 @@ verify_webapps_php_ini() {
   # ${WWW_TMP_DIR} = /usr/local/www/tmp
 
   if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
-      PHP_INI_WEBAPPS=/usr/local/lib/php.conf.d/50-webapps.ini
-      mkdir -p /usr/local/lib/php.conf.d
+    PHP_INI_WEBAPPS=/usr/local/lib/php.conf.d/50-webapps.ini
+    mkdir -p /usr/local/lib/php.conf.d
   else
-      PHP_INI_WEBAPPS=/usr/local/php${OPT_PHP1_VERSION}/lib/php.conf.d/50-webapps.ini
-      mkdir -p "/usr/local/php${OPT_PHP1_VERSION}/lib/php.conf.d"
+    PHP_INI_WEBAPPS=/usr/local/php${OPT_PHP1_VERSION}/lib/php.conf.d/50-webapps.ini
+    mkdir -p "/usr/local/php${OPT_PHP1_VERSION}/lib/php.conf.d"
   fi
 
   ## Copy custom/ file (not implemented)
@@ -5276,6 +5238,8 @@ verify_webapps_php_ini() {
       echo "disable_functions=exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname"
     } > "${PHP_INI_WEBAPPS}"
   fi
+
+  return
 }
 
 ################################################################################################
@@ -5296,7 +5260,7 @@ verify_webapps_tmp() {
 
 ################################################################################################
 
-## Get Webmail Link (copied from CB2)
+## Get Webmail Link (from CB2)
 get_webmail_link() {
 
   WEBMAIL_LINK=roundcube
@@ -5313,10 +5277,10 @@ get_webmail_link() {
 
 ################################################################################################
 
-## Apache Host Configuration (copied from CB2: doApacheHostConf())
+## Apache Host Configuration (from CB2: doApacheHostConf())
 apache_host_conf() {
 
-  APACHE_HOSTNAME_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
+  local APACHE_HOSTNAME_CONF=${APACHE_EXTRA_PATH}/httpd-hostname.conf
 
   ## Copy custom/ file
   ## APACHE_HOSTNAME_CONF_CUSTOM
@@ -5418,9 +5382,10 @@ apache_host_conf() {
 
 ## Add Alias Redirect (from CB2: add_alias_redirect())
 add_alias_redirect() {
-  AF=$1
-  A=$2
-  P=$3
+
+  local AF=$1
+  local A=$2
+  local P=$3
 
   HTTP=http://
   if [ "${OPT_REDIRECT_HOST_HTTPS}" = "YES" ]; then
@@ -5471,7 +5436,7 @@ do_rewrite_httpd_alias() {
   if [ -e "${PB_PATH}/custom/ap2/conf/extra/httpd-alias.conf" ]; then
     cp -pf "${PB_PATH}/custom/ap2/conf/extra/httpd-alias.conf" "${APACHE_EXTRA_PATH}/httpd-alias.conf"
   else
-    HA="${APACHE_EXTRA_PATH}/httpd-alias.conf"
+    local HA="${APACHE_EXTRA_PATH}/httpd-alias.conf"
 
     ## Truncate file
     printf "" > ${HA}
@@ -5538,12 +5503,13 @@ do_rewrite_httpd_alias() {
 ################################################################################################
 
 ## Verify: Todo:
-## Add Nginx Alias Redirect (copied from CB2: add_nginx_alias_redirect)
+## Add Nginx Alias Redirect (from CB2: add_nginx_alias_redirect())
 add_nginx_alias_redirect() {
+
   ## CB2: A fake P real
-  FILE=$1
-  A=$2
-  P=$3
+  local FILE=$1
+  local A=$2
+  local P=$3
 
   {
     printf "\tlocation /%s {\n" "${A}"
@@ -5555,10 +5521,11 @@ add_nginx_alias_redirect() {
 ################################################################################################
 
 ## Verify: Todo:
-## Add Nginx Alias (copied from CB2: add_nginx_alias)
+## Add Nginx Alias (from CB2: add_nginx_alias())
 add_nginx_alias() {
-  F=$1
-  A=$2
+
+  local F=$1
+  local A=$2
 
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
     {
@@ -5601,14 +5568,15 @@ add_nginx_alias() {
 ################################################################################################
 
 ## Verify: Todo:
-## Rewrite Nginx Webapps (copied from CB2: do_rewrite_nginx_webapps)
+## Rewrite Nginx Webapps (from CB2: do_rewrite_nginx_webapps())
 do_rewrite_nginx_webapps() {
+
   if [ -e "${PB_PATH}/custom/nginx/conf/webapps.conf" ] && [ "${OPT_WEBSERVER}" = "nginx" ]; then
     cp -pf "${PB_PATH}/custom/nginx/conf/webapps.conf" ${NGINX_PATH}/webapps.conf
   elif [ -e "${PB_PATH}/custom/nginx_reverse/conf/webapps.conf" ] && [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     cp -pf "${PB_PATH}/custom/nginx_reverse/conf/webapps.conf" ${NGINX_PATH}/webapps.conf
   else
-    NW=${NGINX_PATH}/webapps.conf
+    local NW=${NGINX_PATH}/webapps.conf
 
     : > ${NW}
 
@@ -5703,7 +5671,7 @@ do_rewrite_nginx_webapps() {
 ## Create httpd Nginx (copied from CB2: create_httpd_nginx())
 create_httpd_nginx() {
 
-  CONF_FILE="${APACHE_EXTRA_PATH}/httpd-nginx.conf"
+  local CONF_FILE="${APACHE_EXTRA_PATH}/httpd-nginx.conf"
 
   ## PB: printf "" > "${CONF_FILE}"
 
@@ -5802,7 +5770,6 @@ rewrite_confs() {
       echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
     fi
 
-    ## Verify:
     do_rewrite_httpd_alias
 
     ## Rewrite ips.conf
@@ -5818,7 +5785,6 @@ rewrite_confs() {
     if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf")" = "0" ] || [ ! -e "${APACHE_EXTRA_PATH}/directadmin-vhosts.conf" ]; then
       ## CB2: doVhosts
       rewrite_vhosts
-      ##PB: cd "${CWD}/httpd-${APACHE2_VER}" || exit
     fi
 
     ## Verify SSL directory exist
@@ -5962,7 +5928,7 @@ rewrite_confs() {
 
     php_conf
 
-    doModLsapi 0
+    # doModLsapi 0
 
     ## Disable UserDir access if userdir_access=no is set in the options.conf file
     if [ "${OPT_USERDIR_ACCESS}" = "NO" ]; then
@@ -5971,12 +5937,11 @@ rewrite_confs() {
       ${PERL} -pi -e 's#UserDir disabled#UserDir public_html#' ${APACHE_EXTRA_PATH}/httpd-vhosts.conf
     fi
 
-    ## Verify:
     create_httpd_nginx
 
     if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
       printf "Restarting Apache\n"
-      ${SERVICE} apachectl restart
+      ${SERVICE} apache24 restart
     fi
   fi
 
@@ -5993,12 +5958,11 @@ rewrite_confs() {
     verify_server_ca
     ensure_dhparam "${NGINX_CONF}/ssl.crt/dhparams.pem"
 
-    ## Todo:
     if [ "${OPT_MODSECURITY}" = "YES" ]; then
       update_modsecurity_rules norestart
     fi
 
-    # Rewrite ips.conf
+    ## Rewrite ips.conf
     echo "action=rewrite&value=nginx" >> "${TASK_QUEUE}"
     echo "action=rewrite&value=ips" >> "${TASK_QUEUE}"
 
@@ -6046,7 +6010,7 @@ rewrite_confs() {
     tokenize_IP
     tokenize_ports
 
-    # Disable UserDir access if userdir_access=no is set in the options.conf file
+    ## Disable UserDir access if userdir_access=no is set in the options.conf file
     if [ "${OPT_USERDIR_ACCESS}" = "NO" ]; then
       ${PERL} -pi -e "s| include ${NGINX_PATH}/nginx-userdir.conf;| #include ${NGINX_PATH}/nginx-userdir.conf;|" "${NGINX_PATH}/nginx-vhosts.conf"
     else
@@ -6079,9 +6043,9 @@ rewrite_confs() {
 run_dataskq() {
   ## $1 = argument (e.g. "d" for debug)
 
-  DATASKQ_OPT=$1
+  local DATASKQ_OPT=$1
   if [ -s "${DA_CONF_FILE}" ]; then
-    /usr/local/directadmin/dataskq "${DATASKQ_OPT}" --custombuild
+    ${DA_PATH}/dataskq "${DATASKQ_OPT}" --custombuild
   fi
 }
 
@@ -6090,7 +6054,7 @@ run_dataskq() {
 ## Rewrite directadmin-vhosts.conf (copied from CB2: doVhosts())
 rewrite_vhosts() {
 
-  PATHNAME=${APACHE_EXTRA_PATH}
+  local PATHNAME=${APACHE_EXTRA_PATH}
 
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
     PATHNAME="${NGINX_PATH}"
@@ -6130,16 +6094,16 @@ verify_server_ca() {
   ## Replace with security/ca_root_nss port/package?
 
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    SSL_CA=${APACHE_SSL_CA}
-    SSL_CRT=${APACHE_SSL_CRT}
-    SSL_KEY=${APACHE_SSL_KEY}
+    SSL_CA="${APACHE_SSL_CA}"
+    SSL_CRT="${APACHE_SSL_CRT}"
+    SSL_KEY="${APACHE_SSL_KEY}"
     ## PB: mkdir -p ${APACHE_PATH}/ssl.crt
   elif [ "${OPT_WEBSERVER}" = "nginx" ]; then
-    SSL_CA=${NGINX_SSL_CA}
-    SSL_CRT=${NGINX_SSL_CRT}
+    SSL_CA="${NGINX_SSL_CA}"
+    SSL_CRT="${NGINX_SSL_CRT}"
     ## PB: mkdir -p ${NGINX_PATH}/ssl.crt
   else
-    echo "Unknown value for webserver=${OPT_WEBSERVER}"
+    printf "Unknown value for WEBSERVER=%s\n" "${OPT_WEBSERVER}"
     return
   fi
 
@@ -6148,21 +6112,21 @@ verify_server_ca() {
     ## PB: mkdir -p ${NGINX_PATH}/ssl.key
   # fi
 
-  echo "Making sure ${SSL_CA} is set."
+  printf "Making sure %s is set.\n" "${SSL_CA}"
 
   if [ ! -s ${SSL_CA} ]; then
-    echo "Downloading a generic server SSL Certificate Authority..."
-    wget ${WGET_CONNECT_OPTIONS} -O ${SSL_CA} ${WEBPATH_SERVICES}/all/ssl/server.ca
+    printf "Downloading a generic server SSL Certificate Authority...\n"
+    ${WGET} ${WGET_CONNECT_OPTIONS} -O ${SSL_CA} ${WEBPATH_SERVICES}/all/ssl/server.ca
 
     if [ ! -s ${SSL_CA} ]; then
-      echo "Trying server.ca from backup services URL..."
-      wget ${WGET_CONNECT_OPTIONS} -O ${SSL_CA} ${WEBPATH_SERVICES_BACKUP}/all/ssl/server.ca
+      printf "Trying server.ca from backup services URL...\n"
+      ${WGET} ${WGET_CONNECT_OPTIONS} -O ${SSL_CA} ${WEBPATH_SERVICES_BACKUP}/all/ssl/server.ca
 
       if [ ! -s ${SSL_CA} ]; then
-        echo "server.ca download failed."
+        printf "server.ca download failed.\n"
 
         if [ -s ${SSL_CRT} ]; then
-          echo "Copying main server.crt to server.ca just as a valid read value so Apache can start up"
+          printf "Copying main server.crt to server.ca just as a valid read value so Apache can start up\n"
           cp -f ${SSL_CRT} ${SSL_CA}
         fi
       fi
@@ -6177,9 +6141,9 @@ verify_server_ca() {
       cat ${SSL_CA} >> ${SSL_CRT}.combined
     fi
 
-    NG_CA=${NGINX_SSL_CA}
-    NG_CRT=${NGINX_SSL_CRT}
-    NG_KEY=${NGINX_SSL_KEY}
+    NG_CA="${NGINX_SSL_CA}"
+    NG_CRT="${NGINX_SSL_CRT}"
+    NG_KEY="${NGINX_SSL_KEY}"
 
     cp -f ${SSL_CA} ${NG_CA}
     cp -f ${SSL_CRT} ${NG_CRT}
@@ -6187,8 +6151,8 @@ verify_server_ca() {
   fi
 
   if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    NG_CA=${NGINX_SSL_CA}
-    NG_CRT=${NGINX_SSL_CRT}
+    NG_CA="${NGINX_SSL_CA}"
+    NG_CRT="${NGINX_SSL_CRT}"
 
     if [ -s ${NG_CRT} ] && [ -s ${NG_CA} ]; then
       cat ${NG_CRT} > ${NG_CRT}.combined
@@ -6205,17 +6169,19 @@ verify_server_ca() {
 
 ################################################################################################
 
-## Backup HTTP (Copied from CB2: backupHttp())
+## Backup HTTP (from CB2: backupHttp())
 backupHttp() {
 
-  echo "Backing up Apache's SSL certificate and key, and turning off DirectAdmin's httpd status check."
+  printf "Backing up Apache's SSL certificate and key, and turning off DirectAdmin's httpd status check.\n"
 
   if [ -e ${APACHE_SSL_CRT} ]; then
     cp -fp ${APACHE_SSL_CRT} "${APACHE_SSL_CRT}.backup"
   fi
+
   if [ -e ${APACHE_SSL_KEY} ]; then
     cp -fp ${APACHE_SSL_KEY} "${APACHE_SSL_KEY}.backup"
   fi
+
   if [ -e ${APACHE_CONF} ]; then
     cp -fp ${APACHE_CONF} "${APACHE_CONF}.backup"
   fi
@@ -6226,21 +6192,23 @@ backupHttp() {
 
 ################################################################################################
 
-## Restore HTTP (Copied from CB2: restoreHttp())
+## Restore HTTP (from CB2: restoreHttp())
 restoreHttp() {
 
-  echo "Restoring Apache's SSL certificate and key, and turning on DirectAdmin's httpd status check."
+  printf "Restoring Apache's SSL certificate and key, and turning on DirectAdmin's httpd status check.\n"
 
-  if [ -e ${APACHE_SSL_CRT}.backup ]; then
-    cp -fp ${APACHE_SSL_CRT}.backup ${APACHE_SSL_CRT}
+  if [ -e "${APACHE_SSL_CRT}.backup" ]; then
+    cp -fp "${APACHE_SSL_CRT}.backup" ${APACHE_SSL_CRT}
     chmod 600 ${APACHE_SSL_CRT}
   fi
-  if [ -e ${APACHE_SSL_KEY}.backup ]; then
-    cp -fp ${APACHE_SSL_KEY}.backup ${APACHE_SSL_KEY}
+
+  if [ -e "${APACHE_SSL_KEY}.backup" ]; then
+    cp -fp "${APACHE_SSL_KEY}.backup" ${APACHE_SSL_KEY}
     chmod 600 ${APACHE_SSL_KEY}
   fi
-  if [ -e ${APACHE_CONF}.backup ]; then
-    cp -fp ${APACHE_CONF}.backup ${APACHE_CONF}
+
+  if [ -e "${APACHE_CONF}.backup" ]; then
+    cp -fp "${APACHE_CONF}.backup" ${APACHE_CONF}
   fi
 
   verify_server_ca
@@ -6256,12 +6224,13 @@ suhosin_install() {
 
   if [ "${OPT_SUHOSIN}" != "YES" ]; then
     printf "*** Error: Suhosin is not enabled in options.conf\n"
+    return
   fi
 
   printf "Starting Suhosin installation\n"
 
   ## Main Installation
-  pkgi "${PORT_SUHOSIN}"
+  ${PKGI} "${PORT_SUHOSIN}"
 
   ## Add support for scanning uploads using ClamAV
   if [ "${OPT_SUHOSIN_UPLOADSCAN}" = "YES" ] && [ ! -e "${CLAMDSCAN_BIN}" ]; then
@@ -6278,6 +6247,7 @@ suhosin_install() {
 
 ## Tokenize the IP (from CB2: tokenizeIP())
 tokenize_IP() {
+
   TOKENFILE_APACHE=${APACHE_EXTRA_PATH}/httpd-vhosts.conf
 
   TOKENFILE_NGINX=${NGINX_PATH}/nginx.conf
@@ -6371,6 +6341,7 @@ tokenize_ports() {
       TOKENFILE_NGINX=${NGINX_PATH}/nginx-vhosts.conf
     fi
   fi
+
   TOKENFILE_NGINX_USERDIR=${NGINX_PATH}/nginx-userdir.conf
 
   ## Apache:
@@ -6475,7 +6446,7 @@ tokenize_ports() {
     fi
 
     ## Apache:
-    if [ -e ${TOKENFILE_APACHE} ]; then
+    if [ -e "${TOKENFILE_APACHE}" ]; then
       if [ "$(grep -m1 -c '|PORT_80|' ${TOKENFILE_APACHE})" -gt "0" ]; then
         STR="${PERL} -pi -e \"s/\|PORT_80\|/${PORT_8080}/\" ${TOKENFILE_APACHE}"
         eval "${STR}"
@@ -6572,14 +6543,15 @@ php_conf() {
   ## PHP1:
   if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
     ## PB: Future: ${SERVICE} "php-fpm${OPT_PHP1_VERSION}" restart
-    ${SERVICE} php-fpm restart
+    php_fpm_restart
     set_service "php-fpm${OPT_PHP1_VERSION}" ON
     eval $(echo "HAVE_FPM${OPT_PHP1_VERSION}=YES")
   fi
 
-  ## PHP2:
+  ## Todo: PHP2:
   if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
-     ${SERVICE} "php-fpm${OPT_PHP2_VERSION}" restart
+     #${SERVICE} "php-fpm${OPT_PHP2_VERSION}" restart
+     php_fpm_restart
      set_service "php-fpm${OPT_PHP2_VERSION}" ON
     eval $(echo "HAVE_FPM${OPT_PHP2_VERSION}=YES")
   fi
@@ -6661,7 +6633,7 @@ php_conf() {
       } > "${SUPHP_CONF_FILE}"
 
       ## Writing data to ${APACHE_EXTRA_PATH}/httpd-suphp.conf
-      echo "Writing data to ${SUPHP_HTTPD}"
+      printf "Writing data to %s\n" "${SUPHP_HTTPD}"
       {
         echo "<IfModule mod_suphp.c>"
         echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
@@ -6714,7 +6686,7 @@ bfm_setup() {
   setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" ${DA_CONF_TEMPLATE_FILE}
   setVal brute_force_squirrelmail_log "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" ${DA_CONF_TEMPLATE_FILE}
 
-  if [ -e ${DA_CONF_FILE} ]; then
+  if [ -e "${DA_CONF_FILE}" ]; then
     setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" ${DA_CONF_FILE}
     setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" ${DA_CONF_FILE}
     setVal brute_force_squirrelmail_log "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" ${DA_CONF_FILE}
@@ -6722,7 +6694,7 @@ bfm_setup() {
 
   ## Todo:
   if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    ${WGET} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+    ${WGET} ${WGET_CONNECT_OPTIONS} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
   fi
 
   return
@@ -6837,6 +6809,7 @@ ipfw_remove() {
 ## Test $1 variable, and warn if not set to YES or NO.
 ## Return 0 if it's "yes" (et al), nonzero otherwise.
 checkyesno() {
+
   eval _value=\$${1}
   # debug "checkyesno: $1 is set to $_value."
   case $_value in
@@ -6926,9 +6899,9 @@ validate_options() {
   esac
 
   ## Todo: PHP2:
-  OPT_PHP2_MODE=NO
-  OPT_PHP2_VERSION=NO
-  OPT_PHP2_RELEASE=NO
+  OPT_PHP2_MODE="NO"
+  OPT_PHP2_VERSION="NO"
+  OPT_PHP2_RELEASE="NO"
   # case ${PHP2_VERSION} in
   #   55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION} ;;
   #   *) echo "*** Error: Invalid PHP2_VERSION value set in options.conf"; exit ;;
@@ -6963,12 +6936,12 @@ validate_options() {
   esac
 
   case $(uc ${USERDIR_ACCESS}) in
-    "YES"|"NO") OPT_USERDIR_ACCESS=${USERDIR_ACCESS} ;;
+    "YES"|"NO") OPT_USERDIR_ACCESS="${USERDIR_ACCESS}" ;;
     *) printf "*** Error: Invalid USERDIR_ACCESS value set in options.conf\n"; exit ;;
   esac
 
   case $(uc ${REDIRECT_HOST_HTTPS}) in
-    "YES"|"NO"|"AUTO") OPT_REDIRECT_HOST_HTTPS=${REDIRECT_HOST_HTTPS} ;;
+    "YES"|"NO"|"AUTO") OPT_REDIRECT_HOST_HTTPS="${REDIRECT_HOST_HTTPS}" ;;
     *) printf "*** Error: Invalid REDIRECT_HOST_HTTPS value set in options.conf\n"; exit ;;
   esac
 
@@ -7211,31 +7184,31 @@ install_app() {
     "bind"|"named"|"dns") bind_setup ;;
     "blockcracking"|"bc") blockcracking_install ;;
     "directadmin"|"da") directadmin_install ;;
-    "dkim") pkgi ${PORT_LIBDKIM} ;;
+    "dkim") ${PKGI} ${PORT_LIBDKIM} ;;
     "easy_spam_fighter"|"easyspamfighter"|"esf") easyspamfighter_install ;;
     "exim") exim_install ;;
-    "ioncube"|"ic") pkgi "${PORT_IONCUBE}" ;;
+    "ioncube"|"ic") ${PKGI} "${PORT_IONCUBE}" ;;
     "ipfw") ipfw_enable ;;
-    "libspf2"|"libspf"|"spf") pkgi ${PORT_LIBSPF2} ;;
+    "libspf2"|"libspf"|"spf") ${PKGI} ${PORT_LIBSPF2} ;;
     "mariadb55")
-      pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
+      ${PKGI} ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
       sql_post_install ;;
     "mariadb100")
-      pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
+      ${PKGI} ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
       sql_post_install ;;
     "mariadb101")
-      pkgi ${PORT_MARIADB101} ${PORT_MARIADB101_CLIENT}
+      ${PKGI} ${PORT_MARIADB101} ${PORT_MARIADB101_CLIENT}
       sql_post_install ;;
     "mysql55")
-      pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
+      ${PKGI} ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
       sql_post_install ;;
     "mysql56")
-      pkgi ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
+      ${PKGI} ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
       sql_post_install ;;
     "mysql57")
-      pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
+      ${PKGI} ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
       sql_post_install ;;
-    "mariadb") echo "oops" ;;
+    "mariadb") echo "oops" ;; ## Todo:
     "modsecurity"|"modsec"|"mod_security") modsecurity_install ;;
     "nginx") nginx_install ;;
     "php"|"ftm"|"php55"|"php56"|"php70") php_install ;;
@@ -7298,18 +7271,6 @@ update() {
 }
 
 ################################################################################################
-
-## Todo: Upgrade
-upgrade() {
-
-  case $2 in
-    "") show_menu_upgrade ;;
-  esac
-
-  return
-}
-
-################################################################
 
 ## Upgrade an application or service
 upgrade_app() {

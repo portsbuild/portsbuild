@@ -10,22 +10,22 @@ OS_MAJ=$(uname -r | cut -d. -f1) # 9, 10
 
 if [ "${OS_MAJ}" -eq 10 ]; then
   NAMED_DIR=/usr/local/etc/namedb
-elif [ "$OS_MAJ" -eq 9 ]; then
+elif [ "${OS_MAJ}" -eq 9 ]; then
   NAMED_DIR=/etc/namedb
 else
   NAMED_DIR=/etc/namedb
 fi
 
 DA_USERS_DIR=/usr/local/directadmin/data/users
-NS1=`grep ns1= /usr/local/directadmin/conf/directadmin.conf | cut -d= -f2`
-NS2=`grep ns2= /usr/local/directadmin/conf/directadmin.conf | cut -d= -f2`
+NS1=$(grep ns1= /usr/local/directadmin/conf/directadmin.conf | cut -d= -f2)
+NS2=$(grep ns2= /usr/local/directadmin/conf/directadmin.conf | cut -d= -f2)
 
 for DA_USER in `ls ${DA_USERS_DIR}`; do
 {
-  for DOMAIN in `cat ${DA_USERS_DIR}/${DA_USER}/domains.list; cat ${DA_USERS_DIR}/${DA_USER}/domains/*.pointers 2>/dev/null | cut -d= -f1;`; do
+  for DOMAIN in $(cat "${DA_USERS_DIR}/${DA_USER}/domains.list"; cat ${DA_USERS_DIR}/${DA_USER}/domains/*.pointers 2>/dev/null | cut -d= -f1;); do
   {
-    echo $DOMAIN
-    rm ${NAMED_DIR}/${DOMAIN}.db
+    echo "${DOMAIN}"
+    rm "${NAMED_DIR}/${DOMAIN}.db"
 
     if [ ! -r "${NAMED_DIR}/${DOMAIN}.db" ]; then
       IP=`cat ${DA_USERS_DIR}/${DA_USER}/domains/${DOMAIN}.conf | grep ip= | cut -d= -f2`
@@ -61,13 +61,13 @@ for DA_USER in `ls ${DA_USERS_DIR}`; do
       {
         echo "${SUB}              14400   IN              A       ${IP}"                             >> ${NAMED_DIR}/${DOMAIN}.db
       }
-      done;
+      done
 
       chown bind:bind ${NAMED_DIR}/${DOMAIN}.db
 
       echo "  - database created."
     fi
   }
-  done;
+  done
 }
-done;
+done

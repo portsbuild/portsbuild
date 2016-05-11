@@ -14,23 +14,23 @@ cd /usr/local/directadmin/data/users || exit
 
 for u in `ls`; do {
   if [ ! -d "$u" ]; then
-    continue;
+    continue
   fi
 
   SHADOW=/home/$u/.shadow
   if [ ! -e "$SHADOW" ]; then
-    continue;
+    continue
   fi
 
-  #make sure it doesn't already exist
+  ## Make sure it doesn't already exist
   COUNT=$(grep -c -e "^${u}:" $PF)
   if [ "$COUNT" -ne 0 ]; then
-    continue;
+    continue
   fi
 
   UUID=$(id -u $u)
   UGID=$(id -g $u)
 
-  echo "${u}:`cat /home/$u/.shadow`:${UUID}:${UGID}:system:/home/${u}:/bin/false";
-};
-done;
+  echo "${u}:`cat /home/$u/.shadow`:${UUID}:${UGID}:system:/home/${u}:/bin/false"
+}
+done
