@@ -168,7 +168,7 @@ DA_LICENSE_FILE=${DA_PATH}/conf/license.key
 
 DA_ADMIN_EMAIL=${DA_ADMIN_USER}@${SERVER_DOMAIN}
 DA_SETUP_TXT=${DA_SCRIPTS_PATH}/setup.txt
-DA_FREEBSD_SERVICES="services_freebsd90_64.tar.gz"
+DA_FREEBSD_SERVICES="services_freebsd91_64.tar.gz"
 
 DA_SERVICES=${DA_PATH}/data/admin/services.status
 DA_TASK_QUEUE=${DA_PATH}/data/task.queue.cb
@@ -1155,7 +1155,7 @@ global_setup() {
       ${PKGI} ${PORT_CCACHE}
 
       if [ $? = 0 ]; then
-        ## sysrc -f /etc/make.conf WITH_CCACHE_BUILD=yes
+        sysrc -f /etc/make.conf WITH_CCACHE_BUILD=yes ## Still needed?
         sysrc -f /etc/make.conf CCACHE_DIR="/var/db/ccache"
       fi
     fi
@@ -1200,12 +1200,11 @@ global_setup() {
     ## Disable sendmail if Exim is enabled
     if [ "${OPT_EXIM}" = "YES" ] || [ "${OPT_DISABLE_SENDMAIL}" = "YES" ] ; then
       printf "Disabling sendmail from running (updating /etc/rc.conf)\n"
+      ${SERVICE} sendmail stop
       sysrc sendmail_enable="NONE"
       sysrc sendmail_submit_enable="NO"
       sysrc sendmail_outbound_enable="NO"
       sysrc sendmail_msp_queue_enable="NO"
-
-      ${SERVICE} sendmail onestop
     fi
 
     ## Ethernet Device checking here
@@ -1276,13 +1275,18 @@ global_setup() {
     ## DirectAdmin Install
     ## This is where directadmin.conf gets created for the first time (copy of the template)
     printf "Running ./directadmin i\n"
-    cd ${DA_PATH} || exit
-    ./directadmin i
+    ${DA_PATH}/directadmin i
 
     ## Set DirectAdmin Permissions
     printf "Running ./directadmin p\n"
-    cd ${DA_PATH} || exit
-    ./directadmin p
+    ${DA_PATH}/directadmin p
+
+    ## On first time startup, DirectAdmin creates /etc/proftpd.conf and backs up the original to /etc/proftpd.conf.back
+    ## "Install of /usr/local/directadmin/data/templates/proftpd.conf to /etc/proftpd.conf successfull"
+    ## PB: Verify:
+    rm /etc/proftpd.conf
+    rm /etc/proftpd.conf.back
+    ln -s /usr/local/etc/proftpd.conf /etc/proftpd.conf
 
     ## From DA's scripts/install.sh
     ADMIN_GROUP_COUNT=$(grep -c -e '^admin:' /etc/group)
@@ -1298,6 +1302,8 @@ global_setup() {
     ${SERVICE} directadmin start
 
     install_cron
+
+    deny_cron
 
     bfm_setup
 
@@ -1443,6 +1449,75 @@ update_rc() {
 
 ################################################################################################
 
+## PB: Verify: Control Service
+control_service() {
+
+  SERVICE_NAME="${1}"
+  SERVICE_ACTION="${2}" ## start, restart, stop, reload
+
+  if [ "${SERVICE_NAME}" = "" ] || [ "${SERVICE_ACTION}" = "" ]; then
+    printf "*** Error: Missing arguments for control_service().\n"
+    return
+  fi
+
+  if [ ! -e "${INITD_DIR}/${SERVICE_NAME}" ] || [ ! -e "/etc/rc.d/${SERVICE_NAME}" ]; then
+    printf "*** Error: Service %s not found." "${SERVICE_NAME}"
+    return
+  fi
+
+  SERVICE_STATUS=$(${SERVICE} "${SERVICE_NAME}" status)
+
+  if [ "${SERVICE_NAME}" = "directadmin" ]; then
+    if [ "${SERVICE_ACTION}" = "restart" ]; then
+      echo "action=directadmin&value=reload" >> "${DA_TASK_QUEUE}"
+      run_dataskq
+    else
+      ## Handover to rc.d/directadmin
+      ${SERVICE} directadmin "${SERVICE_ACTION}"
+    fi
+    return
+  fi
+
+  ## Test certain service config files before restarting to prevent downtime
+  case ${SERVICE_NAME} in
+    "php-fpm"|"fpm"|"php") CONFIG_STATUS=$(${SERVICE} php-fpm configtest) ;;
+    "apache"|"apache24"|"httpd") CONFIG_STATUS=$(${SERVICE} apache24 configtest) ;;
+    "nginx") CONFIG_STATUS=$(${SERVICE} nginx configtest) ;;
+    "exim") CONFIG_STATUS=$(${EXIM_BIN} -C "${EXIM_CONF}" -bV) ;;
+    "dovecot") CONFIG_STATUS=$(${DOVECOT_BIN} -c ${DOVECOT_CONF}) ;;
+  esac
+
+  ## Perform the necessary action
+  case ${SERVICE_ACTION} in
+    "start"|"restart")
+      if [ "${CONFIG_STATUS}" = 0 ]; then
+        if [ "${SERVICE_STATUS}" = 0 ]; then
+          printf "Restarting %s\n" "${SERVICE_NAME}"
+          ${SERVICE} "${SERVICE_NAME}" restart
+        else
+          printf "Starting %s\n" "${SERVICE_NAME}"
+          ${SERVICE} "${SERVICE_NAME}" start
+        fi
+      else
+        printf "*** Error: Cannot %s %s due to configuration file error.\n" "${SERVICE_ACTION}" "${SERVICE_NAME}"
+      fi
+    ;;
+    "reload")
+      if [ "${CONFIG_STATUS}" = 0 ]; then
+        printf "Reloading %s\n" "${SERVICE_NAME}"
+        ${SERVICE} "${SERVICE_NAME}" reload
+      fi
+    ;;
+    "stop") ${SERVICE} "${SERVICE_NAME}" stop ;;
+    "status") printf "%s\n" "${SERVICE_STATUS}" ;;
+    *) printf "Action %s not found\n" "${SERVICE_ACTION}" ;;
+  esac
+
+  return
+}
+
+################################################################################################
+
 ## Setup BIND (named)
 bind_setup() {
 
@@ -1454,24 +1529,24 @@ bind_setup() {
   printf "Setting up named (BIND)\n"
 
   if [ "${OS_MAJ}" -eq 10 ]; then
-    ## FreeBSD 10.2: /usr/local/etc/namedb/
+    ## FreeBSD 10.x: /usr/local/etc/namedb/
     NAMED_BIN=/usr/local/sbin/named
     NAMEDB_PATH=/usr/local/etc/namedb
     RNDC_BIN=/usr/local/sbin/rndc-confgen
-    NAMEDB_CONF=/usr/local/etc/namedb/named.conf
-    RNDC_KEY=/usr/local/etc/namedb/rndc.key
+    NAMED_CONF=${NAMEDB_PATH}/named.conf
+    RNDC_KEY=${NAMEDB_PATH}/rndc.key
 
     if [ "${COMPAT_NAMED_SYMLINKS}" = "YES" ]; then
       ## PB: Needed as of 2016-05-10:
       ln -s /usr/local/sbin/named-checkzone /usr/sbin/named-checkzone
     fi
-  elif [ "$OS_MAJ" -eq 9 ]; then
+  elif [ "${OS_MAJ}" -eq 9 ]; then
     ## FreeBSD 9.3: /etc/namedb/
     NAMED_BIN=/usr/sbin/named
     NAMEDB_PATH=/etc/namedb
     RNDC_BIN=/sbin/rndc-confgen
-    NAMEDB_CONF=/etc/namedb/named.conf
-    RNDC_KEY=/etc/namedb/rndc.key
+    NAMED_CONF=${NAMEDB_PATH}/named.conf
+    RNDC_KEY=${NAMEDB_PATH}/rndc.key
   fi
 
   if [ ! -e "${NAMED_BIN}" ]; then
@@ -1484,13 +1559,13 @@ bind_setup() {
     mkdir -p ${NAMEDB_PATH}
   fi
 
-  if [ ! -e "${NAMEDB_CONF}" ]; then
-    printf "*** Warning: Cannot find %s.\n" ${NAMEDB_CONF}
+  if [ ! -e "${NAMED_CONF}" ]; then
+    printf "*** Warning: Cannot find %s.\n" ${NAMED_CONF}
 
     if [ -e "${PB_PATH}/configure/named/named.${OS_MAJ}.conf" ]; then
-      cp "${PB_PATH}/configure/named/named.${OS_MAJ}.conf" ${NAMEDB_CONF}
+      cp "${PB_PATH}/configure/named/named.${OS_MAJ}.conf" ${NAMED_CONF}
     else
-      ${WGET} -O ${NAMEDB_CONF} "${PB_MIRROR}/configure/named/named.${OS_MAJ}.conf"
+      ${WGET} -O ${NAMED_CONF} "${PB_MIRROR}/configure/named/named.${OS_MAJ}.conf"
     fi
   fi
 
@@ -1499,14 +1574,27 @@ bind_setup() {
     ${RNDC_BIN} -a -s "${DA_SERVER_IP}"
   fi
 
-  setVal namedconfig "${NAMEDB_CONF}" "${DA_CONF_TEMPLATE}"
+  setVal namedconfig "${NAMED_CONF}" "${DA_CONF_TEMPLATE}"
   setVal nameddir "${NAMEDB_PATH}" "${DA_CONF_TEMPLATE}"
+
+  if [ -e "${DA_CONF}" ]; then
+    setVal namedconfig "${NAMED_CONF}" "${DA_CONF}"
+    setVal nameddir "${NAMEDB_PATH}" "${DA_CONF}"
+  fi
 
   printf "Updating /etc/rc.conf with named_enable=YES\n"
   sysrc named_enable="YES"
 
-  printf "Starting named\n"
-  ${SERVICE} named start
+  ## PB: Todo: Replace with control_service()
+  NAMED_STATUS=$(${SERVICE} named status)
+
+  if [ "${NAMED_STATUS}" = 0 ]; then
+    printf "Restarting named\n"
+    ${SERVICE} named restart
+  else
+    printf "Starting named\n"
+    ${SERVICE} named start
+  fi
 
   return
 }
@@ -1615,10 +1703,21 @@ directadmin_install() {
 
   ## The following lines were in DA's install/setup do_checks():
   ## Check for a separate /home partition (for quota support)
-  HOME_YES=$(grep -c /home /etc/fstab)
-  if [ "$HOME_YES" -lt "1" ]; then
+  HOME_FOUND=$(grep -c /home /etc/fstab)
+  if [ "$HOME_FOUND" -lt "1" ]; then
     printf "Setting quota_partition=/ in DirectAdmin's Configuration Template File\n"
     setVal quota_partition "/" "${DA_CONF_TEMPLATE}"
+  fi
+
+  ## 2016-05-13: From scripts/fstab.sh (/proc is needed)
+  ## PB: Verify: Add quota support to fstab
+  ${PERL} -pi -e 's/[\ \t]+\/home[\ \t]+ufs[\ \t]+rw[\ \t]+/\t\t\/home\t\t\tufs\trw,userquota,groupquota\t/' /etc/fstab
+  ${PERL} -pi -e 's/[\ \t]+\/[\ \t]+ufs[\ \t]+rw[\ \t]+/\t\t\t\/\t\t\tufs\trw,userquota,groupquota\t/' /etc/fstab
+
+  PROCFS_NUM=$(grep -c procfs /etc/fstab)
+  if [ "$PROCFS_NUM" -eq 0 ]; then
+    printf "proc\t\t/proc\t\tprocfs\trw\t0\t0\n" >> /etc/fstab
+    /sbin/mount procfs /proc
   fi
 
   ## Detect the ethernet interfaces that are available on the system, or use the one supplied by the user from first time setup
@@ -1885,6 +1984,31 @@ install_cron() {
       printf "*** Error: Could not find %s or the file is empty.\n" "${DA_CRON_FILE}"
     fi
   fi
+}
+
+################################################################################################
+
+## Deny Specific Users from Cron (from install.sh)
+deny_cron() {
+
+  DENY=/var/cron/deny
+
+  deny() {
+    if [ -e "${DENY}" ]; then
+      DENY_COUNT=$(grep -c -e "^$1\$" "${DENY}")
+      if [ "${DENY_COUNT}" -ne 0 ]; then
+        return
+      fi
+    fi
+
+    echo "${1}" >> "${DENY}"
+    chmod 600 "${DENY}"
+  }
+
+  deny "${APACHE_USER}"
+  deny "${WEBAPPS_USER}"
+
+  return
 }
 
 ################################################################################################
@@ -2214,7 +2338,7 @@ spamassassin_upgrade() {
 spamassassin_uninstall() {
 
   printf "Stopping SpamAssassin\n"
-  ${SERVICE} sa-spamd onestop
+  ${SERVICE} sa-spamd stop
 
   printf "Disabling SpamAssassin startup\n"
   sysrc -x spamd_enable
@@ -6013,7 +6137,6 @@ rewrite_confs() {
 
     printf "Restarting nginx.\n"
     # /usr/sbin/nginx -s stop >/dev/null 2>&1
-    # control_service nginx start
     ${SERVICE} nginx restart
   fi
 
