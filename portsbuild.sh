@@ -1147,8 +1147,8 @@ global_setup() {
       ${PKGI} ${PORT_CCACHE}
 
       if [ $? = 0 ]; then
-        sysrc -f /etc/make.conf WITH_CCACHE_BUILD=yes ## Still needed?
-        sysrc -f /etc/make.conf CCACHE_DIR="/var/db/ccache"
+        ${SYSRC} -f /etc/make.conf WITH_CCACHE_BUILD=yes ## Still needed?
+        ${SYSRC} -f /etc/make.conf CCACHE_DIR="/var/db/ccache"
       fi
     fi
 
@@ -1439,6 +1439,13 @@ update_rc() {
     sysrc -x clamav_clamd_enable
     sysrc -x clamav_freshclam_enable
   fi
+
+  # rc_debug="NO"          # Set to YES to enable debugging output from rc.d
+  # rc_info="NO"            # Enables display of informational messages at boot.
+  # rc_startmsgs="YES"      # Show "Starting foo:" messages at boot
+  # fsck_y_enable="NO"      # Set to YES to do fsck -y if the initial preen fails.
+  # background_fsck="YES"   # Attempt to run fsck in the background where possible.
+  # background_fsck_delay="60" # Time to wait (seconds) before starting the fsck.
 
   return
 }
@@ -6995,26 +7002,26 @@ ipfw_enable() {
   ## From: http://help.directadmin.com/item.php?id=380
   ##  and: http://forum.directadmin.com/showthread.php?t=42202
 
-  ## Updated /etc/sysctl.conf
-  sysrc firewall_enable="YES"
-  sysrc firewall_type="simple"
-  sysrc firewall_script="/etc/ipfw.rules"
-  sysrc firewall_logging="YES"
+  ## Update /etc/rc.conf:
+  ${SYSRC} firewall_enable="YES"
+  ${SYSRC} firewall_type="simple"
+  ${SYSRC} firewall_script="/etc/ipfw.rules"
+  ${SYSRC} firewall_logging="YES"
 
-  ## IPFW enhancements:
-  sysrc -f /etc/sysctl.conf net.inet.ip.fw.verbose=1
-  sysrc -f /etc/sysctl.conf net.inet.ip.fw.verbose_limit=5
-  sysrc -f /etc/sysctl.conf net.inet.ip.fw.dyn_max=65536
-  sysrc -f /etc/sysctl.conf net.inet.ip.fw.dyn_keepalive=1
+  ## Update /etc/sysctl.conf with IPFW enhancements:
+  ${SYSRC} -f /etc/sysctl.conf net.inet.ip.fw.verbose=1
+  ${SYSRC} -f /etc/sysctl.conf net.inet.ip.fw.verbose_limit=5
+  ${SYSRC} -f /etc/sysctl.conf net.inet.ip.fw.dyn_max=65536
+  ${SYSRC} -f /etc/sysctl.conf net.inet.ip.fw.dyn_keepalive=1
 
   ## Recycle finwait2 connections faster:
-  sysrc -f /etc/sysctl.conf net.inet.tcp.fast_finwait2_recycle=1
+  ${SYSRC} -f /etc/sysctl.conf net.inet.tcp.fast_finwait2_recycle=1
 
   ## Faster finwait2 timeouts:
-  sysrc -f /etc/sysctl.conf net.inet.tcp.finwait2_timeout=15000
+  ${SYSRC} -f /etc/sysctl.conf net.inet.tcp.finwait2_timeout=15000
 
   ## Verify:
-  sysrc -f /etc/ipfw.rules pif="${ETH_DEV}"
+  ${SYSRC} -f /etc/ipfw.rules pif="${ETH_DEV}"
 
   touch /root/blocked_ips.txt
   touch /root/exempt_ips.txt
@@ -7037,8 +7044,8 @@ ipfw_enable() {
 ## Disable IPFW
 ipfw_disable() {
 
-  sysrc firewall_enable="NO"
-  sysrc firewall_logging="NO"
+  ${SYSRC} firewall_enable="NO"
+  ${SYSRC} firewall_logging="NO"
 
   return
 }
@@ -7049,18 +7056,18 @@ ipfw_disable() {
 ipfw_remove() {
 
   ## /etc/rc.conf
-  sysrc -x firewall_enable
-  sysrc -x firewall_type
-  sysrc -x firewall_script
-  sysrc -x firewall_logging
+  ${SYSRC} -x firewall_enable
+  ${SYSRC} -x firewall_type
+  ${SYSRC} -x firewall_script
+  ${SYSRC} -x firewall_logging
 
   ## /etc/sysctl.conf
-  sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.verbose
-  sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.verbose_limit
-  sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.dyn_max
-  sysrc -f /etc/sysctl.conf -x net.inet.ip.fw.dyn_keepalive
-  sysrc -f /etc/sysctl.conf -x net.inet.tcp.fast_finwait2_recycle
-  sysrc -f /etc/sysctl.conf -x net.inet.tcp.finwait2_timeout
+  ${SYSRC} -f /etc/sysctl.conf -x net.inet.ip.fw.verbose
+  ${SYSRC} -f /etc/sysctl.conf -x net.inet.ip.fw.verbose_limit
+  ${SYSRC} -f /etc/sysctl.conf -x net.inet.ip.fw.dyn_max
+  ${SYSRC} -f /etc/sysctl.conf -x net.inet.ip.fw.dyn_keepalive
+  ${SYSRC} -f /etc/sysctl.conf -x net.inet.tcp.fast_finwait2_recycle
+  ${SYSRC} -f /etc/sysctl.conf -x net.inet.tcp.finwait2_timeout
 
   ## da/scripts/custom:
   rm -f "${DA_PATH}/scripts/custom/block_ip.sh"
@@ -7072,7 +7079,7 @@ ipfw_remove() {
 }
 
 ################################################################################################
-## err exitval message (from /etc/rc.subr)
+## Error exitval message (from /etc/rc.subr)
 ## Display message to stderr and log to the syslog, and exit with exitval.
 err() {
   exitval=$1
@@ -7088,33 +7095,33 @@ err() {
 ################################################################################################
 ## info message (from /etc/rc.subr)
 ## Display informational message to stdout and log to syslog.
-# info() {
-#   case "${rc_info}" in
-#   [Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|[Oo][Nn]|1)
-#     if [ -x /usr/bin/logger ]; then
-#       logger "$0: INFO: $*"
-#     fi
-#     echo "$0: INFO: $*"
-#     ;;
-#   esac
-# }
+info() {
+  case "${rc_info}" in
+  [Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|[Oo][Nn]|1)
+    if [ -x /usr/bin/logger ]; then
+      logger "$0: INFO: $*"
+    fi
+    echo "$0: INFO: $*"
+    ;;
+  esac
+}
 ################################################################################################
-## debug message (from /etc/rc.subr)
-## If debugging is enabled in rc.conf output message to stderr.
+## Debug message (from /etc/rc.subr)
+## If debugging is enabled output message to stderr.
 ## BEWARE that you don't call any subroutine that itself calls this function.
-# debug() {
-#   case ${rc_debug} in
-#   [Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|[Oo][Nn]|1)
-#     if [ -x /usr/bin/logger ]; then
-#       logger "$0: DEBUG: $*"
-#     fi
-#     echo 1>&2 "$0: DEBUG: $*"
-#     ;;
-#   esac
-# }
+debug() {
+  case ${rc_debug} in
+    [Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|[Oo][Nn]|1)
+      if [ -x /usr/bin/logger ]; then
+        logger "$0: DEBUG: $*"
+      fi
+      echo 1>&2 "$0: DEBUG: $*"
+    ;;
+  esac
+}
 
 ################################################################################################
-## warn message (from /etc/rc.subr)
+## Warning message (from /etc/rc.subr)
 ## Display message to stderr and log to the syslog.
 warn() {
   if [ -x /usr/bin/logger ]; then
@@ -7132,16 +7139,9 @@ checkyesno_opt() {
   eval _value=\$${1}
   # debug "checkyesno: $1 is set to $_value."
   case $_value in
-    # "yes", "true", "on", or "1"
-  [Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|[Oo][Nn]|1)
-    return 0
-    ;;
-    # "no", "false", "off", or "0"
-  [Nn][Oo]|[Ff][Aa][Ll][Ss][Ee]|[Oo][Ff][Ff]|0)
-    return 0
-    ;;
-  *)
-    err 1 "${1} is not set properly in options.conf (value must be YES or NO)."
+    [Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|[Oo][Nn]|1) return 0 ;; # "yes", "true", "on", or "1"
+    [Nn][Oo]|[Ff][Aa][Ll][Ss][Ee]|[Oo][Ff][Ff]|0) return 0 ;; # "no", "false", "off", or "0"
+    *) err 1 "${1} is not set properly in options.conf (value must be YES or NO)."
     return 1
     ;;
   esac
