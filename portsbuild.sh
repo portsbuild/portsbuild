@@ -7090,6 +7090,29 @@ warn() {
 ## checkyesno var (from /etc/rc.subr)
 ## Test $1 variable, and warn if not set to YES or NO.
 ## Return 0 if it's "yes" (et al), nonzero otherwise.
+## NOTE: Modified to return 0 for yes or no, 1 for incorrect values
+checkyesno_opt() {
+  eval _value=\$${1}
+  # debug "checkyesno: $1 is set to $_value."
+  case $_value in
+    # "yes", "true", "on", or "1"
+  [Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|[Oo][Nn]|1)
+    return 0
+    ;;
+    # "no", "false", "off", or "0"
+  [Nn][Oo]|[Ff][Aa][Ll][Ss][Ee]|[Oo][Ff][Ff]|0)
+    return 0
+    ;;
+  *)
+    err 1 "${1} is not set properly in options.conf (value must be YES or NO)."
+    return 1
+    ;;
+  esac
+}
+################################################################################################
+## checkyesno var (from /etc/rc.subr)
+## Test $1 variable, and warn if not set to YES or NO.
+## Return 0 if it's "yes" (et al), nonzero otherwise.
 checkyesno() {
   eval _value=\$${1}
   # debug "checkyesno: $1 is set to $_value."
@@ -7103,7 +7126,7 @@ checkyesno() {
     return 1
     ;;
   *)
-    warn "\$${1} is not set properly in options.conf."
+    warn "${1} is not set properly in options.conf (value must be YES or NO)."
     return 1
     ;;
   esac
@@ -7152,6 +7175,37 @@ validate_options() {
   PORT_8080=$(getDA_Opt port_8080 8080)
   PORT_8081=$(getDA_Opt port_8081 8081)
 
+  if checkyesno_opt AWSTATS; then OPT_AWSTATS="$(uc ${AWSTATS})"; fi
+  if checkyesno_opt BLOCKCRACKING; then OPT_BLOCKCRACKING="$(uc ${BLOCKCRACKING})"; fi
+  if checkyesno_opt CLAMAV; then OPT_CLAMAV="$(uc ${CLAMAV})"; fi
+  if checkyesno_opt CLAMAV_WITH_EXIM; then OPT_CLAMAV_WITH_EXIM="$(uc ${CLAMAV_WITH_EXIM})"; fi
+  if checkyesno_opt DOVECOT; then OPT_DOVECOT="$(uc ${DOVECOT})"; fi
+  if checkyesno_opt EASY_SPAM_FIGHTER; then OPT_EASY_SPAM_FIGHTER="$(uc ${EASY_SPAM_FIGHTER})"; fi
+  if checkyesno_opt EXIM; then OPT_EXIM="$(uc ${EXIM})"; fi
+  if checkyesno_opt HTSCANNER; then OPT_HTSCANNER="$(uc ${HTSCANNER})"; fi
+  if checkyesno_opt INSTALL_CCACHE; then OPT_INSTALL_CCACHE="$(uc ${INSTALL_CCACHE})"; fi
+  if checkyesno_opt INSTALL_SYNTH; then OPT_INSTALL_SYNTH="$(uc ${INSTALL_SYNTH})"; fi
+  if checkyesno_opt MAJORDOMO; then OPT_MAJORDOMO="$(uc ${MAJORDOMO})"; fi
+  if checkyesno_opt MODSECURITY; then OPT_MODSECURITY="$(uc ${MODSECURITY})"; fi
+  if checkyesno_opt NAMED; then OPT_NAMED="$(uc ${NAMED})"; fi
+  if checkyesno_opt PB_SYMLINK; then OPT_PB_SYMLINK="$(uc ${PB_SYMLINK})"; fi
+  if checkyesno_opt PHP_INI_XMAILHEADER; then OPT_PHP_INI_XMAILHEADER="$(uc ${PHP_INI_XMAILHEADER})"; fi
+  if checkyesno_opt PHPMYADMIN; then OPT_PHPMYADMIN="$(uc ${PHPMYADMIN})"; fi
+  if checkyesno_opt PIGEONHOLE; then OPT_PIGEONHOLE="$(uc ${PIGEONHOLE})"; fi
+  if checkyesno_opt PROFTPD_UPLOADSCAN; then OPT_PROFTPD_UPLOADSCAN="$(uc ${PROFTPD_UPLOADSCAN})"; fi
+  if checkyesno_opt PUREFTPD_UPLOADSCAN; then OPT_PUREFTPD_UPLOADSCAN="$(uc ${PUREFTPD_UPLOADSCAN})"; fi
+  if checkyesno_opt REDIRECT_HOST_HTTPS; then OPT_REDIRECT_HOST_HTTPS="$(uc ${REDIRECT_HOST_HTTPS})"; fi
+  if checkyesno_opt ROUNDCUBE; then OPT_ROUNDCUBE="$(uc ${ROUNDCUBE})"; fi
+  if checkyesno_opt SPAM_INBOX_PREFIX; then OPT_SPAM_INBOX_PREFIX="$(uc ${SPAM_INBOX_PREFIX})"; fi
+  if checkyesno_opt SPAMASSASSIN; then OPT_SPAMASSASSIN="$(uc ${SPAMASSASSIN})"; fi
+  if checkyesno_opt SPAMASSASSIN_UTILITIES; then OPT_SPAMASSASSIN_UTILITIES="$(uc ${SPAMASSASSIN_UTILITIES})"; fi
+  if checkyesno_opt SUHOSIN; then OPT_SUHOSIN="$(uc ${SUHOSIN})"; fi
+  if checkyesno_opt SUHOSIN_UPLOADSCAN; then OPT_SUHOSIN_UPLOADSCAN="$(uc ${SUHOSIN_UPLOADSCAN})"; fi
+  if checkyesno_opt USE_HOSTNAME_FOR_ALIAS; then OPT_USE_HOSTNAME_FOR_ALIAS="$(uc ${USE_HOSTNAME_FOR_ALIAS})"; fi
+  if checkyesno_opt USERDIR_ACCESS; then OPT_USERDIR_ACCESS="$(uc ${USERDIR_ACCESS})"; fi
+  if checkyesno_opt WEBALIZER; then OPT_WEBALIZER="$(uc ${WEBALIZER})"; fi
+  if checkyesno_opt WEBAPPS_INBOX_PREFIX; then OPT_WEBAPPS_INBOX_PREFIX="$(uc ${WEBAPPS_INBOX_PREFIX})"; fi
+
   ## Port/Package Options
   case ${PHP1_VERSION} in
     "55"|"56"|"70") OPT_PHP1_VERSION=${PHP1_VERSION}
@@ -7179,7 +7233,7 @@ validate_options() {
         *) printf "*** Error: Invalid PHP1_MODE value set in options.conf\n"; exit;;
       esac
       case $(lc ${PHP_INI_TYPE}) in
-        "production"|"development") OPT_PHP_INI_TYPE=${PHP_INI_TYPE} ;;
+        "production"|"development") OPT_PHP_INI_TYPE="${PHP_INI_TYPE}" ;;
         "custom") OPT_PHP_INI_TYPE="custom" ;;
         "no"|"none") OPT_PHP_INI_TYPE="none" ;;
         *) printf "*** Error: Invalid PHP ini Type set in options.conf\n"; exit ;;
@@ -7217,38 +7271,6 @@ validate_options() {
   ## OPT_PHP_ENABLE="YES"
   ## DUAL_PHP_MODE="YES"
 
-  ## Todo: apply UC/LC:
-  if checkyesno PHP_INI_XMAILHEADER; then OPT_PHP_INI_XMAILHEADER="${PHP_INI_XMAILHEADER}"; fi
-  if checkyesno USERDIR_ACCESS; then OPT_USERDIR_ACCESS="${USERDIR_ACCESS}"; fi
-  if checkyesno REDIRECT_HOST_HTTPS; then OPT_REDIRECT_HOST_HTTPS="${REDIRECT_HOST_HTTPS}"; fi
-  if checkyesno EXIM; then OPT_EXIM="${EXIM}"; fi
-  if checkyesno NAMED; then OPT_NAMED="${NAMED}"; fi
-  if checkyesno CLAMAV; then OPT_CLAMAV="${CLAMAV}"; fi
-  if checkyesno DOVECOT; then OPT_DOVECOT="${DOVECOT}"; fi
-  if checkyesno CLAMAV_WITH_EXIM; then OPT_CLAMAV_WITH_EXIM="${CLAMAV_WITH_EXIM}"; fi
-  if checkyesno WEBAPPS_INBOX_PREFIX; then OPT_WEBAPPS_INBOX_PREFIX="${WEBAPPS_INBOX_PREFIX}"; fi
-  if checkyesno SPAM_INBOX_PREFIX; then OPT_SPAM_INBOX_PREFIX="${SPAM_INBOX_PREFIX}"; fi
-  if checkyesno SPAMASSASSIN; then OPT_SPAMASSASSIN="${SPAMASSASSIN}"; fi
-  if checkyesno BLOCKCRACKING; then OPT_BLOCKCRACKING="${BLOCKCRACKING}"; fi
-  if checkyesno EASY_SPAM_FIGHTER; then OPT_EASY_SPAM_FIGHTER="${EASY_SPAM_FIGHTER}"; fi
-  if checkyesno PROFTPD_UPLOADSCAN; then OPT_PROFTPD_UPLOADSCAN="${PROFTPD_UPLOADSCAN}"; fi
-  if checkyesno PUREFTPD_UPLOADSCAN; then OPT_PUREFTPD_UPLOADSCAN="${PUREFTPD_UPLOADSCAN}"; fi
-  if checkyesno AWSTATS; then OPT_AWSTATS="${AWSTATS}"; fi
-  if checkyesno WEBALIZER; then OPT_WEBALIZER="${WEBALIZER}"; fi
-  if checkyesno MAJORDOMO; then OPT_MAJORDOMO="${MAJORDOMO}"; fi
-  if checkyesno PHPMYADMIN; then OPT_PHPMYADMIN="${PHPMYADMIN}"; fi
-  if checkyesno SUHOSIN; then OPT_SUHOSIN="${SUHOSIN}"; fi
-  if checkyesno SUHOSIN_UPLOADSCAN; then OPT_SUHOSIN_UPLOADSCAN="${SUHOSIN_UPLOADSCAN}"; fi
-  if checkyesno MODSECURITY; then OPT_MODSECURITY="${MODSECURITY}"; fi
-  if checkyesno HTSCANNER; then OPT_HTSCANNER="${HTSCANNER}"; fi
-  if checkyesno ROUNDCUBE; then OPT_ROUNDCUBE="${ROUNDCUBE}"; fi
-  if checkyesno PIGEONHOLE; then OPT_PIGEONHOLE="${PIGEONHOLE}"; fi
-  if checkyesno PB_SYMLINK; then OPT_PB_SYMLINK="${PB_SYMLINK}"; fi
-  if checkyesno INSTALL_CCACHE; then OPT_INSTALL_CCACHE="${INSTALL_CCACHE}"; fi
-  if checkyesno INSTALL_SYNTH; then OPT_INSTALL_SYNTH="${INSTALL_SYNTH}"; fi
-  if checkyesno USE_HOSTNAME_FOR_ALIAS; then OPT_USE_HOSTNAME_FOR_ALIAS="${USE_HOSTNAME_FOR_ALIAS}"; fi
-
-
   case $(lc ${WEBSERVER}) in
     "apache"|"apache24") OPT_WEBSERVER="apache"; OPT_APACHE_VER="2.4";
     case $(lc ${APACHE_MPM}) in
@@ -7276,7 +7298,7 @@ validate_options() {
     *) printf "*** Error: Invalid FTPD value set in options.conf\n"; exit ;;
   esac
 
-  ## Todo:
+  ## Verify:
   if [ "${OPT_FTPD}" = "pureftpd" ]; then
     if [ -s "${DA_CONF}" ]; then
       UNIFIED_FTP="$(${DA_BIN} c | grep -m1 unified_ftp_password_file | cut -d= -f2)"
@@ -7300,19 +7322,6 @@ validate_options() {
     #   setVal unified_ftp_password_file 1 ${DA_CONF_TEMPLATE}
     #   setVal unified_ftp_password_file 1 ${DA_CONF}
     fi
-  fi
-
-
-  if [ "$(uc ${SPAMASSASSIN})" = "YES" ]; then
-    OPT_SPAMASSASSIN="YES"
-    if [ "$(uc "${SPAMASSASSIN_UTILITIES}")" = "YES" ]; then
-      OPT_SPAMASSASSIN_UTILITIES="YES"
-    else
-      OPT_SPAMASSASSIN_UTILITIES="NO"
-    fi
-  elif [ "$(uc ${SPAMASSASSIN})" = "NO" ]; then
-    OPT_SPAMASSASSIN="NO"
-    OPT_SPAMASSASSIN_UTILITIES="NO"
   fi
 
   if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ] && [ "${OPT_SPAMASSASSIN}" = "NO" ]; then
@@ -7508,37 +7517,37 @@ show_config() {
   printf "\tConfigured Option Values\n"
   printf "\t=====================================\n"
   {
-    printf "\tPHP1 Version: %s\n" ${OPT_PHP1_VERSION}
-    printf "\tPHP1 Mode: %s\n" ${OPT_PHP1_MODE}
-    printf "\tPHP ini Type: %s\n" ${OPT_PHP_INI_TYPE}
-    printf "\tWeb Server: %s\n" ${OPT_WEBSERVER}
-    printf "\tApache MPM: %s\n" ${OPT_APACHE_MPM}
-    printf "\tSQL Server: %s\n" ${OPT_SQL_DB}
-    printf "\tFTP Server: %s\n" ${OPT_FTPD}
-    printf "\tExim: %s\n" ${OPT_EXIM}
-    printf "\tDovecot: %s\n" ${OPT_DOVECOT}
-    printf "\tClamAV: %s\n" ${OPT_CLAMAV}
-    printf "\tExim w/ClamAV: %s\n" ${OPT_CLAMAV_WITH_EXIM}
-    printf "\tWebapps Inbox Prefix: %s\n" ${OPT_WEBAPPS_INBOX_PREFIX}
-    printf "\tSpam Inbox Prefix: %s\n" ${OPT_SPAM_INBOX_PREFIX}
-    printf "\tBlockCracking: %s\n" ${OPT_BLOCKCRACKING}
-    printf "\tEasy Spam Fighter: %s\n" ${OPT_EASY_SPAM_FIGHTER}
-    printf "\tSpamAssassin: %s\n" ${OPT_SPAMASSASSIN}
-    printf "\tSpamAssassin Utilities: %s\n" ${OPT_SPAMASSASSIN_UTILITIES}
-    printf "\tProFTPD Upload Scan: %s\n" ${OPT_PROFTPD_UPLOADSCAN}
-    printf "\tPureFTPD Upload Scan: %s\n" ${OPT_PUREFTPD_UPLOADSCAN}
-    printf "\tAwstats: %s\n" ${OPT_AWSTATS}
-    printf "\tWebalizer: %s\n" ${OPT_WEBALIZER}
-    printf "\tMajordomo: %s\n" ${OPT_MAJORDOMO}
-    printf "\tphpMyAdmin: %s\n" ${OPT_PHPMYADMIN}
-    printf "\tSuhosin: %s\n" ${OPT_SUHOSIN}
-    printf "\tSuhosin Upload Scan: %s\n" ${OPT_SUHOSIN_UPLOADSCAN}
-    printf "\tModSecurity: %s\n" ${OPT_MODSECURITY}
-    printf "\tRoundCube: %s\n" ${OPT_ROUNDCUBE}
-    printf "\tPigeonHole: %s\n" ${OPT_PIGEONHOLE}
-    printf "\tPB Symlink: %s\n" ${OPT_PB_SYMLINK}
-    printf "\tInstall CCache: %s\n" ${OPT_INSTALL_CCACHE}
-    printf "\tInstall Synth: %s\n" ${OPT_INSTALL_SYNTH}
+    printf "\tPHP1 Version: %s\n" "${OPT_PHP1_VERSION}"
+    printf "\tPHP1 Mode: %s\n" "${OPT_PHP1_MODE}"
+    printf "\tPHP ini Type: %s\n" "${OPT_PHP_INI_TYPE}"
+    printf "\tWeb Server: %s\n" "${OPT_WEBSERVER}"
+    printf "\tApache MPM: %s\n" "${OPT_APACHE_MPM}"
+    printf "\tSQL Server: %s\n" "${OPT_SQL_DB}"
+    printf "\tFTP Server: %s\n" "${OPT_FTPD}"
+    printf "\tExim: %s\n" "${OPT_EXIM}"
+    printf "\tDovecot: %s\n" "${OPT_DOVECOT}"
+    printf "\tClamAV: %s\n" "${OPT_CLAMAV}"
+    printf "\tExim w/ClamAV: %s\n" "${OPT_CLAMAV_WITH_EXIM}"
+    printf "\tWebapps Inbox Prefix: %s\n" "${OPT_WEBAPPS_INBOX_PREFIX}"
+    printf "\tSpam Inbox Prefix: %s\n" "${OPT_SPAM_INBOX_PREFIX}"
+    printf "\tBlockCracking: %s\n" "${OPT_BLOCKCRACKING}"
+    printf "\tEasy Spam Fighter: %s\n" "${OPT_EASY_SPAM_FIGHTER}"
+    printf "\tSpamAssassin: %s\n" "${OPT_SPAMASSASSIN}"
+    printf "\tSpamAssassin Utilities: %s\n" "${OPT_SPAMASSASSIN_UTILITIES}"
+    printf "\tProFTPD Upload Scan: %s\n" "${OPT_PROFTPD_UPLOADSCAN}"
+    printf "\tPureFTPD Upload Scan: %s\n" "${OPT_PUREFTPD_UPLOADSCAN}"
+    printf "\tAwstats: %s\n" "${OPT_AWSTATS}"
+    printf "\tWebalizer: %s\n" "${OPT_WEBALIZER}"
+    printf "\tMajordomo: %s\n" "${OPT_MAJORDOMO}"
+    printf "\tphpMyAdmin: %s\n" "${OPT_PHPMYADMIN}"
+    printf "\tSuhosin: %s\n" "${OPT_SUHOSIN}"
+    printf "\tSuhosin Upload Scan: %s\n" "${OPT_SUHOSIN_UPLOADSCAN}"
+    printf "\tModSecurity: %s\n" "${OPT_MODSECURITY}"
+    printf "\tRoundCube: %s\n" "${OPT_ROUNDCUBE}"
+    printf "\tPigeonHole: %s\n" "${OPT_PIGEONHOLE}"
+    printf "\tPB Symlink: %s\n" "${OPT_PB_SYMLINK}"
+    printf "\tInstall CCache: %s\n" "${OPT_INSTALL_CCACHE}"
+    printf "\tInstall Synth: %s\n" "${OPT_INSTALL_SYNTH}"
   } | column -t -s:
 
   printf "\n"
