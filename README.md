@@ -25,14 +25,14 @@ Exim            | 4.8x          | Supported
 SpamBlocker     | 4.3.x         | Supported
 ClamAV          | 0.9x          | Supported
 SpamAssassin    | 3.4           | Supported
-RoundCube       | 1.1.x         | In progress
+RoundCube       | 1.1.x         | Supported
 phpMyAdmin      | 4.5.x         | Supported
 proftpd         | 1.3.5a        | Supported
 pure-FTPd       | 1.0.42        | Supported
 Majordomo       | 1.94.5        | Supported (via DA source copy)
-nginx           | 1.8.x         | Untested (www/nginx)
-suphp           |               | Untested (www/suphp)
-fastcgi         |               | Untested (www/mod_fastcgi)
+nginx           | 1.8.x         | In progress (www/nginx)
+suphp           |               | In progress (www/suphp)
+fastcgi         |               | In progress (www/mod_fastcgi)
 AwStats         |               | Untested (www/awstats)
 Webalizer       |               | Untested (www/webalizer)
 suhosin         |               | Untested (security/php-suhosin)
@@ -51,7 +51,7 @@ PortsBuild will NOT support:
 ### Currently known issues and limitations
 * BIND (named) does not restart after adding a domain on 9.3 due to startup script location in /etc/rc.d/ instead of /usr/local/etc/rc.d/ (DirectAdmin limitation)
 * PHP-FPM does not restart after adding a user due to startup script being called "php-fpm" instead of "php-fpmXX" (XX= 55, 56, 70, etc.) (DirectAdmin limitation)
-* Only one instance of PHP can be installed (afaik). Multiple PHP versions may be possible, but requires testing.
+* Only one instance of PHP can be installed through ports/packages (afaik). Multiple PHP versions may be possible, but requires testing.
 
 
 ### Additional documentation to add
@@ -71,7 +71,7 @@ PortsBuild will NOT support:
 
 
 ### Copyrights (more to be added)
-Portions of this file include references from third-party authors and companies not affiliated with the author or the PortsBuild project.
+Portions of this file include references from third-party authors and companies not affiliated with the PortsBuild project.
 * DirectAdmin Copyright (C) 2003-2016 JBMC Software, St. Albert, AB, Canada: http://www.directadmin.com
 * CustomBuild is written by DirectAdmin and Martynas Bendorius (smtalk)
 * SpamBlockerTechnology is a Trademark of NoBaloney Internet Services: http://www.nobaloney.net

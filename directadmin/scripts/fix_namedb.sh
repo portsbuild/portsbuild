@@ -1,10 +1,19 @@
 #!/bin/sh
-
+# Script written by DirectAdmin
+# URL: http://www.directadmin.com
 # Source: http://help.directadmin.com/item.php?id=330
 #
 # Usage:
-# chmod 755 fix_namedb.sh
-# ./fix_namedb.sb
+#   chmod 755 fix_namedb.sh
+#   ./fix_namedb.sb
+
+## 2016-05-13: PortsBuild version
+## PB: Verify:
+
+DA_PATH=/usr/local/directadmin
+DA_USERS_DIR=${DA_PATH}/data/users
+
+TTL=14400
 
 OS_MAJ=$(uname -r | cut -d. -f1) # 9, 10
 
@@ -16,58 +25,62 @@ else
   NAMED_DIR=/etc/namedb
 fi
 
-DA_USERS_DIR=/usr/local/directadmin/data/users
-NS1=$(grep ns1= /usr/local/directadmin/conf/directadmin.conf | cut -d= -f2)
-NS2=$(grep ns2= /usr/local/directadmin/conf/directadmin.conf | cut -d= -f2)
+NS1=$(grep ns1= "${DA_PATH}/conf/directadmin.conf" | cut -d= -f2)
+NS2=$(grep ns2= "${DA_PATH}/conf/directadmin.conf" | cut -d= -f2)
 
-for DA_USER in `ls ${DA_USERS_DIR}`; do
+for DA_USER in $(ls ${DA_USERS_DIR}); do
 {
   for DOMAIN in $(cat "${DA_USERS_DIR}/${DA_USER}/domains.list"; cat ${DA_USERS_DIR}/${DA_USER}/domains/*.pointers 2>/dev/null | cut -d= -f1;); do
   {
-    echo "${DOMAIN}"
+    printf "%s\n" "${DOMAIN}"
     rm "${NAMED_DIR}/${DOMAIN}.db"
 
     if [ ! -r "${NAMED_DIR}/${DOMAIN}.db" ]; then
-      IP=`cat ${DA_USERS_DIR}/${DA_USER}/domains/${DOMAIN}.conf | grep ip= | cut -d= -f2`
+      IP=$(grep ip= "${DA_USERS_DIR}/${DA_USER}/domains/${DOMAIN}.conf" | cut -d= -f2)
       if [ "$IP" = "" ]; then
-        IP=`cat ${DA_USERS_DIR}/${DA_USER}/user.conf | grep ip= | cut -d= -f2`
+        IP=$(grep ip= "${DA_USERS_DIR}/${DA_USER}/user.conf" | cut -d= -f2)
       fi
 
-      echo "\$TTL 14400"  >  ${NAMED_DIR}/${DOMAIN}.db
-      echo "@         IN      SOA     ${NS1}.         hostmaster.${DOMAIN}. ("        >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "                                                          2010101901"                     >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "                                                          14400"                          >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "                                                          3600"                           >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "                                                          1209600"                        >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "                                                          86400 )"                        >> ${NAMED_DIR}/${DOMAIN}.db
-      echo ""                                                                                         >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "${DOMAIN}.        14400   IN              NS      ${NS1}."                >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "${DOMAIN}.        14400   IN              NS      ${NS2}."                >> ${NAMED_DIR}/${DOMAIN}.db
-      echo ""  >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "${DOMAIN}.        14400   IN              A       ${IP}"                             >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "ftp               14400   IN              A       ${IP}"                             >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "localhost         14400   IN              A       127.0.0.1"                              >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "mail              14400   IN              A       ${IP}"                             >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "pop               14400   IN              A       ${IP}"                             >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "smtp              14400   IN              A       ${IP}"                             >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "www               14400   IN              A       ${IP}"                             >> ${NAMED_DIR}/${DOMAIN}.db
-      echo ""  >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "${DOMAIN}.        14400   IN              MX      10 mail"                                >> ${NAMED_DIR}/${DOMAIN}.db
-      echo "${DOMAIN}.        14400   IN              TXT     \"v=spf1 a mx ip4:${IP} -all\""    >> ${NAMED_DIR}/${DOMAIN}.db
-
-      echo ""  >> ${NAMED_DIR}/${DOMAIN}.db
-
-      for SUB in `cat ${DA_USERS_DIR}/${DA_USER}/domains/${DOMAIN}.subdomains`; do
+      ## Write to ${NAMED_DIR}/${DOMAIN}.db
       {
-        echo "${SUB}              14400   IN              A       ${IP}"                             >> ${NAMED_DIR}/${DOMAIN}.db
+        printf "\$TTL 14400\n"
+        printf "@         IN      SOA     %s.         hostmaster.%s. (\n" "${NS1}" "${DOMAIN}"
+        printf "                                                          2010101901\n"
+        printf "                                                          14400\n"
+        printf "                                                          3600\n"
+        printf "                                                          1209600\n"
+        printf "                                                          86400 )\n"
+        printf "\n"
+        echo "%s.        14400   IN              NS      %s." "${DOMAIN}" "${NS1}"
+        echo "%s.        14400   IN              NS      %s." "${DOMAIN}" "${NS2}"
+        echo ""
+        echo "%s.        14400   IN              A       %s" "${DOMAIN}" "${IP}"
+        echo "ftp               14400   IN              A       %s" "${IP}"
+        echo "localhost         14400   IN              A       127.0.0.1"
+        echo "mail              14400   IN              A       %s" "${IP}"
+        echo "pop               14400   IN              A       %s" "${IP}"
+        echo "smtp              14400   IN              A       %s" "${IP}"
+        echo "www               14400   IN              A       %s" "${IP}"
+        printf "\n"
+        printf "%s.        14400   IN              MX      10 mail\n" "${DOMAIN}"
+        echo "%s.        14400   IN              TXT     \"v=spf1 a mx ip4:%s -all\"" "${DOMAIN}" "${IP}"
+        printf "\n"
+      } > "${NAMED_DIR}/${DOMAIN}.db"
+
+      ## PB: Todo: Replace with while loop
+      for SUB in $(cat "${DA_USERS_DIR}/${DA_USER}/domains/${DOMAIN}.subdomains"); do
+      {
+        echo "${SUB}              14400   IN              A       ${IP}" >> "${NAMED_DIR}/${DOMAIN}.db"
       }
       done
 
-      chown bind:bind ${NAMED_DIR}/${DOMAIN}.db
+      chown bind:bind "${NAMED_DIR}/${DOMAIN}.db"
 
-      echo "  - database created."
+      printf "  - database created.\n"
     fi
   }
   done
 }
 done
+
+exit 0

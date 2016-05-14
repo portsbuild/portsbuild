@@ -1,81 +1,84 @@
 #!/bin/sh
-# Script to install Majordomo
-# PortsBuild edition
+## This script is written by DirectAdmin
+## http://www.directadmin.com
+## Script to install Majordomo (FreeBSD systems only)
+## 2016-05-12: PortsBuild version
+## PB: do:
 
-# This script is written originally by DirectAdmin
-# http://www.directadmin.com
-
-OS=$(uname)
+MAKE=/usr/bin/make
+PATCH=/usr/bin/patch
+PERL=/usr/local/bin/perl
+PW=/usr/sbin/pw
 
 SERVER=http://files.directadmin.com/services/all/majordomo
 ADDPATCHES=1
 
 SOURCEPATH="/usr/local/directadmin/scripts/packages/majordomo-1.94.5"
+TARGETPATH=/etc/virtual/majordomo
 
-if [ ! -e ${SOURCEPATH}/Makefile ]
-then
-	echo "The source path for majordomo does not exist. Make sure the correct path is set in majordomo.sh"
+if [ ! -e "${SOURCEPATH}/Makefile" ]; then
+	printf "The source path for Majordomo does not exist. Make sure the correct path is set in majordomo.sh\n"
 	exit 0
 fi
 
-/bin/mkdir -p /etc/virtual/majordomo
+/bin/mkdir -p "${TARGETPATH}"
 
 MDGID=$(id -g daemon)
 
-if  [ "$OS" = "FreeBSD" ]; then
-	/usr/sbin/pw useradd majordomo -b /etc/virtual/majordomo -g daemon -s /sbin/nologin 2> /dev/null
-fi
+${PW} useradd majordomo -b "${TARGETPATH}" -g daemon -s /sbin/nologin 2> /dev/null
 
 MDUID=$(id -u majordomo)
 
-/usr/local/bin/perl -pi -e 's/PERL = .*/PERL = \/usr\/local\/bin\/perl/' ${SOURCEPATH}/Makefile
-/usr/local/bin/perl -pi -e 's/W_HOME = .*/W_HOME = \/etc\/virtual\/majordomo/' ${SOURCEPATH}/Makefile
+## PB: Todo:
+${PERL} -pi -e 's/PERL = .*/PERL = \/usr\/local\/bin\/perl/' ${SOURCEPATH}/Makefile
+${PERL} -pi -e 's/W_HOME = .*/W_HOME = \/etc\/virtual\/majordomo/' ${SOURCEPATH}/Makefile
 
 # Perl and Bash weren't getting along. MDUID wasn't showing up so I did it this way.
-STR="/usr/local/bin/perl -pi -e 's/W_USER = .*/W_USER = ${MDUID}/' ${SOURCEPATH}/Makefile"
+STR="${PERL} -pi -e 's/W_USER = .*/W_USER = ${MDUID}/' ${SOURCEPATH}/Makefile"
 eval "$STR"
 
-STR="/usr/local/bin/perl -pi -e 's/W_GROUP = .*/W_GROUP = ${MDGID}/' ${SOURCEPATH}/Makefile"
+STR="${PERL} -pi -e 's/W_GROUP = .*/W_GROUP = ${MDGID}/' ${SOURCEPATH}/Makefile"
 eval "$STR"
 
-STR="/usr/local/bin/perl -pi -e 's/TMPDIR = .*/TMPDIR = \/tmp/' ${SOURCEPATH}/Makefile"
+STR="${PERL} -pi -e 's/TMPDIR = .*/TMPDIR = \/tmp/' ${SOURCEPATH}/Makefile"
 eval "$STR"
 
 # Fix REALLY-TO value in digests file
-STR="/usr/local/bin/perl -pi -e 's/\$ARGV\[0\];/\$ARGV\[0\].\${whereami};/' ${SOURCEPATH}/digest"
+STR="${PERL} -pi -e 's/\$ARGV\[0\];/\$ARGV\[0\].\${whereami};/' ${SOURCEPATH}/digest"
 eval "$STR"
 
-STR="/usr/local/bin/perl -pi -e 's#/usr/test/majordomo#/etc/virtual/majordomo#' ${SOURCEPATH}/sample.cf"
+STR="${PERL} -pi -e 's#/usr/test/majordomo#/etc/virtual/majordomo#' ${SOURCEPATH}/sample.cf"
 eval "$STR"
 
+## PB: Todo: Remove directory changing
 cd ${SOURCEPATH} || exit
 
-make wrapper
-make install
-make install-wrapper
+${MAKE} -C ${SOURCEPATH} wrapper
+${MAKE} -C ${SOURCEPATH} install
+${MAKE} -C ${SOURCEPATH} install-wrapper
 
-/usr/local/bin/perl -pi -e 's#/usr/test/majordomo#/etc/virtual/majordomo#' /etc/virtual/majordomo/majordomo.cf
+${PERL} -pi -e 's#/usr/test/majordomo#/etc/virtual/majordomo#' "${TARGETPATH}/majordomo.cf"
 
 if [ $ADDPATCHES -eq 0 ]; then
 	exit 0
 fi
 
 PATCH1=majordomo.patch
-PATCH1_PATH=/etc/virtual/majordomo/${PATCH1}
+PATCH1_PATH="${TARGETPATH}/${PATCH1}"
 if [ ! -s "${PATCH1_PATH}" ]; then
 	wget -O ${PATCH1_PATH} ${SERVER}/${PATCH1}
 fi
 
 if [ -s "${PATCH1_PATH}" ]; then
-	cd /etc/virtual/majordomo || exit
-	patch -p0 < majordomo.patch
+	cd "${TARGETPATH}" || exit
+	${PATCH} -p0 < majordomo.patch
 else
-	echo "Cannot find ${PATCH1_PATH} to patch majordomo."
+	printf "Cannot find %s to patch Majordomo.\n" "${PATCH1_PATH}"
 fi
 
- # Just to put up back where we were... likely not needed.
-cd ${SOURCEPATH} || exoit
+## DA: Just to put up back where we were... likely not needed.
+## PB: # cd ${SOURCEPATH} || exit
 
-chmod 750 /etc/virtual/majordomo
+chmod 750 "${TARGETPATH}"
 
 exit 0

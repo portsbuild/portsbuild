@@ -15,14 +15,14 @@ if [ "$ip" = "" ]; then
 fi
 
 if [ ! -e "$BF" ]; then
-  echo "cannot find $BF to unblock the IP"
+  printf "Cannot find %s to unblock the IP.\n" "$BF"
   exit 2
 fi
 
 COUNT=$(grep -c "^$ip=" $BF)
 
 if [ "$COUNT" -eq 0 ]; then
-  echo "$1 was not in $BF. Not unblocking"
+  printf "%s was not in %s. Not unblocking.\n" "$1" "$BF"
   exit 2
 fi
 

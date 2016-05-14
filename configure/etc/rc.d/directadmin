@@ -5,17 +5,13 @@
 # #BEFORE: SERVERS
 # KEYWORD: shutdown
 
-# 2016-03-15: DirectAdmin Startup Script for PortsBuild
+# 2016-05-13: DirectAdmin Startup Script for PortsBuild
+# See: https://www.freebsd.org/doc/en/books/porters-handbook/rc-scripts.html
+# and: https://www.freebsd.org/doc/en_US.ISO8859-1/articles/rc-scripting/
 
 #
 # Add the following lines to /etc/rc.conf to enable DirectAdmin:
 # directadmin_enable (bool):              Run DirectAdmin, the control panel (or NO).
-#
-# Optional settings (modifying not recommended):
-# directadmin_program (str):              Path to directadmin, if you want a different one.
-# directadmin_conf (str):                 Path to the configuration file
-# directadmin_flags (str):                Use this for flags OTHER than 'd'
-# directadmin_uid (str):                  User to run directadmin as (default: "directadmin")
 #
 
 . /etc/rc.subr
@@ -24,27 +20,154 @@ name=directadmin
 desc="DirectAdmin startup script"
 rcvar=directadmin_enable
 
-extra_commands=reload
+command="/usr/local/directadmin/directadmin"
+pidfile="/var/run/${name}.pid"
+procname=${name}
+lock="/var/spool/lock/${name}"
+command_prepend="${directadmin_prepend:="/usr/sbin/daemon"}"
+command_args="${directadmin_args:="d"}"
+required_files="/usr/local/directadmin/dataskq"
+: ${directadmin_enable:="NO"}
+
+extra_commands="reload"
+
+# start,stop,reload,restart,status, poll,rcvar,enabled
+
+################################################################
+
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+status_cmd="${name}_status"
+
+# reload_cmd="${name}_reload"
+# stop_cmd="${name}_stop"
+# start_precmd=${name}_prestart
+# start_postcmd=${name}_poststart
+# stop_postcmd=${name}_poststop
+
+################################################################
+
+## Start DirectAdmin
+directadmin_start() {
+
+  printf "Starting DirectAdmin: "
+
+  ${command_prepend} ${command} "${command_args}"
+
+  if [ $? = 0 ]; then
+    printf "[ OK ]\n"
+  else
+    printf "[ FAILED ]\n"
+  fi
+
+  touch "${lock}"
+}
+
+################################################################
+
+## Stop DirectAdmin
+directadmin_stop() {
+
+  local ret
+
+  ret=1
+
+  printf "Stopping DirectAdmin: "
+
+  pid=$(cat ${pidfile})
+  if [ -d "/proc/${pid}" ]; then
+    kill -TERM "${pid}"
+    ret=$?
+  else
+    killall -KILL "${name}" 1>/dev/null 2>/dev/null
+    ret=$?
+  fi
+
+  sleep 1
+
+  killall -KILL "${name}" 1>/dev/null 2>/dev/null
+
+  if [ $? = 0 ]; then
+    printf "[ OK ]\n"
+  else
+    printf "[ FAILED ]\n"
+  fi
+
+  rm -f "${lock}"
+}
+
+################################################################
+
+## Reload DirectAdmin
+directadmin_reload() {
+
+  printf "Reloading DirectAdmin config file: "
+  killall "${name}" -HUP
+  echo
+}
+
+################################################################
+
+## DirectAdmin Status (from 'functions')
+directadmin_status() {
+
+  local pid
+
+  ## First try "pidof"
+  pid=$(pidof "${name}")
+
+  if [ "${pid}" != "" ] ; then
+    printf "%s (pid %s) is running.\n" "${name}" "${pid}"
+    return 0
+  fi
+
+  ## Next try "/var/run/*.pid" files
+  if [ -f "${pidfile}" ] ; then
+    read pid < "${pidfile}"
+    if [ "${pid}" != "" ] ; then
+      printf "%s dead but pid file exists.\n" "${name}"
+      return 1
+    fi
+  fi
+
+  ## See if ${lock} exists
+  if [ -f "${lock}" ]; then
+    printf "%s dead but subsys is locked.\n" "${name}"
+    return 2
+  fi
+
+  printf "%s is not running.\n" "${name}"
+  return 3
+}
+
+################################################################
+
+## DirectAdmin pidof (from 'pidof' script in rc.d/)
+pidof() {
+
+  if [ "$1" = "" ]; then
+    printf "*** Error: pidof() is missing arguments.\n"
+  fi
+
+  PROC=/proc
+  RETVAL=1
+  for i in $(ls ${PROC}); do
+  {
+    if [ -d "${PROC}/${i}" ]; then
+      if [ "$(head -n 1 "${PROC}/${i}/status" | cut -d\  -f1)" = "$1" ]; then
+        printf "%s " "$i"
+        return 0
+      fi
+    fi
+  };
+  done
+
+  return $RETVAL
+}
+
+################################################################
+
+## Load additional configuration e.g. from /etc/conf.d/directadmin
 load_rc_config ${name}
-
-# start_precmd=directadmin_prestart
-# start_postcmd=directadmin_poststart
-# reload_cmd=directadmin_reload
-# stop_cmd=directadmin_stop
-# stop_postcmd=directadmin_poststop
-
-directadmin_enable=${directadmin_enable:-"NO"}
-directadmin_program=${directadmin_program:-"/usr/local/directadmin/directadmin"}
-directadmin_conf=${directadmin_conf:-"/usr/local/directadmin/conf/directadmin.conf"}
-directadmin_flags=${directadmin_flags:-"d"}
-directadmin_uid=${directadmin_uid:-"directadmin"}
-
-pidfile=${directadmin_pidfile:-"/var/run/directadmin.pid"}
-command=${directadmin_program:-"/usr/local/directadmin/directadmin"}
-command_args=${directadmin_flags:-"d"}
-required_files=/usr/local/directadmin/conf/directadmin.conf
-
-# start,stop,reload,restart,status
-# poll,rcvar,enabled
 
 run_rc_command "$1"
