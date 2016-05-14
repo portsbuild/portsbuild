@@ -1096,6 +1096,7 @@ global_setup() {
   if [ "${OPT_SUHOSIN_UPLOADSCAN}" = "YES" ]; then ( printf ", Suhosin w/ Upload Scanning" ); fi
   if [ "${OPT_MODSECURITY}" = "YES" ]; then ( printf ", ModSecurity" ); fi
   if [ "${OPT_HTSCANNER}" = "YES" ]; then ( printf ", HTScanner" ); fi
+  if [ "${OPT_LETSENCRYPT}" = "YES" ]; then ( printf ", Let's Encrypt" ); fi
   printf "\n\n"
 
   # echo "PHP ini Type: ${OPT_PHP_INI_TYPE}"
@@ -1231,6 +1232,7 @@ global_setup() {
     if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ]; then ( easyspamfighter_install ); fi
     if [ "${OPT_MODSECURITY}" = "YES" ]; then ( modsecurity_install ); fi
     if [ "${OPT_HTSCANNER}" = "YES" ]; then ( install_mod_htscanner ); fi
+    if [ "${OPT_LETSENCRYPT}" = "YES" ]; then ( letsencrypt_install ); fi
 
     ## mod_security
     ## htscanner
@@ -4227,6 +4229,41 @@ install_mod_htscanner() {
 
 ################################################################################################
 
+## Todo:
+## Install Let's Encrypt
+letsencrypt_install() {
+
+  ${PKGI} ${PORT_LETSENCRYPT}
+
+  ${SYSRC} -f /etc/periodic.conf weekly_letsencrypt_enable="YES"
+
+  # To run the certification renenewal as a different user:
+  # ${SYSRC} -f /etc/periodic.confweekly_letsencrypt_user="_letsencrypt"
+
+  # To run a script after the renewal (as root):
+  # ${SYSRC} -f /etc/periodic.conf weekly_letsencrypt_deployscript="/usr/local/etc/letsencrypt.sh/deploy.sh"
+
+  return
+}
+
+################################################################################################
+
+## Todo:
+## Uninstall Let's Encrypt
+letsencrypt_uninstall() {
+
+  ${PKGD} ${PORT_LETSENCRYPT}
+
+  ${SYSRC} -f /etc/periodic.conf -x weekly_letsencrypt_enable="YES"
+
+  # ${SYSRC} -f /etc/periodic.conf -x weekly_letsencrypt_user
+  # ${SYSRC} -f /etc/periodic.conf -x weekly_letsencrypt_deployscript
+
+  return
+}
+
+################################################################################################
+
 ## Verify:
 ## Install mod_fcgid (from CB2: doModFCGID())
 install_mod_fcgid() {
@@ -7185,6 +7222,7 @@ validate_options() {
   if checkyesno_opt HTSCANNER; then OPT_HTSCANNER="$(uc ${HTSCANNER})"; fi
   if checkyesno_opt INSTALL_CCACHE; then OPT_INSTALL_CCACHE="$(uc ${INSTALL_CCACHE})"; fi
   if checkyesno_opt INSTALL_SYNTH; then OPT_INSTALL_SYNTH="$(uc ${INSTALL_SYNTH})"; fi
+  if checkyesno_opt LETSENCRYPT; then OPT_LETSENCRYPT="$(uc "${LETSENCRYPT}")"; fi
   if checkyesno_opt MAJORDOMO; then OPT_MAJORDOMO="$(uc ${MAJORDOMO})"; fi
   if checkyesno_opt MODSECURITY; then OPT_MODSECURITY="$(uc ${MODSECURITY})"; fi
   if checkyesno_opt NAMED; then OPT_NAMED="$(uc ${NAMED})"; fi
