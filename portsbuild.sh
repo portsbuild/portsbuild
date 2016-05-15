@@ -369,6 +369,18 @@ fi
 
 MODSECURITY_CUSTOM_RULES="${PB_CUSTOM}/modsecurity/conf"
 
+## Verify: From CB2:
+if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+  ## CB2: Do we have httpd-phpmodules.conf line?
+  NEWCONFIGS=1
+  if [ -e "${APACHE_CONF}" ]; then
+    if [ "$(grep -m1 -c -e "${APACHE_EXTRA_PATH}/httpd-phpmodules.conf" "${APACHE_CONF}")" = "0" ]; then
+      NEWCONFIGS=0
+    fi
+  fi
+fi
+
+
 ## PortsBuild Compatibility Settings
 COMPAT_APACHE24_SYMLINKS=NO
 COMPAT_PHP_SYMLINKS=YES
@@ -500,8 +512,8 @@ GLOBAL_MAKE_VARIABLES="" # e.g. WITH_OPENSSL_PORT=YES BATCH=YES WITH_CCACHE_BUIL
 GLOBAL_MAKE_SET=""
 GLOBAL_MAKE_UNSET="" # EXAMPLES X11 HTMLDOCS CUPS TESTS DOCS NLS
 
-APACHE24_MAKE_SET="SUEXEC MPM_EVENT"
-APACHE24_MAKE_UNSET="MPM_PREFORK"
+APACHE24_MAKE_SET="" # SUEXEC MPM_EVENT
+APACHE24_MAKE_UNSET="" # MPM_PREFORK
 
 ## Todo: Harden symlinks patch
 # APACHE24_EXTRA_PATCHES=""
@@ -1332,112 +1344,115 @@ update_rc() {
   ## Perhaps rename this function to verify_rc?
 
   ## Todo: refactor with "${SERVICE_NAME}_enable"
-  ## Todo: directadmin rc script
+
+  if [ -e /usr/local/etc/rc.d/directadmin ]; then
+    ${SYSRC} directadmin_enable="YES"
+  fi
 
   if [ "${OPT_NAMED}" = "YES" ]; then
-    sysrc named_enable="YES"
+    ${SYSRC} named_enable="YES"
   else
-    sysrc -x named_enable
+    ${SYSRC} -x named_enable
   fi
 
   if [ "${OPT_WEBSERVER}" = "apache" ]; then
-    sysrc apache24_enable="YES"
-    sysrc apache24_http_accept_enable="YES"
-    sysrc -f /boot/loader.conf accf_http_load="YES"
-    sysrc -f /boot/loader.conf accf_data_load="YES"
-    sysrc -x nginx_enable
+    ${SYSRC} apache24_enable="YES"
+    ${SYSRC} apache24_http_accept_enable="YES"
+    ${SYSRC} -f /boot/loader.conf accf_http_load="YES"
+    ${SYSRC} -f /boot/loader.conf accf_data_load="YES"
+    ${SYSRC} -x nginx_enable
   else
-    sysrc -x apache24_enable
-    sysrc -x apache24_http_accept_enable
-    sysrc -f /boot/loader.conf -x accf_http_load
-    sysrc -f /boot/loader.conf -x accf_data_load
+    ${SYSRC} -x apache24_enable
+    ${SYSRC} -x apache24_http_accept_enable
+    ${SYSRC} -f /boot/loader.conf -x accf_http_load
+    ${SYSRC} -f /boot/loader.conf -x accf_data_load
   fi
 
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
-    sysrc nginx_enable="YES"
-    sysrc -x apache24_enable
-    sysrc -x apache24_http_accept_enable
-    sysrc -f /boot/loader.conf -x accf_http_load
-    sysrc -f /boot/loader.conf -x accf_data_load
+    ${SYSRC} nginx_enable="YES"
+    ${SYSRC} -x apache24_enable
+    ${SYSRC} -x apache24_http_accept_enable
+    ${SYSRC} -f /boot/loader.conf -x accf_http_load
+    ${SYSRC} -f /boot/loader.conf -x accf_data_load
   else
-    sysrc -x nginx_enable
+    ${SYSRC} -x nginx_enable
   fi
 
   if [ "${OPT_SQL_DB}" != "NO" ]; then
-    sysrc mysql_enable="YES"
-    sysrc mysql_dbdir="${SQL_DATA_PATH}"
-    sysrc mysql_optfile="/usr/local/etc/my.cnf"
+    ${SYSRC} mysql_enable="YES"
+    ${SYSRC} mysql_dbdir="${SQL_DATA_PATH}"
+    ${SYSRC} mysql_optfile="/usr/local/etc/my.cnf"
   fi
 
-  if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
-    sysrc php_fpm_enable="YES"
+  if [ "${OPT_PHP1_MODE}" = "php-fpm" ] && [ "${OPT_PHP1_RELEASE}" != "NO" ]; then
+    ${SYSRC} php_fpm_enable="YES"
   else
-    sysrc -x php_fpm_enable
+    ${SYSRC} -x php_fpm_enable
   fi
 
   if [ "${OPT_EXIM}" = "YES" ]; then
-    sysrc exim_enable="YES"
-    sysrc exim_flags="-bd -q1h"
-    sysrc -f /etc/periodic.conf daily_status_include_submit_mailq="NO"
-    sysrc -f /etc/periodic.conf daily_clean_hoststat_enable="NO"
+    ${SYSRC} exim_enable="YES"
+    ${SYSRC} exim_flags="-bd -q1h"
+    ${SYSRC} -f /etc/periodic.conf daily_status_include_submit_mailq="NO"
+    ${SYSRC} -f /etc/periodic.conf daily_clean_hoststat_enable="NO"
   else
-    sysrc -x exim_enable
-    sysrc -x exim_flags
-    sysrc -f /etc/periodic.conf -x daily_status_include_submit_mailq
-    sysrc -f /etc/periodic.conf -x daily_clean_hoststat_enable
+    ${SYSRC} -x exim_enable
+    ${SYSRC} -x exim_flags
+    ${SYSRC} -f /etc/periodic.conf -x daily_status_include_submit_mailq
+    ${SYSRC} -f /etc/periodic.conf -x daily_clean_hoststat_enable
   fi
 
   if [ "${OPT_DOVECOT}" = "YES" ]; then
-    sysrc dovecot_enable="YES"
+    ${SYSRC} dovecot_enable="YES"
   else
-    sysrc -x dovecot_enable
+    ${SYSRC} -x dovecot_enable
   fi
 
   if [ "${OPT_FTPD}" = "pureftpd" ]; then
-    sysrc ftpd_enable="NO"
-    sysrc pureftpd_enable="YES"
-    sysrc -x proftpd_enable
+    ${SYSRC} ftpd_enable="NO"
+    ${SYSRC} pureftpd_enable="YES"
+    ${SYSRC} -x proftpd_enable
   else
-    sysrc -x pureftpd_enable
+    ${SYSRC} -x pureftpd_enable
   fi
 
   if [ "${OPT_FTPD}" = "proftpd" ]; then
-    sysrc ftpd_enable="NO"
-    sysrc proftpd_enable="YES"
-    sysrc -x pureftpd_enable
+    ${SYSRC} ftpd_enable="NO"
+    ${SYSRC} proftpd_enable="YES"
+    ${SYSRC} -x pureftpd_enable
   else
-    sysrc -x proftpd_enable
+    ${SYSRC} -x proftpd_enable
   fi
 
   if [ "${OPT_SPAMASSASSIN}" = "YES" ]; then
-    sysrc spamd_enable="YES"
-    sysrc spamd_flags="-c -m 15"
+    ${SYSRC} spamd_enable="YES"
+    ${SYSRC} spamd_flags="-c -m 15"
   else
-    sysrc -x spamd_enable
-    sysrc -x spamd_flags
+    ${SYSRC} -x spamd_enable
+    ${SYSRC} -x spamd_flags
   fi
 
   if [ "${OPT_SPAMASSASSIN_UTILITIES}" = "YES" ] && [ "${OPT_SPAMASSASSIN}" = "YES" ]; then
-    sysrc -f /etc/periodic.conf daily_sa_enable="YES"
-    sysrc -f /etc/periodic.conf daily_sa_quiet="NO"
-    sysrc -f /etc/periodic.conf daily_sa_compile_nice="YES"
-    sysrc -f /etc/periodic.conf daily_sa_restart_spamd="YES"
+    ${SYSRC} -f /etc/periodic.conf daily_sa_enable="YES"
+    ${SYSRC} -f /etc/periodic.conf daily_sa_quiet="NO"
+    ${SYSRC} -f /etc/periodic.conf daily_sa_compile_nice="YES"
+    ${SYSRC} -f /etc/periodic.conf daily_sa_restart_spamd="YES"
     # daily_sa_update_flags="" ## -D --nogpg
     # daily_sa_compile_flags=""
     # daily_sa_compile_nice_flags=""
   else
-    sysrc -f /etc/periodic.conf -x daily_sa_enable
-    sysrc -f /etc/periodic.conf -x daily_sa_quiet
-    sysrc -f /etc/periodic.conf -x daily_sa_compile_nice
-    sysrc -f /etc/periodic.conf -x daily_sa_restart_spamd
+    ${SYSRC} -f /etc/periodic.conf -x daily_sa_enable
+    ${SYSRC} -f /etc/periodic.conf -x daily_sa_quiet
+    ${SYSRC} -f /etc/periodic.conf -x daily_sa_compile_nice
+    ${SYSRC} -f /etc/periodic.conf -x daily_sa_restart_spamd
   fi
 
   if [ "${OPT_CLAMAV}" = "YES" ]; then
-    sysrc clamav_clamd_enable="YES"
-    sysrc clamav_freshclam_enable="YES"
+    ${SYSRC} clamav_clamd_enable="YES"
+    ${SYSRC} clamav_freshclam_enable="YES"
   else
-    sysrc -x clamav_clamd_enable
-    sysrc -x clamav_freshclam_enable
+    ${SYSRC} -x clamav_clamd_enable
+    ${SYSRC} -x clamav_freshclam_enable
   fi
 
   # rc_debug="NO"          # Set to YES to enable debugging output from rc.d
@@ -3327,6 +3342,40 @@ dovecotChecks() {
 ## PHP Installation Tasks
 php_install() {
 
+  ## Install Web Server first
+
+  ## Apache / Nginx+Apache:
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    if [ ! -d ${APACHE_PATH} ]; then
+      apache_install
+    fi
+  fi
+
+  ## Nginx / Nginx+Apache:
+  if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    if [ ! -d ${NGINX_PATH} ]; then
+      nginx_install
+    fi
+  fi
+
+  ## CB2 code:
+  PHPMODULES=${APACHE_EXTRA_PATH}/httpd-phpmodules.conf
+  if [ "${HAVE_CLI}" = "YES" ] && [ -e "${PHPMODULES}" ]; then
+    if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+      if grep -m1 -q 'LoadModule mpm_event_module /usr/local/libexec/apache24/mod_mpm_event.so' ${PHPMODULES}; then
+        echo "Switching Apache Event MPM to Prefork, because of mod_php used..."
+        ${PERL} -pi -e 's#LoadModule mpm_event_module /usr/local/libexec/apache24/mod_mpm_event.so#LoadModule mpm_prefork_module /usr/local/libexec/apache24/mod_mpm_prefork.so#' ${PHPMODULES}
+        ${SERVICE} apache24 restart
+      fi
+      if grep -m1 -q 'LoadModule mpm_worker_module /usr/local/libexec/apache24/mod_mpm_worker.so' ${PHPMODULES}; then
+        echo "Switching Apache Worker MPM to Prefork, because of mod_php used..."
+        ${PERL} -pi -e 's#LoadModule mpm_worker_module /usr/local/libexec/apache24/mod_mpm_worker.so#LoadModule mpm_prefork_module /usr/local/libexec/apache24/mod_mpm_prefork.so#' ${PHPMODULES}
+        ${SERVICE} apache24 restart
+      fi
+    fi
+  fi
+
+  ## PHP1 Version Selector
   case ${OPT_PHP1_VERSION} in
     55) PORT_PHP="${PORT_PHP55}"
         PORT_PHP_EXT="${PORT_PHP55_EXT}"
@@ -3361,133 +3410,198 @@ php_install() {
         PHP_MOD_MAKE_UNSET="${MOD_PHP70_MAKE_UNSET}"
         PHP_EXT_LIST="math/php70-bcmath archivers/php70-bz2 misc/php70-calendar textproc/php70-ctype ftp/php70-curl textproc/php70-dom graphics/php70-exif sysutils/php70-fileinfo security/php70-filter ftp/php70-ftp graphics/php70-gd devel/php70-gettext security/php70-hash converters/php70-iconv mail/php70-imap devel/php70-json converters/php70-mbstring security/php70-mcrypt databases/php70-mysqli databases/php70-odbc www/php70-opcache security/php70-openssl databases/php70-pdo databases/php70-pdo_mysql databases/php70-pdo_sqlite archivers/php70-phar sysutils/php70-posix textproc/php70-pspell devel/php70-readline converters/php70-recode www/php70-session textproc/php70-simplexml net-mgmt/php70-snmp net/php70-soap net/php70-sockets databases/php70-sqlite3 www/php70-tidy devel/php70-tokenizer textproc/php70-wddx textproc/php70-xml textproc/php70-xmlreader net/php70-xmlrpc textproc/php70-xmlwriter textproc/php70-xsl archivers/php70-zip archivers/php70-zlib"
         ;;
-    *) ;;
+    *) printf "*** Error: Wrong PHP version selected. (Script error?)\n"; exit ;;
   esac
 
   printf "Starting PHP installation\n"
 
   if [ "${PHP_MAKE_SET}" = "" ] && [ "${PHP_MAKE_UNSET}" = "" ] ; then
     case ${OPT_PHP1_MODE} in
-      fpm) ${PKGI} ${PORT_PHP} "${PHP_EXT_LIST}"
-        ;;
-      mod_php) ${PKGI} ${PORT_MOD_PHP}
-        ;;
-      fastcgi) echo "not done"
-        ;;
-      suphp) echo "not done"
-        ${PKGI} ${PORT_SUPHP}
-        ;;
+      "fpm") ${PKGI} ${PORT_PHP} "${PHP_EXT_LIST}" ;;
+      "mod_php") ${PKGI} ${PORT_MOD_PHP} ;;
+      # fastcgi) echo "not done" ;;
+      "suphp") ${PKGI} ${PORT_SUPHP} ;;
     esac
   else
     case ${OPT_PHP1_MODE} in
-      fpm)
+      "fpm")
           make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" rmconfig
           make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" OPTIONS_SET="${PHP_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
           make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" rmconfig
           make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
           ;;
-      mod_php)
+      "mod_php")
           make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" rmconfig
           make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" OPTIONS_SET="${PHP_MOD_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_MOD_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
           make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
           ;;
-      fastcgi) echo "not done" ;;
-      suphp) echo "not done"
-          ${PKGI} ${PORT_SUPHP}
-          ;;
-      *) printf "*** Error: Wrong PHP version selected. (Script error?)\n"; exit ;;
+      # fastcgi) echo "not done" ;;
+      "suphp") ${PKGI} ${PORT_SUPHP} ;;
+      *) printf "*** Error: Wrong PHP mode selected. (Script error?)\n"; exit ;;
     esac
   fi
 
   # make -DNO_DIALOG -C "${PORT_PHP_EXT}" reinstall clean
 
-  ## Replace default php-fpm.conf with DirectAdmin/CB2 version:
-  cp -f "${PB_PATH}/configure/fpm/php-fpm.conf.${OPT_PHP1_VERSION}" /usr/local/etc/php-fpm.conf
+  ### CB2 code:
 
-  if [ "${OPT_PHP_INI_TYPE}" = "production" ]; then
-    cp -f /usr/local/etc/php.ini-production /usr/local/etc/php.ini
-  elif [ "${OPT_PHP_INI_TYPE}" = "development" ]; then
-    cp -f /usr/local/etc/php.ini-development /usr/local/etc/php.ini
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    printf "" > "${PHPMODULES}"
+
+    if [ -e "${PHPMODULES}" ]; then
+      COUNT="$(grep -m1 -c 'suphp_module' ${PHPMODULES})"
+      if [ "${HAVE_SUPHP_CGI}" = "YES" ] && [ "${COUNT}" -eq 0 ]; then
+        ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' ${APACHE_CONF}
+        echo "LoadModule  suphp_module    ${APACHE_LIB_PATH}/mod_suphp.so" >> ${PHPMODULES}
+      fi
+
+      COUNT="$(grep -m1 -c 'httpd-modsecurity' ${PHPMODULES})"
+      if [ "${OPT_MODSECURITY}" = "YES" ] && [ ! -e "${APACHE_LIB_PATH}/mod_security2.so" ]; then
+        modsecurity_install
+      fi
+
+      if [ "${OPT_MODSECURITY}" = "YES" ]  && [ "${COUNT}" -eq 0 ] && [ "${OPT_WEBSERVER}" = "apache" ]; then
+        ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' ${APACHE_CONF}
+        echo "Include ${APACHE_EXTRA_PATH}/httpd-modsecurity.conf" >> ${PHPMODULES}
+        cp -pf "${MODSECURITY_APACHE_INCLUDE}" "${APACHE_EXTRA_PATH}/httpd-modsecurity.conf"
+      fi
+
+      if [ "${HAVE_CLI}" = "NO" ]; then
+        COUNT="$(grep -m1 -c 'htscanner_module' ${PHPMODULES})"
+        if [ "${OPT_HTSCANNER}" = "YES" ] && [ "${COUNT}" -eq 0 ]; then
+          ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
+          echo "LoadModule  htscanner_module    ${APACHE_LIB_PATH}/mod_htscanner2.so" >> ${PHPMODULES}
+        fi
+      elif [ "${HAVE_CLI}" = "YES" ]; then
+        COUNT="$(grep -m1 -c 'htscanner_module' ${PHPMODULES})"
+        if [ "${OPT_HTSCANNER}" = "YES" ] && [ "${COUNT}" -gt 0 ]; then
+          ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
+          ${PERL} -pi -e 's|^LoadModule htscanner_module|^#LoadModule htscanner_module' ${PHPMODULES}
+        fi
+      fi
+    fi
+
+    if ! grep -m1 -q '/usr/local/libexec/apache24/mod_mpm_' ${PHPMODULES}; then
+      if [ "${OPT_APACHE_MPM}" = "auto" ]; then
+        ## CB2: Use event MPM for CGI (FPM) and prefork for cli (mod_php)
+        if [ "${HAVE_CLI}" = "NO" ]; then
+          ## CB2: Add to httpd-phpmodules.conf
+          echo "LoadModule mpm_event_module ${APACHE_LIB_PATH}/mod_mpm_event.so" >> ${PHPMODULES}
+        else
+          ## CB2: Add to httpd-phpmodules.conf
+          echo "LoadModule mpm_prefork_module ${APACHE_LIB_PATH}/mod_mpm_prefork.so" >> ${PHPMODULES}
+        fi
+      elif [ "${OPT_APACHE_MPM}" = "event" ]; then
+        echo "LoadModule mpm_event_module ${APACHE_LIB_PATH}/mod_mpm_event.so" >> ${PHPMODULES}
+      elif [ "${OPT_APACHE_MPM}" = "worker" ]; then
+        echo "LoadModule mpm_worker_module ${APACHE_LIB_PATH}/mod_mpm_worker.so" >> ${PHPMODULES}
+      else
+        echo "LoadModule mpm_prefork_module ${APACHE_LIB_PATH}/mod_mpm_prefork.so" >> ${PHPMODULES}
+      fi
+    fi
   fi
 
-  ## Todo: Temp:
-  ## e.g. PHP1_VER="56"
-  PHP1_PATH="/usr/local/php${OPT_PHP1_VERSION}"
+  ${PERL} -pi -e 's/^LoadModule php4/\#LoadModule php4/' ${APACHE_CONF}
+  ${PERL} -pi -e 's/^LoadModule php5/\#LoadModule php5/' ${APACHE_CONF}
+  ${PERL} -pi -e 's/^LoadModule php7/\#LoadModule php7/' ${APACHE_CONF}
 
-  if [ "${COMPAT_PHP_SYMLINKS}" = "YES" ]; then
-    ## Create directories for DA compat:
-    mkdir -p "${PHP1_PATH}"
-    mkdir -p "${PHP1_PATH}/bin"
-    mkdir -p "${PHP1_PATH}/etc"
-    mkdir -p "${PHP1_PATH}/include"
-    mkdir -p "${PHP1_PATH}/lib"
-    mkdir -p "${PHP1_PATH}/php"
-    mkdir -p "${PHP1_PATH}/sbin"
-    mkdir -p "${PHP1_PATH}/sockets"
-    mkdir -p "${PHP1_PATH}/var/log/"
-    mkdir -p "${PHP1_PATH}/var/run"
-    # mkdir -p "${PHP_PATH}/lib/php.conf.d/"
-    mkdir -p "${PHP1_PATH}/lib/php/"
+  ## CB2: Add correct PHP module to httpd-phpmodules.conf
 
-    ## Symlink for compat
-    ln -s /usr/local/bin/php "${PHP1_PATH}/bin/php"
-    ln -s /usr/local/bin/php-cgi "${PHP1_PATH}/bin/php-cgi"
-    ln -s /usr/local/bin/php-config "${PHP1_PATH}/bin/php-config"
-    ln -s /usr/local/bin/phpize "${PHP1_PATH}/bin/phpize"
-    ln -s /usr/local/sbin/php-fpm "${PHP1_PATH}/sbin/php-fpm"
-    ln -s /var/log/php-fpm.log "${PHP1_PATH}/var/log/php-fpm.log"
-    ln -s /usr/local/include/php "${PHP1_PATH}/include"
-
-    ## php.conf.d: directory for additional PHP ini files loaded by FPM:
-    ln -s /usr/local/etc/php "${PHP1_PATH}/lib/php.conf.d"
-    ln -s /usr/local/etc/php.ini "${PHP1_PATH}/lib/php.ini"
-    ln -s /usr/local/etc/php-fpm.conf "${PHP1_PATH}/etc/php-fpm.conf"
-    ln -s /usr/local/lib/php/build "${PHP1_PATH}/lib/php/build"
+  ## PHP1: mod_php:
+  if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
+    if [ "${OPT_PHP1_RELEASE}" = "7.0" ]; then
+      echo "LoadModule  php7_module       ${APACHE_LIB_PATH}/libphp7.so" >> ${PHPMODULES}
+    else
+      echo "LoadModule  php5_module       ${APACHE_LIB_PATH}/libphp5.so" >> ${PHPMODULES}
+    fi
   fi
 
-  ## Verify: extension_dir "YYYYMMDD" is different across PHP versions:
-  ## This call returns e.g. "/usr/local/lib/php/20131226"
-  PHP_EXTENSION_DIR=$(/usr/local/bin/php-config --extension-dir)
+  ## PHP2: mod_php:
+  if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
+    if [ "${OPT_PHP2_RELEASE}" = "7.0" ]; then
+      echo "LoadModule  php7_module       ${APACHE_LIB_PATH}/libphp7.so" >> ${PHPMODULES}
+    else
+      echo "LoadModule  php5_module       ${APACHE_LIB_PATH}/libphp5.so" >> ${PHPMODULES}
+    fi
+  fi
 
-  ln -s "${PHP_EXTENSION_DIR}" "${PHP1_PATH}/lib/php/extensions"
+  ## FCGID
+  if [ "${HAVE_FCGID}" = "YES" ]; then
+    if [ -e ${PHPMODULES} ]; then
+      if [ ! -s "${APACHE_LIB_PATH}/mod_fcgid.so" ]; then
+        install_mod_fcgid
+      fi
 
-  ## Old method (to remove):
-  # if [ ${PHP1_VERSION} = "55" ]; then
-  #   ln -s /usr/local/lib/php/20121212 ${PHP1_PATH}/lib/php/extensions
-  # elif [ ${PHP1_VERSION} = "56" ]; then
-  #   ln -s /usr/local/lib/php/20131226 ${PHP1_PATH}/lib/php/extensions
-  # elif [ ${PHP1_VERSION} = "70" ]; then
-  #   ln -s /usr/local/lib/php/20151012 ${PHP1_PATH}/lib/php/extensions
+      if ! grep -m1 -q 'fcgid_module' ${PHPMODULES}; then
+        ${PERL} -pi -e 's|^LoadModule  mod_fcgid|#LoadModule   mod_fcgid|' ${APACHE_CONF}
+        echo "LoadModule  fcgid_module    ${APACHE_LIB_PATH}/mod_fcgid.so" >> ${PHPMODULES}
+      fi
+
+      if ! grep -m1 -c 'httpd-fcgid.conf' ${PHPMODULES}; then
+        echo "Include ${APACHE_EXTRA_PATH}/httpd-fcgid.conf" >> ${PHPMODULES}
+      fi
+    fi
+  fi
+
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
+      if [ "${OPT_HTSCANNER}" = "YES" ] && [ ! -e ${APACHE_LIB_PATH}/mod_htscanner2.so ]; then
+        install_mod_htscanner
+      fi
+    fi
+    if [ "${NEWCONFIGS}" = "1" ]; then
+      ${PERL} -pi -e 's/^LoadModule mod_php/\#LoadModule mod_php/' ${APACHE_CONF}
+      ${PERL} -pi -e 's/^LoadModule php/\#LoadModule php/' ${APACHE_CONF}
+    fi
+  fi
+
+  php_conf
+
+  fpmChecks
+
+  if [ "${OPT_WEBSERVER}" = "apache" ]  || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    echo "Rewriting all users httpd.conf files, please wait..."
+    echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
+  elif [ "${OPT_WEBSERVER}" = "nginx" ]; then
+    echo "Rewriting all users nginx.conf files, please wait..."
+    echo "action=rewrite&value=nginx" >> ${DA_TASK_QUEUE}
+  fi
+
+  run_dataskq d
+
+  ## PHP1: FPM:
+  if [ "${OPT_PHP1_MODE}" = "php-fpm" ] || [ "${OPT_PHP1_MODE}" = "suphp" ] || [ "${OPT_PHP1_MODE}" = "fastcgi" ]; then
+    ln -sf /usr/local/php${PHP1_SHORTRELEASE}/bin/php${PHP1_SHORTRELEASE} /usr/local/bin/php
+    if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
+      echo "Restarting php-fpm${PHP1_SHORTRELEASE}."
+      control_service php-fpm${PHP1_SHORTRELEASE} restart
+    fi
+  fi
+
+  ## PHP2: FPM:
+  if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
+    echo "Restarting php-fpm${PHP2_SHORTRELEASE}."
+    control_service php-fpm${PHP2_SHORTRELEASE} restart
+  fi
+
+  # if [ -s /usr/local/bin/php ] && [ ! -e /bin/php ]; then
+  #   ln -s /usr/local/bin/php /bin/php
   # fi
 
-  ## Scripted reference (from CB2):
-  printf "Making PHP installation compatible with php.ini file\n"
-  ${PERL} -pi -e 's/^register_long_arrays/;register_long_arrays/' ${PHP_INI}
-  ${PERL} -pi -e 's/^magic_quotes_gpc/;magic_quotes_gpc/' ${PHP_INI}
-  ${PERL} -pi -e 's/^safe_mode/;safe_mode/' ${PHP_INI}
-  ${PERL} -pi -e 's/^register_globals/;register_globals/' ${PHP_INI}
-  ${PERL} -pi -e 's/^register_long_arrays/;register_long_arrays/' ${PHP_INI}
-  ${PERL} -pi -e 's/^allow_call_time_pass_reference/;allow_call_time_pass_reference/' ${PHP_INI}
-  ${PERL} -pi -e 's/^define_syslog_variables/;define_syslog_variables/' ${PHP_INI}
-  ${PERL} -pi -e 's/^highlight.bg/;highlight.bg/' ${PHP_INI}
-  ${PERL} -pi -e 's/^session.bug_compat_42/;session.bug_compat_42/' ${PHP_INI}
-  ${PERL} -pi -e 's/^session.bug_compat_warn/;session.bug_compat_warn/' ${PHP_INI}
-  ${PERL} -pi -e 's/^y2k_compliance/;y2k_compliance/' ${PHP_INI}
-  ${PERL} -pi -e 's/^magic_quotes_runtime/;magic_quotes_runtime/' ${PHP_INI}
-  ${PERL} -pi -e 's/^magic_quotes_sybase/;magic_quotes_sybase/' ${PHP_INI}
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    echo "Restarting Apache"
+    ${SERVICE} apache24 restart
+  fi
 
-  secure_php_ini ${PHP_INI}
-
-  ## Todo: Verify:
-  ## HAVE_PHP_FPM?
-  if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
-    printf "Enabling PHP-FPM startup (updating /etc/rc.conf)\n"
-    sysrc php_fpm_enable="YES"
-    php_fpm_restart
+  if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    echo "Restarting Nginx"
+    ## Verify: /usr/sbin/nginx -s stop >/dev/null 2>&1
+    ${SERVICE} nginx restart
   fi
 
   return
 }
+
 
 ################################################################
 
@@ -5132,8 +5246,8 @@ roundcube_install() {
 webapps_install() {
 
   ## Create user and group:
-  ${PW} groupadd ${WEBAPPS_GROUP}
-  ${PW} useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
+  # ${PW} groupadd ${WEBAPPS_GROUP}
+  # ${PW} useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin
 
   ## Set permissions on temp directory:
   if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
@@ -6041,7 +6155,7 @@ rewrite_confs() {
 
     verify_server_ca
 
-    # Verify we have the correct apache_ver
+    ## CB2: Verify we have the correct apache_ver
     if [ "$(grep -m1 -c apache_ver=2.0 ${DA_CONF_TEMPLATE})" -eq "0" ]; then
       printf "apache_ver=2.0\n" >> ${DA_CONF_TEMPLATE}
     elif [ "$(grep -m1 -c apache_ver= ${DA_CONF_TEMPLATE})" -ne "0" ]; then
@@ -6116,7 +6230,6 @@ rewrite_confs() {
 
     ## Example: ${APACHE_LIB_PATH}/mod_mpm_event.so
 
-    ## Verify:
     if ! grep -m1 -q "${APACHE_LIB_PATH}/mod_mpm_" "${PHPMODULES}"; then
       ## Use event MPM for php-fpm and prefork for mod_php
       if [ "${OPT_APACHE_MPM}" = "auto" ]; then
@@ -6136,7 +6249,7 @@ rewrite_confs() {
       fi
     fi
 
-    ## ${PERL} -pi -e 's/^LoadModule php4/\#LoadModule php4/' "${APACHE_CONF}"
+    ${PERL} -pi -e 's/^LoadModule php4/\#LoadModule php4/' "${APACHE_CONF}"
     ${PERL} -pi -e 's/^LoadModule php5/\#LoadModule php5/' "${APACHE_CONF}"
     ${PERL} -pi -e 's/^LoadModule php7/\#LoadModule php7/' "${APACHE_CONF}"
 
@@ -6160,7 +6273,7 @@ rewrite_confs() {
       fi
     fi
 
-    ## FastCGI (fcgid)
+    ## FCGID:
     if [ "${HAVE_FCGID}" = "YES" ]; then
       if [ -e "${PHPMODULES}" ]; then
         if ! grep -m1 -c 'fcgid_module' ${PHPMODULES}; then
@@ -6213,7 +6326,6 @@ rewrite_confs() {
     ${PERL} -pi -e "s#Alias /webmail \"/usr/local/www/roundcube/\"#Alias /webmail \"/usr/local/www/${WEBMAILLINK}/\"#" "${APACHE_EXTRA_PATH}/httpd-alias.conf"
 
     php_conf
-
     # doModLsapi 0
 
     ## Disable UserDir access if userdir_access=no is set in the options.conf file
@@ -6780,6 +6892,7 @@ php_conf() {
       set_service "php-fpm${php_shortrelease}" OFF
     done
   else
+    ## Delete FPM service
     for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
       set_service "php-fpm${php_shortrelease}" delete
     done
@@ -6878,7 +6991,7 @@ php_conf() {
         echo "loglevel=warn"
         echo ""
         echo ";User Apache is running as"
-        echo "webserver_user=apache"
+        echo "webserver_user=${APACHE_USER}"
         echo ""
         echo ";Path all scripts have to be in"
         echo "docroot=/"
