@@ -1332,6 +1332,10 @@ global_setup() {
 
     basic_system_security
 
+    printf "PortsBuild installation completed.\n\n"
+
+    exit 0
+
   else
     printf "PortsBuild installation canceled.\n\n"
     # show_main_menu
@@ -2002,7 +2006,7 @@ install_cron() {
   COUNT=$(grep -c dataskq < /etc/crontab)
 
   if [ "$COUNT" = 0 ]; then
-    if [ -s "${DA_CRON_FILE}" ]; then
+    # if [ -s "${DA_CRON_FILE}" ]; then
       printf "Updating /etc/crontab with required DirectAdmin schedules\n"
       # cat "${DA_CRON_FILE}" >> /etc/crontab
       {
@@ -2014,9 +2018,9 @@ install_cron() {
         printf "40\t1\t1\t*\t*\troot\techo 'action=reset&value=all' >> /usr/local/directadmin/data/task.queue\n"
         printf "0\t4\t*\t*\t*\troot\techo 'action=check&value=license' >> /usr/local/directadmin/data/task.queue\n"
       } >> /etc/crontab
-    else
-      printf "*** Error: Could not find %s or the file is empty.\n" "${DA_CRON_FILE}"
-    fi
+    # else
+    #   printf "*** Error: Could not find %s or the file is empty.\n" "${DA_CRON_FILE}"
+    # fi
   fi
 }
 
@@ -3844,7 +3848,7 @@ phpmyadmin_upgrade() {
 ## Apache 2.4 Installation (refereces doApache2 from CB2)
 apache_install() {
 
-  local PHPMODULES ADMIN_HTTP HAVE_DACONF HDC
+  local APACHE_HSP PHPMODULES ADMIN_HTTP HAVE_DACONF HDC
 
   if [ "${OPT_WEBSERVER}" != "apache" ]; then
     printf "***\n Error: Can't install Apache 2.4 because it hasn't been enabled in options.conf"
@@ -3877,7 +3881,7 @@ apache_install() {
   # fi
 
   ### Main Installation
-  if [ "${APACHE24_MAKE_SET}" = "" ] && [ "${APACHE24_MAKE_UNSET}" = "" ] && [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "NO" ]; then
+  if [ -z "${APACHE24_MAKE_SET}" ] && [ -z "${APACHE24_MAKE_UNSET}" ] && [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "NO" ]; then
     ${PKGI} "${PORT_APACHE24}"
   else
     ## Todo: Harden Symlinks Patch for Apache 2.4
@@ -3925,7 +3929,7 @@ apache_install() {
   ## This is already done (Apache 2.4 default)
   ${PERL} -pi -e 's/^DefaultType/#DefaultType/' ${APACHE_CONF}
 
-  ${CHMOD} 710 ${APACHE_PATH}
+  ${CHMOD} 710 "${APACHE_PATH}"
 
   ## Update directadmin.conf (template) with new paths:
   setVal apache_ver 2.0 "${DA_CONF_TEMPLATE}"
@@ -4332,6 +4336,8 @@ apache_install() {
     printf "Restarting Apache\n"
     ${SERVICE} apache24 restart
   fi
+
+  return
 
 }
 
@@ -7645,7 +7651,7 @@ validate_options() {
 ## e.g. install_app exim
 install_app() {
 
-  case $2 in
+  case $1 in
     "apache"|"apache24") apache_install ;;
     "awstats") awstats_install ;;
     "bfm") bfm_setup ;;
@@ -7747,7 +7753,7 @@ update() {
 ## Upgrade an application or service
 upgrade_app() {
 
-  case $2 in
+  case $1 in
     "apache"|"httpd") apache_upgrade ;;
     "awstats") awstats_upgrade ;;
     "blockcracking"|"bc") blockcracking_upgrade ;;
@@ -7877,7 +7883,9 @@ show_debug() {
 ## Verify: Rewrite Menu
 rewrite_app() {
 
-  case $2 in
+  local APP="$1"
+
+  case "${APP}" in
     "apache"|"apache24") apache_host_conf ;;
     "exim") exim_rewrite_confs ;;
     "dovecot") dovecot_rewrite_confs ;;
