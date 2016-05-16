@@ -121,6 +121,7 @@ readonly EXIM_GROUP="mail"     ## mail
 # readonly DA_SRV_GROUP=diradmin
 
 ## System Binary/Application paths and variables
+# readonly BIN=/bin
 # readonly UB=/usr/bin
 # readonly US=/usr/sbin
 # readonly ULB=/usr/local/bin
@@ -137,9 +138,6 @@ readonly MAKE=/usr/bin/make
 readonly MKDIR=/bin/mkdir
 readonly PERL=/usr/local/bin/perl
 readonly PKG=/usr/sbin/pkg
-readonly PKGI="${PKG} install -y"
-readonly PKGU="${PKG} upgrade -y"
-readonly PKGD="${PKG} delete -f"
 readonly PW=/usr/sbin/pw
 readonly PORTSNAP=/usr/sbin/portsnap
 readonly PORTMASTER=/usr/local/sbin/portmaster
@@ -907,6 +905,9 @@ ask_user() {
 
 ################################################################################
 
+pkgi() { ${PKG} install -y "$@"; }
+pkgu() { ${PKG} upgrade -y "$@"; }
+pkgd() { ${PKG} delete -f "$@"; }
 
 ## pkg update
 pkg_update() {
@@ -914,20 +915,6 @@ pkg_update() {
   printf "Updating FreeBSD packages index\n"
   ${PKG} update
 }
-
-################################################################
-
-## Install packages without prompts
-# pkgi() {
-#   ${PKG} install -y "$@"
-# }
-
-################################################################
-
-## Upgrade packages without prompts
-# pkgu() {
-#   ${PKG} upgrade -y "$@"
-# }
 
 ################################################################
 
@@ -944,8 +931,8 @@ ports_update() {
 ## (Need to work with eval)
 make_install_clean() {
 
-  ## $1 = category?
-  ## $2 = port?
+  # local CATEGORY=$1
+  # local PORT=$2
 
   ## Origin: category/portname
   CHOSEN_PORT=$1
@@ -957,8 +944,11 @@ make_install_clean() {
   # # install via ports:
 
   ## /usr/bin/make
-  make -DNO_DIALOG -C "${PORTS_BASE}/${CHOSEN_PORT}" rmconfig
-  make -DNO_DIALOG -C "${PORTS_BASE}/${CHOSEN_PORT}" OPTIONS_SET="${_MAKE_SET}" OPTIONS_UNSET="${_MAKE_UNSET}" reinstall clean
+  ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${CHOSEN_PORT}" rmconfig
+  ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${CHOSEN_PORT}" \
+  OPTIONS_SET="${_MAKE_SET}" \
+  OPTIONS_UNSET="${_MAKE_UNSET}" \
+  reinstall clean
   # fi
 }
 
@@ -1019,20 +1009,19 @@ getTimezone() {
 ## Add (new) User to (new) Group (from CB2)
 addUserGroup() {
 
-  ## $1 = user
-  ## $2 = group
+  local USER=$1
+  local GROUP=$2
 
-  if ! /usr/bin/grep -q "^${2}:" < /etc/group; then
-    ${PW} groupadd "${2}"
+  if ! /usr/bin/grep -q "^${GROUP}:" < /etc/group; then
+    ${PW} groupadd "${GROUP}"
   fi
 
-  if ! /usr/bin/id "${1}" > /dev/null; then
-    ${PW} useradd -g "${2}" -n "${1}" -s /sbin/nologin
+  if ! /usr/bin/id "${USER}" > /dev/null; then
+    ${PW} useradd -g "${GROUP}" -n "${USER}" -s /sbin/nologin
   fi
 }
 
 ################################################################################
-
 
 ## Random Password Generator (from CB2)
 random_pass() {
@@ -1153,9 +1142,9 @@ global_setup() {
     ## Install Dependencies
     printf "Installing required dependencies and compatibility libraries (misc/compats)\n"
     if [ "${OS_MAJ}" -eq 10 ]; then
-      ${PKGI} "${PORT_DEPS_100}" misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
+      pkgi "${PORT_DEPS_100}" misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
     elif [ "${OS_MAJ}" -eq 9 ]; then
-      ${PKGI} "${PORT_DEPS}" misc/compat4x misc/compat5x misc/compat6x misc/compat8x
+      pkgi "${PORT_DEPS}" misc/compat4x misc/compat5x misc/compat6x misc/compat8x
     fi
 
     ## Check for /etc/rc.conf
@@ -1172,7 +1161,7 @@ global_setup() {
 
     if [ "${OPT_INSTALL_CCACHE}" = "YES" ]; then
       printf "Installing: %s\n" "${PORT_CCACHE}"
-      ${PKGI} "${PORT_CCACHE}"
+      pkgi "${PORT_CCACHE}"
 
       if [ $? = 0 ]; then
         ${SYSRC} -f /etc/make.conf WITH_CCACHE_BUILD=yes ## Still needed?
@@ -1181,11 +1170,11 @@ global_setup() {
     fi
 
     printf "Installing: %s\n" "${PORT_PORTMASTER}"
-    ${PKGI} "${PORT_PORTMASTER}"
+    pkgi "${PORT_PORTMASTER}"
 
     if [ "${OPT_INSTALL_SYNTH}" = "YES" ] && [ ! -e "${SYNTH}" ]; then
       printf "Installing: %s\n" "${PORT_SYNTH}"
-      ${PKGI} "${PORT_SYNTH}"
+      pkgi "${PORT_SYNTH}"
 
       ## Todo: Configure synth (copy a default/stock Live system profile?)
       # synth configure
@@ -1198,7 +1187,7 @@ global_setup() {
       if [ -e "${PERL}" ]; then
         ln -s "${PERL}" /usr/bin/perl
       else
-        ${PKGI} "${PORT_PERL}"
+        pkgi "${PORT_PERL}"
         if [ $? -eq 0 ]; then
           ln -s "${PERL}" /usr/bin/perl
         fi
@@ -1296,18 +1285,20 @@ global_setup() {
     ## DirectAdmin Install
     ## This is where directadmin.conf gets created for the first time (copy of the template)
     printf "Running ./directadmin i\n"
-    ${DA_PATH}/directadmin i
+    ${DA_BIN} i
 
     ## Set DirectAdmin Permissions
     printf "Running ./directadmin p\n"
-    ${DA_PATH}/directadmin p
+    ${DA_BIN} p
 
     ## On first time startup, DirectAdmin creates /etc/proftpd.conf and backs up the original to /etc/proftpd.conf.back
     ## "Install of /usr/local/directadmin/data/templates/proftpd.conf to /etc/proftpd.conf successfull"
     ## PB: Verify:
-    rm /etc/proftpd.conf
-    rm /etc/proftpd.conf.back
-    ln -s /usr/local/etc/proftpd.conf /etc/proftpd.conf
+    if [ -e /etc/proftpd.conf ]; then
+      rm /etc/proftpd.conf
+      rm /etc/proftpd.conf.back
+      ln -s /usr/local/etc/proftpd.conf /etc/proftpd.conf
+    fi
 
     ## From DA's scripts/install.sh
     ADMIN_GROUP_COUNT=$(grep -c -e '^admin:' /etc/group)
@@ -1514,6 +1505,7 @@ control_service() {
     "nginx") CONFIG_STATUS=$(${SERVICE} nginx configtest) ;;
     "exim") CONFIG_STATUS=$(${EXIM_BIN} -C "${EXIM_CONF}" -bV) ;;
     "dovecot") CONFIG_STATUS=$(${DOVECOT_BIN} -c ${DOVECOT_CONF}) ;;
+    "sshd") CONFIG_STATUS=$(${SERVICE} sshd configtest) ;;
   esac
 
   ## Perform the necessary action
@@ -2239,18 +2231,22 @@ exim_install() {
 
   ### Main Installation
   if [ "${EXIM_MAKE_SET}" = "" ] && [ "${EXIM_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} ${PORT_EXIM}
+    pkgi ${PORT_EXIM}
   else
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_EXIM}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_EXIM}" mail_exim_SET="${EXIM_MAKE_SET}" mail_exim_UNSET="${EXIM_MAKE_UNSET}" \
-    OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_EXIM}" rmconfig
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_EXIM}" \
+    mail_exim_SET="${EXIM_MAKE_SET}" \
+    mail_exim_UNSET="${EXIM_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" \
+    OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" \
+    reinstall clean
   fi
   # EXIM_USER="${EXIM_USER}" EXIM_GROUP="${EXIM_GROUP}"
 
   ## From: DA's scripts/install.sh
-  mkdir -p ${VIRTUAL_PATH}
-  chown -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}
-  chmod 755 ${VIRTUAL_PATH}
+  mkdir -p "${VIRTUAL_PATH}"
+  chown -f "${EXIM_USER}:${EXIM_GROUP}" "${VIRTUAL_PATH}"
+  chmod 755 "${VIRTUAL_PATH}"
 
   if [ ! -s "${VIRTUAL_PATH}/limit" ]; then
     echo "${LIMIT_DEFAULT}" > "${VIRTUAL_PATH}/limit"
@@ -2424,23 +2420,30 @@ spamassassin_install() {
 
   printf "Installing SpamAssassin optional and required Perl modules first\n"
 
-  ${PKGI} security/p5-Digest-SHA1 net/p5-Geo-IP net/p5-Net-CIDR-Lite mail/razor-agents net/p5-IO-Socket-INET6 www/p5-LWP-UserAgent-WithCache net/p5-Net-Patricia mail/p5-Mail-DKIM mail/p5-Mail-SPF
+  pkgi security/p5-Digest-SHA1 net/p5-Geo-IP net/p5-Net-CIDR-Lite \
+  mail/razor-agents net/p5-IO-Socket-INET6 \
+  www/p5-LWP-UserAgent-WithCache net/p5-Net-Patricia \
+  mail/p5-Mail-DKIM mail/p5-Mail-SPF
   # pkgi www/p5-LWP-UserAgent-Determined
 
   printf "Starting SpamAssassin installation\n"
 
   ### Main Installation
-  if [ "${SPAMASSASSIN_MAKE_SET}" = "" ] && [ "${SPAMASSASSIN_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} ${PORT_SPAMASSASSIN}
+  if [ -z "${SPAMASSASSIN_MAKE_SET}" ] && [ -z "${SPAMASSASSIN_MAKE_UNSET}" ] ; then
+    pkgi ${PORT_SPAMASSASSIN}
   else
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" mail_spamassassin_SET="${SPAMASSASSIN_MAKE_SET}" mail_spamassassin_UNSET="${SPAMASSASSIN_MAKE_UNSET}" \
-    OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" rmconfig
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" \
+    mail_spamassassin_SET="${SPAMASSASSIN_MAKE_SET}" \
+    mail_spamassassin_UNSET="${SPAMASSASSIN_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" \
+    OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" \
+    reinstall clean
   fi
 
   ## SpamAssassin Post-Installation Tasks
-  sysrc spamd_enable="YES"
-  sysrc spamd_flags="-c -m 15"
+  ${SYSRC} spamd_enable="YES"
+  ${SYSRC} spamd_flags="-c -m 15"
 
   ## Start SpamAssassin
   ${SERVICE} sa-spamd start
@@ -2455,12 +2458,16 @@ spamassassin_install() {
 ## SpamAssassin Upgrade
 spamassassin_upgrade() {
 
-  if [ "${SPAMASSASSIN_MAKE_SET}" = "" ] && [ "${SPAMASSASSIN_MAKE_UNSET}" = "" ] ; then
-    pkg upgrade -y ${PORT_SPAMASSASSIN}
+  if [ -z "${SPAMASSASSIN_MAKE_SET}" ] && [ -z "${SPAMASSASSIN_MAKE_UNSET}" ] ; then
+    pkgu ${PORT_SPAMASSASSIN}
   else
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" mail_spamassassin_SET="${SPAMASSASSIN_MAKE_SET}" mail_spamassassin_UNSET="${SPAMASSASSIN_MAKE_UNSET}" \
-    OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" rmconfig
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN}" \
+    mail_spamassassin_SET="${SPAMASSASSIN_MAKE_SET}" \
+    mail_spamassassin_UNSET="${SPAMASSASSIN_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" \
+    OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" \
+    reinstall clean
   fi
 
   ${SERVICE} sa-spamd restart
@@ -2476,8 +2483,8 @@ spamassassin_uninstall() {
   ${SERVICE} sa-spamd stop
 
   printf "Disabling SpamAssassin startup\n"
-  sysrc -x spamd_enable
-  sysrc -x spamd_flags
+  ${SYSRC} -x spamd_enable
+  ${SYSRC} -x spamd_flags
 
   printf "Uninstalling SpamAssassin\n"
   # pkg delete -f spamassassin
@@ -2500,18 +2507,23 @@ spamassassin_utilities_install() {
   printf "Starting SpamAssassin Utilities installation\n"
 
   ### Main Installation
-  if [ "${SPAMASSASSIN_UTILITIES_MAKE_SET}" = "" ] && [ "${SPAMASSASSIN_UTILITIES_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} ${PORT_SPAMASSASSIN_UTILITIES}
+  if [ -z "${SPAMASSASSIN_UTILITIES_MAKE_SET}" ] && [ -z "${SPAMASSASSIN_UTILITIES_MAKE_UNSET}" ] ; then
+    pkgi "${PORT_SPAMASSASSIN_UTILITIES}"
   else
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN_UTILITIES}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN_UTILITIES}" mail_sa-utils_SET="${SPAMASSASSIN_UTILITIES_MAKE_SET}" mail_sa-utils_UNSET="${SPAMASSASSIN_UTILITIES_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN_UTILITIES}" rmconfig
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_SPAMASSASSIN_UTILITIES}" \
+    mail_sa-utils_SET="${SPAMASSASSIN_UTILITIES_MAKE_SET}" \
+    mail_sa-utils_UNSET="${SPAMASSASSIN_UTILITIES_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" \
+    OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" \
+    reinstall clean
   fi
 
   printf "Updating /etc/periodic.conf\n"
-  sysrc -f /etc/periodic.conf daily_sa_enable="YES"
-  sysrc -f /etc/periodic.conf daily_sa_quiet="NO"
-  sysrc -f /etc/periodic.conf daily_sa_compile_nice="YES"
-  sysrc -f /etc/periodic.conf daily_sa_restart_spamd="YES"
+  ${SYSRC} -f /etc/periodic.conf daily_sa_enable="YES"
+  ${SYSRC} -f /etc/periodic.conf daily_sa_quiet="NO"
+  ${SYSRC} -f /etc/periodic.conf daily_sa_compile_nice="YES"
+  ${SYSRC} -f /etc/periodic.conf daily_sa_restart_spamd="YES"
   # daily_sa_update_flags="" ## -D --nogpg
   # daily_sa_compile_flags=""
   # daily_sa_compile_nice_flags=""
@@ -2524,12 +2536,12 @@ spamassassin_utilities_uninstall() {
 
   printf "Uninstalling SpamAssassin Utilities\n"
 
-  sysrc -f /etc/periodic.conf -x daily_sa_enable
-  sysrc -f /etc/periodic.conf -x daily_sa_quiet
-  sysrc -f /etc/periodic.conf -x daily_sa_compile_nice
-  sysrc -f /etc/periodic.conf -x daily_sa_restart_spamd
+  ${SYSRC} -q -f /etc/periodic.conf -x daily_sa_enable
+  ${SYSRC} -q -f /etc/periodic.conf -x daily_sa_quiet
+  ${SYSRC} -q -f /etc/periodic.conf -x daily_sa_compile_nice
+  ${SYSRC} -q -f /etc/periodic.conf -x daily_sa_restart_spamd
 
-  pkg delete -f ${PORT_SPAMASSASSIN_UTILITIES}
+  pkgd "${PORT_SPAMASSASSIN_UTILITIES}"
 
   return
 }
@@ -2542,7 +2554,7 @@ spamassassin_utilities_uninstall() {
 ## Install Exim BlockCracking (BC)
 blockcracking_install() {
 
-  if [ -x ${EXIM_BIN} ]; then
+  if [ -x "${EXIM_BIN}" ]; then
 
     printf "Downloading BlockCracking\n"
 
@@ -2621,15 +2633,15 @@ easyspamfighter_install() {
     # getFile easy_spam_fighter/exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz easy_spam_figther exim.easy_spam_fighter-${EASY_SPAM_FIGHTER_VER}.tar.gz
 
     ## Todo: grab latest version
-    ${WGET} -O "${PB_PATH}/files/esf.tar.gz" ${PB_MIRROR}/files/esf.tar.gz
+    ${WGET} -O "${PB_PATH}/files/esf.tar.gz" "${PB_MIRROR}/files/esf.tar.gz"
 
     if [ -e "${PB_PATH}/files/esf.tar.gz" ]; then
 
       ## path was: ${EXIM_PATH}/exim.easy_spam_fighter
-      mkdir -p ${EXIM_ESF_PATH}
+      mkdir -p "${EXIM_ESF_PATH}"
 
       printf "Extracting Easy Spam Fighter\n"
-      ${TAR} xvf "${PB_PATH}/files/esf.tar.gz" -C ${EXIM_ESF_PATH}
+      ${TAR} xvf "${PB_PATH}/files/esf.tar.gz" -C "${EXIM_ESF_PATH}"
 
       exim_restart
 
@@ -2724,7 +2736,7 @@ dovecot_install() {
 
   ### Main Installation
   if [ "${DOVECOT2_MAKE_SET}" = "" ] && [ "${DOVECOT2_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} ${PORT_DOVECOT2}
+    pkgi ${PORT_DOVECOT2}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" mail_dovecot2_SET="${DOVECOT2_MAKE_SET}" mail_dovecot2_UNSET="${DOVECOT2_MAKE_UNSET}" \
@@ -2916,7 +2928,7 @@ pigeonhole_install() {
 
   ### Main Installation
   if [ "${PIGEONHOLE_MAKE_SET}" = "" ] && [ "${PIGEONHOLE_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} ${PORT_WEBALIZER}
+    pkgi ${PORT_WEBALIZER}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PIGEONHOLE}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PIGEONHOLE}" mail_dovecot2_pigeonhole_SET="${PIGEONHOLE_MAKE_SET}" mail_dovecot2_pigeonhole_UNSET="${PIGEONHOLE_MAKE_UNSET}" \
@@ -2942,7 +2954,7 @@ webalizer_install() {
 
   ### Main Installation
   if [ "${WEBALIZER_MAKE_SET}" = "" ] && [ "${WEBALIZER_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} ${PORT_WEBALIZER}
+    pkgi ${PORT_WEBALIZER}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" www_webalizer_SET="${WEBALIZER_MAKE_SET}" www_webalizer_UNSET="${WEBALIZER_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -2980,7 +2992,7 @@ awstats_install() {
 
   ### Main Installation
   if [ "${AWSTATS_MAKE_SET}" = "" ] && [ "${AWSTATS_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} ${PORT_AWSTATS}
+    pkgi ${PORT_AWSTATS}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" www_awstats_SET="${AWSTATS_MAKE_SET}" www_awstats_UNSET="${AWSTATS_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
@@ -3457,10 +3469,10 @@ php_install() {
 
   if [ "${PHP_MAKE_SET}" = "" ] && [ "${PHP_MAKE_UNSET}" = "" ] ; then
     case ${OPT_PHP1_MODE} in
-      "fpm") ${PKGI} ${PORT_PHP} "${PHP_EXT_LIST}" ;;
-      "mod_php") ${PKGI} ${PORT_MOD_PHP} ;;
+      "fpm") pkgi ${PORT_PHP} "${PHP_EXT_LIST}" ;;
+      "mod_php") pkgi ${PORT_MOD_PHP} ;;
       # fastcgi) echo "not done" ;;
-      "suphp") ${PKGI} ${PORT_SUPHP} ;;
+      "suphp") pkgi ${PORT_SUPHP} ;;
     esac
   else
     case ${OPT_PHP1_MODE} in
@@ -3476,7 +3488,7 @@ php_install() {
           make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" reinstall clean
           ;;
       # fastcgi) echo "not done" ;;
-      "suphp") ${PKGI} ${PORT_SUPHP} ;;
+      "suphp") pkgi ${PORT_SUPHP} ;;
       *) printf "*** Error: Wrong PHP mode selected. (Script error?)\n"; exit ;;
     esac
   fi
@@ -3686,7 +3698,7 @@ php_upgrade() {
 
   printf "Upgrading PHP\n"
 
-  ${PKGI} upgrade "$(pkg query %o | grep "php${OPT_PHP1_VERSION}")"
+  pkgi upgrade "$(pkg query %o | grep "php${OPT_PHP1_VERSION}")"
 
   #pkg query -i -x "%o %v" '(php)'
 }
@@ -3735,7 +3747,7 @@ phpmyadmin_install() {
 
   ### Main Installation
   if [ "${PMA_MAKE_SET}" = "" ] && [ "${PMA_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} ${PORT_PHPMYADMIN}
+    pkgi ${PORT_PHPMYADMIN}
   else
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHPMYADMIN}" rmconfig
     make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHPMYADMIN}" databases_phpmyadmin_SET="${PMA_MAKE_SET}" databases_phpmyadmin_UNSET"${PMA_MAKE_UNSET}" \
@@ -3838,7 +3850,7 @@ phpmyadmin_install() {
 ## Upgrade phpMyAdmin
 phpmyadmin_upgrade() {
 
-  ${PKGU} "${PORT_PHPMYADMIN}"
+  pkgu "${PORT_PHPMYADMIN}"
 
   return
 }
@@ -3882,7 +3894,7 @@ apache_install() {
 
   ### Main Installation
   if [ -z "${APACHE24_MAKE_SET}" ] && [ -z "${APACHE24_MAKE_UNSET}" ] && [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "NO" ]; then
-    ${PKGI} "${PORT_APACHE24}"
+    pkgi "${PORT_APACHE24}"
   else
     ## Todo: Harden Symlinks Patch for Apache 2.4
     if [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "YES" ]; then
@@ -4327,7 +4339,7 @@ apache_install() {
     ln -s "${APACHE_SSL_KEY}" "${APACHE_PATH}/ssl.key/server.key"
     ln -s "${APACHE_SSL_CA}" "${APACHE_PATH}/ssl.crt/server.ca"
 
-    if [ ! -e "${APACHE_HTTPD_BIN}" ]; then
+    if [ -e "${APACHE_HTTPD_BIN}" ]; then
       ln -s "${APACHE_HTTPD_BIN}" /usr/sbin/httpd
     fi
   fi
@@ -4350,7 +4362,7 @@ apache_uninstall() {
 
   ${SERVICE} apache24 stop
 
-  ${PKGD} apache24
+  pkgd apache24
 
   sysrc -q -x apache24_enable
   sysrc -q -x apache24_http_accept_enable
@@ -4371,7 +4383,7 @@ install_mod_htscanner() {
     return
   fi
 
-  ${PKGI} "${PORT_HTSCANNER}"
+  pkgi "${PORT_HTSCANNER}"
 
   # APXS=/usr/local/sbin/apxs
   # $APXS -a -i -c mod_htscanner2.c
@@ -4404,7 +4416,7 @@ letsencrypt_install() {
     return
   fi
 
-  ${PKGI} "${PORT_LETSENCRYPT}"
+  pkgi "${PORT_LETSENCRYPT}"
 
   ${SYSRC} -f /etc/periodic.conf weekly_letsencrypt_enable="YES"
 
@@ -4422,7 +4434,7 @@ letsencrypt_install() {
 ## Uninstall Let's Encrypt
 letsencrypt_uninstall() {
 
-  ${PKGD} "${PORT_LETSENCRYPT}"
+  pkgd "${PORT_LETSENCRYPT}"
 
   ${SYSRC} -q -f /etc/periodic.conf -x weekly_letsencrypt_enable="YES"
 
@@ -4488,7 +4500,7 @@ nginx_install() {
 
   ### Main Installation
   if [ "${NGINX_MAKE_SET}" = "" ] && [ "${NGINX_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} "${PORT_NGINX}"
+    pkgi "${PORT_NGINX}"
   else
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" rmconfig
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_NGINX}" \
@@ -4555,7 +4567,7 @@ nginx_uninstall() {
 
   ${SERVICE} nginx stop
 
-  ${PKGD} "${PORT_NGINX}"
+  pkgd "${PORT_NGINX}"
 
   ${SYSRC} -q -x nginx_enable
 
@@ -4611,7 +4623,7 @@ pureftpd_install() {
 
   ### Main Installation
   if [ "${PUREFTPD_MAKE_SET}" = "" ] && [ "${PUREFTPD_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} "${PORT_PUREFTPD}"
+    pkgi "${PORT_PUREFTPD}"
   else
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" rmconfig
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PUREFTPD}" \
@@ -4725,7 +4737,7 @@ pureftpd_uninstall() {
 
   ${SERVICE} pureftpd stop
 
-  ${PKGD} "${PORT_PUREFTPD}"
+  pkgd "${PORT_PUREFTPD}"
 
   ${SYSRC} -q -x pureftpd_enable
   ${SYSRC} -q -x pureftpd_flags
@@ -4752,7 +4764,7 @@ proftpd_install() {
 
   ### Main Installation
   if [ "${PROFTPD_MAKE_SET}" = "" ] && [ "${PROFTPD_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} "${PORT_PROFTPD}"
+    pkgi "${PORT_PROFTPD}"
   else
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" rmconfig
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PROFTPD}" \
@@ -4797,7 +4809,7 @@ proftpd_install() {
       exit 1
     fi
 
-    ${PKGI} "${PORT_PROFTPD_CLAMAV}"
+    pkgi "${PORT_PROFTPD_CLAMAV}"
 
     ## Verify:
     if ! grep -m1 -q "^Include ${PROFTPD_CLAMAV_CONF}" "${PROFTPD_CONF}"; then
@@ -4846,8 +4858,8 @@ proftpd_uninstall() {
 
   ${SERVICE} proftpd stop
 
-  ${PKGD} "${PORT_PROFTPD}"
-  ${PKGD} "${PORT_PROFTPD_CLAMAV}"
+  pkgd "${PORT_PROFTPD}"
+  pkgd "${PORT_PROFTPD_CLAMAV}"
 
   ${SYSRC} -q -x proftpd_enable
   ${SYSRC} -q -x proftpd_flags
@@ -4870,7 +4882,7 @@ clamav_install() {
 
   ### Main Installation
   if [ "${CLAMAV_MAKE_SET}" = "" ] && [ "${CLAMAV_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} "${PORT_CLAMAV}"
+    pkgi "${PORT_CLAMAV}"
   else
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_CLAMAV}" rmconfig
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_CLAMAV}" \
@@ -4944,7 +4956,7 @@ clamav_uninstall() {
   ${SERVICE} clamav-clamd stop
   ${SERVICE} clamav-freshclam stop
 
-  ${PKGD} "${PORT_CLAMAV}"
+  pkgd "${PORT_CLAMAV}"
 
   ${SYSRC} -q -x clamav_clamd_enable
   ${SYSRC} -q -x clamav_freshclam_enable
@@ -4969,7 +4981,7 @@ roundcube_install() {
 
   ### Main Installation
   if [ "${ROUNDCUBE_MAKE_SET}" = "" ] && [ "${ROUNDCUBE_MAKE_UNSET}" = "" ] ; then
-    ${PKGI} "${PORT_ROUNDCUBE}"
+    pkgi "${PORT_ROUNDCUBE}"
   else
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" rmconfig
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_ROUNDCUBE}" \
@@ -5484,7 +5496,7 @@ modsecurity_install() {
 
   local PHPMODULES
 
-  ${PKGI} www/mod_security
+  pkgi www/mod_security
 
   ## CB2: For nginx we need to rebuild it, because ModSecurity is added as a static module
   if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
@@ -6626,7 +6638,7 @@ verify_server_ca() {
     if [ -s /usr/local/share/certs/ca-root-nss.crt ]; then
       cp -f /usr/local/share/certs/ca-root-nss.crt "${SSL_CA}"
     else
-      ${PKGI} "${PORT_CA_ROOT_NSS}"
+      pkgi "${PORT_CA_ROOT_NSS}"
       if [ $? = 0 ]; then
         cp -f /usr/local/share/certs/ca-root-nss.crt "${SSL_CA}"
       fi
@@ -6747,7 +6759,7 @@ suhosin_install() {
   printf "Starting Suhosin installation\n"
 
   ## Main Installation
-  ${PKGI} "${PORT_SUHOSIN}"
+  pkgi "${PORT_SUHOSIN}"
 
   ## Add support for scanning uploads using ClamAV
   if [ "${OPT_SUHOSIN_UPLOADSCAN}" = "YES" ] && [ ! -e "${CLAMDSCAN}" ]; then
@@ -7651,38 +7663,47 @@ validate_options() {
 ## e.g. install_app exim
 install_app() {
 
-  case $1 in
+  local APP="$1"
+
+  if [ "${APP}" = "install" ]; then
+    APP="$2" # shift?
+  fi
+
+  printf "Debug: arg1: %s\n" "${APP}"
+
+  case ${APP} in
     "apache"|"apache24") apache_install ;;
     "awstats") awstats_install ;;
     "bfm") bfm_setup ;;
     "bind"|"named"|"dns") bind_setup ;;
     "blockcracking"|"bc") blockcracking_install ;;
     "directadmin"|"da") directadmin_install ;;
-    "dkim") ${PKGI} ${PORT_LIBDKIM} ;;
+    "dkim") pkgi ${PORT_LIBDKIM} ;;
     "easy_spam_fighter"|"easyspamfighter"|"esf") easyspamfighter_install ;;
     "exim") exim_install ;;
-    "ioncube"|"ic") ${PKGI} "${PORT_IONCUBE}" ;;
+    "ioncube"|"ic") pkgi "${PORT_IONCUBE}" ;;
     "ipfw") ipfw_enable ;;
-    "libspf2"|"libspf"|"spf") ${PKGI} ${PORT_LIBSPF2} ;;
+    "libspf2"|"libspf"|"spf") pkgi ${PORT_LIBSPF2} ;;
+    "mariadb"|"mysql") echo "Installing: ${OPT_SQL_DB}";
+      install_app "${OPT_SQL_DB}" ;;
     "mariadb55")
-      ${PKGI} ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
+      pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
       sql_post_install ;;
     "mariadb100")
-      ${PKGI} ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
+      pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
       sql_post_install ;;
     "mariadb101")
-      ${PKGI} ${PORT_MARIADB101} ${PORT_MARIADB101_CLIENT}
+      pkgi ${PORT_MARIADB101} ${PORT_MARIADB101_CLIENT}
       sql_post_install ;;
     "mysql55")
-      ${PKGI} ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
+      pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
       sql_post_install ;;
     "mysql56")
-      ${PKGI} ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
+      pkgi ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
       sql_post_install ;;
     "mysql57")
-      ${PKGI} ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
+      pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
       sql_post_install ;;
-    "mariadb") echo "oops" ;; ## Todo:
     "modsecurity"|"modsec"|"mod_security") modsecurity_install ;;
     "nginx") nginx_install ;;
     "php"|"ftm"|"php55"|"php56"|"php70") php_install ;;
@@ -7693,7 +7714,7 @@ install_app() {
     "spamassassin"|"sa") spamassassin_install ;;
     "suhosin") suhosin_install ;;
     "webalizer") webalizer_install ;;
-    "") show_install ;;
+    *) show_install_menu ;;
   esac
 
   return
@@ -7927,9 +7948,8 @@ show_rewrite_menu() {
 
 ################################################################################
 
-
-## Todo: Show Installation Menu
-show_install() {
+## Show Installation Menu
+show_install_menu() {
 
 #  ( printf "Package Version Origin\n" ;
 #  pkg query -i -x "%n %v %o" '(www/apache24|www/nginx
@@ -7974,7 +7994,6 @@ show_install() {
 
 ################################################################################
 
-
 ## Show logo :)
 show_logo() {
 
@@ -8009,14 +8028,14 @@ show_versions() {
   ( printf "Package Version Origin\n" ; \
    pkg query -i -x "%n %v %o" '(www/apache24|www/nginx|security/clamav
    |lang/php54|lang/php55|lang/php56|lang/php70|ftp/curl|mail/exim
-   |mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin
-   |ftp/wget|security/suhosin|www/suphp|databases/mariadb55-server
-   |databases/mariadb55-client|databases/mariadb100-server
-   |databases/mariadb100-client|databases/mariadb101-server
-   |databases/mariadb101-client|databases/mysql55-server
-   |databases/mysql55-client|databases/mysql56-server
-   |databases/mysql56-client|databases/mysql57-server
-   |databases/mysql57-client|databases/phpmyadmin)' ) | column -t
+   |mail/dovecot2|lang/perl5|mail/roundcube|mail/spamassassin
+   |ftp/wget|security/suhosin|www/suphp|databases/phpmyadmin
+   |databases/mariadb55-server|databases/mariadb55-client
+   |databases/mariadb100-server|databases/mariadb100-client
+   |databases/mariadb101-server|databases/mariadb101-client
+   |databases/mysql55-server|databases/mysql55-client
+   |databases/mysql56-server|databases/mysql56-client
+   |databases/mysql57-server|databases/mysql57-client)' ) | column -t
   printf "\n"
 
   return
@@ -8032,14 +8051,14 @@ show_outdated() {
   ( printf "Package Outdated\n" ; \
    pkg version -l '<' -x '(www/apache24|www/nginx|security/clamav
    |lang/php54|lang/php55|lang/php56|lang/php70|ftp/curl|mail/exim
-   |mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin|mail/spamassassin
-   |ftp/wget|security/suhosin|www/suphp|databases/mariadb55-server
-   |databases/mariadb55-client|databases/mariadb100-server
-   |databases/mariadb100-client|databases/mariadb101-server
-   |databases/mariadb101-client|databases/mysql55-server
-   |databases/mysql55-client|databases/mysql56-server
-   |databases/mysql56-client|databases/mysql57-server
-   |databases/mysql57-client|databases/phpmyadmin)' ) | column -t
+   |mail/dovecot2|lang/perl5|mail/roundcube|mail/spamassassin
+   |ftp/wget|security/suhosin|www/suphp|databases/phpmyadmin
+   |databases/mariadb55-server|databases/mariadb55-client
+   |databases/mariadb100-server|databases/mariadb100-client
+   |databases/mariadb101-server|databases/mariadb101-client
+   |databases/mysql55-server|databases/mysql55-client
+   |databases/mysql56-server|databases/mysql56-client
+   |databases/mysql57-server|databases/mysql57-client)' ) | column -t
   printf "\n"
 
   return
