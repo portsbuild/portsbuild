@@ -97,6 +97,7 @@ if [ ! -e "${PB_PATH}" ] || [ "$(pwd)" != "${PB_PATH}" ]; then
 fi
 
 readonly PB_CONF="${PB_PATH}/options.conf"
+readonly PB_CONFIG="${PB_PATH}/configure"
 readonly PB_CUSTOM="${PB_PATH}/custom"
 
 ## PortsBuild Remote File Repository
@@ -259,9 +260,9 @@ PMA_PATH="${WWW_DIR}/phpMyAdmin"
 PMA_CONFIG="${PMA_PATH}/config.inc.php"
 
 ## PHP
-PHP1_VERSION=56
+PHP1_VERSION="5.6"
 PHP1_MODE="php-fpm"
-# PHP2_VERSION=70
+# PHP2_VERSION="7.0"
 # PHP2_MODE="fastcgi"
 PHP_VERSION=${PHP1_VERSION}
 PHP_MODE=${PHP1_MODE}
@@ -277,7 +278,7 @@ PHP_INI_OPCACHE="${PHP_ETC}/opcache.ini"
 PHP_INI_DIRECTADMIN="${PHP_ETC}/10-directadmin.ini"
 
 ## Exim
-EXIM=/usr/local/sbin/exim
+readonly EXIM=/usr/local/sbin/exim
 EXIM_PATH=/usr/local/etc/exim
 EXIM_CONF="${EXIM_PATH}/configure" ## required_files in rc.d/exim
 : ${EXIM_RECIPIENTS_MAX:=150}
@@ -290,7 +291,7 @@ EXIM_BC_PATH="${EXIM_PATH}/bc"
 EXIM_ESF_PATH="${EXIM_PATH}/esf"
 
 ## Dovecot
-DOVECOT=/usr/local/sbin/dovecot
+readonly DOVECOT=/usr/local/sbin/dovecot
 DOVECOT_PATH=/usr/local/etc/dovecot
 DOVECOT_CONF="${DOVECOT_PATH}/dovecot.conf"
 DOVECOT_CONF_SIEVE=""
@@ -300,16 +301,9 @@ DOVECOT_SSL_CRT="${DOVECOT_PATH}/ssl/dovecot.crt"
 DOVECOT_SSL_CA="${DOVECOT_PATH}/ssl/dovecot.ca"
 
 ## ClamAV
+readonly CLAMDSCAN=/usr/local/bin/clamdscan
 CLAMD_CONF=/usr/local/etc/clamd.conf
 FRESHCLAM_CONF=/usr/local/etc/freshclam.conf
-CLAMDSCAN=/usr/local/bin/clamdscan
-
-## PureFTPD
-PATH_TO_UPLOADSCAN=/usr/local/bin/pureftpd_uploadscan.sh
-PUREFTPD_UPLOADSCAN_SCRIPT="${PB_PATH}/configure/pureftpd/pureftpd_uploadscan.sh"
-if [ -e "${PB_CUSTOM}/pureftpd/pureftpd_uploadscan.sh" ]; then
-  PUREFTPD_UPLOADSCAN_SCRIPT="${PB_CUSTOM}/pureftpd/pureftpd_uploadscan.sh"
-fi
 
 ## ProFTPD
 PROFTPD_CONF=/usr/local/etc/proftpd.conf
@@ -318,21 +312,24 @@ PROFTPD_DHPARAMS="${PROFTPD_ETC}/dhparams.pem"
 PROFTPD_CLAMAV_CONF=/usr/local/etc/proftpd.clamav.conf
 # PROFTPD_PASSWD=/usr/local/etc/proftpd.db
 
+## PureFTPD
+PUREFTPD_UPLOADSCAN=/usr/local/bin/pureftpd_uploadscan.sh
+
 ## MySQL/MariaDB
 ## DA default data path is: /home/mysql
 : ${SQL_DATA_PATH:=/var/db/mysql}
 MYSQL_HOST=localhost
-MYSQL_CNF=/usr/local/etc/my.cnf
-MYSQL=/usr/local/bin/mysql
-MYSQLADMIN=/usr/local/bin/mysqladmin
-MYSQLCHECK=/usr/local/bin/mysqlcheck
-MYSQLD=/usr/local/libexec/mysqld
-MYSQLD_SAFE=/usr/local/bin/mysqld_safe
-MYSQLDUMP=/usr/local/bin/mysqldump
-MYSQLIMPORT=/usr/local/bin/mysqlimport
-MYSQLSECURE=/usr/local/bin/mysql_secure_installation
-MYSQLSHOW=/usr/local/bin/mysqlshow
-MYSQLUPGRADE=/usr/local/bin/mysql_upgrade
+readonly MYSQL_CNF=/usr/local/etc/my.cnf
+readonly MYSQL=/usr/local/bin/mysql
+readonly MYSQLADMIN=/usr/local/bin/mysqladmin
+readonly MYSQLCHECK=/usr/local/bin/mysqlcheck
+readonly MYSQLD=/usr/local/libexec/mysqld
+readonly MYSQLD_SAFE=/usr/local/bin/mysqld_safe
+readonly MYSQLDUMP=/usr/local/bin/mysqldump
+readonly MYSQLIMPORT=/usr/local/bin/mysqlimport
+readonly MYSQLSECURE=/usr/local/bin/mysql_secure_installation
+readonly MYSQLSHOW=/usr/local/bin/mysqlshow
+readonly MYSQLUPGRADE=/usr/local/bin/mysql_upgrade
 
 ## Custom SSL Certificates
 CUSTOM_SSL_KEY=/usr/local/etc/ssl/server.key
@@ -362,7 +359,8 @@ elif [ -x /usr/bin/openssl ]; then
   OPENSSL=/usr/bin/openssl
   # GLOBAL_MAKE_VARIABLES="${GLOBAL_MAKE_VARIABLES} WITH_OPENSSL_BASE=YES"
 else
-  err 1 "***OpenSSL binary not found. Does /usr/bin/openssl exist?\n"
+  printf "*** Error: "
+  printf "OpenSSL binary not found. Does /usr/bin/openssl exist?\n"
   exit 0
 fi
 
@@ -384,12 +382,12 @@ fi
 ################################################################################
 
 ## PortsBuild Compatibility Settings
-COMPAT_APACHE24_SYMLINKS=NO
-COMPAT_PHP_SYMLINKS=YES
-COMPAT_EXIM_SYMLINKS=YES
-COMPAT_NAMED_SYMLINKS=YES
-COMPAT_DOVECOT_SYMLINKS=YES
-COMPAT_SQL_SYMLINKS=YES
+COMPAT_APACHE24_SYMLINKS="NO"
+COMPAT_DOVECOT_SYMLINKS="YES"
+COMPAT_EXIM_SYMLINKS="YES"
+COMPAT_NAMED_SYMLINKS="YES"
+COMPAT_PHP_SYMLINKS="YES"
+COMPAT_SQL_SYMLINKS="YES"
 
 ################################################################################
 
@@ -462,16 +460,16 @@ PORT_HTSCANNER=devel/pecl-htscanner
 # PORT_PCRE=devel/pcre
 
 ## Ports: Mail & Related Services
-PORT_EXIM=mail/exim
-PORT_SPAMASSASSIN=mail/spamassassin
-PORT_SPAMASSASSIN_UTILITIES=mail/sa-utils
-PORT_DOVECOT2=mail/dovecot2
-PORT_PIGEONHOLE=mail/dovecot2-pigeonhole
-PORT_CLAMAV=security/clamav
-PORT_ROUNDCUBE=mail/roundcube
-PORT_LIBSPF2=mail/libspf2
-PORT_LIBDKIM=mail/libdkim
-PORT_MAILMAN=mail/mailman
+PORT_EXIM="mail/exim"
+PORT_SPAMASSASSIN="mail/spamassassin"
+PORT_SPAMASSASSIN_UTILITIES="mail/sa-utils"
+PORT_DOVECOT2="mail/dovecot2"
+PORT_PIGEONHOLE="mail/dovecot2-pigeonhole"
+PORT_CLAMAV="security/clamav"
+PORT_ROUNDCUBE="mail/roundcube"
+PORT_LIBSPF2="mail/libspf2"
+PORT_LIBDKIM="mail/libdkim"
+PORT_MAILMAN="mail/mailman"
 
 ## Ports: FTPd
 PORT_PUREFTPD="ftp/pure-ftpd"
@@ -527,17 +525,26 @@ NGINX_MAKE_UNSET=""
 
 PHP55_MAKE_SET="" # MAILHEAD
 PHP55_MAKE_UNSET=""
-PHP55_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP GD GETTEXT HASH ICONV IMAP JSON MBSTRING MCRYPT MYSQL MYSQLI OPCACHE OPENSSL PDF PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
+PHP55_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP \
+GD GETTEXT HASH ICONV IMAP JSON MBSTRING MCRYPT MYSQL MYSQLI OPCACHE OPENSSL PDF \
+PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP \
+SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
 PHP55_EXT_MAKE_UNSET=""
 
 PHP56_MAKE_SET="" # MAILHEAD
 PHP56_MAKE_UNSET=""
-PHP56_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP GD GETTEXT HASH ICONV IMAP JSON MBSTRING MCRYPT MYSQL MYSQLI OPCACHE OPENSSL PDF PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
+PHP56_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP \
+GD GETTEXT HASH ICONV IMAP JSON MBSTRING MCRYPT MYSQL MYSQLI OPCACHE OPENSSL PDF \
+PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP \
+SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
 PHP56_EXT_MAKE_UNSET=""
 
 PHP70_MAKE_SET=""
 PHP70_MAKE_UNSET=""
-PHP70_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP GD GETTEXT HASH ICONV IMAP INTL JSON MBSTRING MCRYPT MYSQLI OPCACHE OPENSSL PDF PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
+PHP70_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP \
+GD GETTEXT HASH ICONV IMAP INTL JSON MBSTRING MCRYPT MYSQLI OPCACHE OPENSSL PDF \
+PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP \
+SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
 PHP70_EXT_MAKE_UNSET=""
 
 ## Prefixes for multi-PHP installations:
@@ -598,41 +605,53 @@ PUREFTPD_MAKE_UNSET=""
 
 ################################################################################
 
-PHP_HANDLERS_HTTPD=${APACHE_EXTRAS}/httpd-php-handlers.conf
-SUPHP_HTTPD=${APACHE_EXTRAS}/httpd-suphp.conf
-
-APCONFDIR="${PB_PATH}/configure/ap2/conf"
-APCUSTOMCONFDIR=0
-
-if [ -d "${PB_PATH}/custom/ap2/conf" ]; then
-  APCUSTOMCONFDIR="${PB_PATH}/custom/ap2/conf"
-fi
+###
+### Custom Configurations
+###
 
 ## SSL Certificate Generation Parameters
-SSL_REQ_CONF="${PB_PATH}/configure/ssl/openssl_req.conf"
+SSL_REQ_CONF="${PB_CONFIG}/ssl/openssl_req.conf"
 if [ -e "${PB_CUSTOM}/ssl/openssl_req.conf" ]; then
   SSL_REQ_CONF="${PB_CUSTOM}/ssl/openssl_req.conf"
 fi
 
+PHP_HANDLERS_CONF="${APACHE_EXTRAS}/httpd-php-handlers.conf"
+SUPHP_HTTPD="${APACHE_EXTRAS}/httpd-suphp.conf"
+SUPHP_CONF_FILE=/usr/local/etc/suphp.conf
+# SUPHP_PATH=/usr/local/suphp
+# SUPHP_SO=/usr/lib/apache/mod_suphp.so
+
 ## Mod Security for Apache
-MODSECURITY_APACHE_INCLUDE="${PB_PATH}/configure/ap2/conf/extra/httpd-modsecurity.conf"
+MODSECURITY_APACHE_INCLUDE="${PB_CONFIG}/ap2/conf/extra/httpd-modsecurity.conf"
 if [ -e "${PB_CUSTOM}/ap2/conf/extra/httpd-modsecurity.conf" ]; then
   MODSECURITY_APACHE_INCLUDE="${PB_CUSTOM}/ap2/conf/extra/httpd-modsecurity.conf"
 fi
 
 ## Mod Security for Nginx
-MODSECURITY_NGINX_INCLUDE="${PB_PATH}/configure/nginx/conf/nginx-modsecurity.conf"
+MODSECURITY_NGINX_INCLUDE="${PB_CONFIG}/nginx/conf/nginx-modsecurity.conf"
 if [ -e "${PB_CUSTOM}/nginx/conf/nginx-modsecurity.conf" ]; then
   MODSECURITY_NGINX_INCLUDE="${PB_CUSTOM}/nginx/conf/nginx-modsecurity.conf"
 fi
 
 ## Mod Security for Apache+Nginx Reverse Proxy
-MODSECURITY_NGINX_REVERSE_INCLUDE="${PB_PATH}/configure/nginx_reverse/conf/nginx-modsecurity.conf"
+MODSECURITY_NGINX_REVERSE_INCLUDE="${PB_CONFIG}/nginx_reverse/conf/nginx-modsecurity.conf"
 if [ -e "${PB_CUSTOM}/nginx_reverse/conf/nginx-modsecurity.conf" ]; then
   MODSECURITY_NGINX_REVERSE_INCLUDE="${PB_CUSTOM}/nginx_reverse/conf/nginx-modsecurity.conf"
 fi
 
 MODSECURITY_CUSTOM_RULES="${PB_CUSTOM}/modsecurity/conf"
+
+## Verify:
+# for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
+#   eval $(echo "PHP_EXT_FPM${php_shortrelease}=/usr/local/php${php_shortrelease}/lib/php.conf.d/10-directadmin.ini")
+#   EVAL_PHP_EXT_SUPHP_VAR=PHP_EXT_FPM${php_shortrelease}
+#   eval $(echo "PHP_EXT_SUPHP${php_shortrelease}=$(eval_var "${EVAL_PHP_EXT_SUPHP_VAR}")")
+# done
+
+## Additional ini files
+PHP_CUSTOM_PHP_CONF_D_INI_PATH="${PB_CUSTOM}/php.conf.d"
+
+################################################################################
 
 ## Verify: From CB2:
 if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
@@ -647,7 +666,6 @@ fi
 
 ################################################################################
 
-
 ## Todo:
 # if [ ! -f options.conf ]; then
 # # recreate file
@@ -660,7 +678,6 @@ fi
 . options.conf
 
 ################################################################################
-
 
 ## Get DirectAdmin Option Values (from CB2)
 ## Retrieves values from directadmin/conf/options.conf
@@ -726,40 +743,40 @@ getOpt() {
 ## Used to manipulate CB options.conf
 setOpt() {
 
-  ## $1 = option name
-  ## $2 = value
-  ## PB Note: no eval_var
+  local OPTION_NAME="$1"
+  local OPTION_VALUE="$2"
+  local OPTION_DEFAULT="$3"
+  local VAR VALID OPT_VALUE
 
   ## Option Validation
-  VAR=$(echo "$1" | tr "'a-z'" "'A-Z'")
-  if [ -z "$(eval_var ${VAR}_DEF)" ]; then
-    echo "${1} is not a valid option."
-    #EXIT_CODE=50
-    return
-  fi
+  # VAR=$(echo "${OPTION_NAME}" | tr "'a-z'" "'A-Z'")
+  # if [ -z "$(eval_var ${VAR}_DEF)" ]; then
+  #   err 50 "${OPTION_NAME} is not a valid option."
+  #   # EXIT_CODE=50
+  #   # return
+  # fi
 
-  VALID="no"
-  ## Revalidate by asking user
-  for i in $(eval_var "${VAR}_SET"); do
-    if [ "${i}" = "${2}" ] || [ "${i}" = "userinput" ]; then
-      VALID="YES"
-      break
-    fi
-  done
+  VALID="NO"
+  ## CB2: Revalidate by asking user
+  # for i in $(eval_var "${VAR}_SET"); do
+  #   if [ "${i}" = "${2}" ] || [ "${i}" = "userinput" ]; then
+  #     VALID="YES"
+  #     break
+  #   fi
+  # done
 
-  ## Invalid option
-  if [ "${VALID}" = "NO" ]; then
-    echo "${2} is not a valid setting for ${1} option."
-    #EXIT_CODE=51
-    return
-  fi
+  ## CB2: Invalid option
+  # if [ "${VALID}" = "NO" ]; then
+  #   err 51 "${OPTION_VALUE} is not a valid setting for ${OPTION_NAME} option."
+  #   # EXIT_CODE=51
+  #   # return
+  # fi
 
-  OPT_VALUE=$(grep -m1 "^$1=" "${PB_CONF}" | cut -d= -f2)
-  ${PERL} -pi -e "s#$1=${OPT_VALUE}#$1=$2#" "${PB_CONF}"
+  OPT_VALUE=$(grep -m1 "^${OPTION_NAME}=" "${CB_CONF}" | cut -d= -f2)
+  ${PERL} -pi -e "s#${OPTION_NAME}=${OPT_VALUE}#${OPTION_NAME}=${OPTION_VALUE}#" "${CB_CONF}"
 }
 
 ################################################################################
-
 
 ## Set Value ($1) to ($2) in file ($3) (from CB2)
 setVal() {
@@ -3466,8 +3483,8 @@ php_install() {
   fi
 
   ## PHP1 Version Selector
-  case ${OPT_PHP1_VERSION} in
-    55) PORT_PHP="${PORT_PHP55}"
+  case ${OPT_PHP1_VER} in
+    "55") PORT_PHP="${PORT_PHP55}"
         PORT_PHP_EXT="${PORT_PHP55_EXT}"
         PORT_MOD_PHP="${PORT_MOD_PHP55}"
         PHP_MAKE_SET="${PHP55_MAKE_SET}"
@@ -3492,7 +3509,7 @@ php_install() {
         net/php55-xmlrpc textproc/php55-xmlwriter textproc/php55-xsl \
         archivers/php55-zip archivers/php55-zlib"
         ;;
-    56) PORT_PHP="${PORT_PHP56}"
+    "56") PORT_PHP="${PORT_PHP56}"
         PORT_PHP_EXT="${PORT_PHP56_EXT}"
         PORT_MOD_PHP="${PORT_MOD_PHP56}"
         PHP_MAKE_SET="${PHP56_MAKE_SET}"
@@ -3517,7 +3534,7 @@ php_install() {
         net/php56-xmlrpc textproc/php56-xmlwriter textproc/php56-xsl \
         archivers/php56-zip archivers/php56-zlib"
         ;;
-    70) PORT_PHP="${PORT_PHP70}"
+    "70") PORT_PHP="${PORT_PHP70}"
         PORT_PHP_EXT="${PORT_PHP70_EXT}"
         PORT_MOD_PHP="${PORT_MOD_PHP70}"
         PHP_MAKE_SET="${PHP70_MAKE_SET}"
@@ -3791,7 +3808,7 @@ php_upgrade() {
 
   printf "Upgrading PHP\n"
 
-  pkgi upgrade "$(pkg query %o | grep "php${OPT_PHP1_VERSION}")"
+  pkgi upgrade "$(pkg query %o | grep "php${OPT_PHP1_VER}")"
 
   #pkg query -i -x "%o %v" '(php)'
 }
@@ -4763,7 +4780,6 @@ pureftpd_install() {
   ${CHMOD} 600 "${PUREFTPD_PEM}"
 
   START_SCRIPT_UPLOADSCAN=1
-  PATH_TO_UPLOADSCAN=/usr/local/bin/pureftpd_uploadscan.sh
 
   if [ "${OPT_PUREFTPD_UPLOADSCAN}" = "YES" ] && [ "${OPT_CLAMAV}" = "YES" ]; then
     if [ ! -e "${CLAMDSCAN}" ]; then
@@ -4776,13 +4792,13 @@ pureftpd_install() {
     fi
 
     printf "Enabling Pure-FTPD upload scanning script\n"
-    cp -f "${PUREFTPD_UPLOADSCAN_SCRIPT}" "${PATH_TO_UPLOADSCAN}"
-    chmod 711 "${PATH_TO_UPLOADSCAN}"
+    cp -f "${PUREFTPD_UPLOADSCAN_SCRIPT}" "${PUREFTPD_UPLOADSCAN}"
+    chmod 711 "${PUREFTPD_UPLOADSCAN}"
 
     ${SYSRC} pureftpd_upload_enable="YES"
-    ${SYSRC} pureftpd_uploadscript="${PATH_TO_UPLOADSCAN}"
+    ${SYSRC} pureftpd_uploadscript="${PUREFTPD_UPLOADSCAN}"
   else
-    rm -f ${PATH_TO_UPLOADSCAN}
+    rm -f ${PUREFTPD_UPLOADSCAN}
     ${SYSRC} -q -x pureftpd_upload_enable
     ${SYSRC} -q -x pureftpd_uploadscript
   fi
@@ -4839,7 +4855,7 @@ pureftpd_uninstall() {
   ${SYSRC} -q -x pureftpd_upload_enable
   ${SYSRC} -q -x pureftpd_uploadscript
 
-  rm -f ${PATH_TO_UPLOADSCAN}
+  rm -f ${PUREFTPD_UPLOADSCAN}
 
   return
 }
@@ -5810,8 +5826,8 @@ verify_webapps_php_ini() {
     PHP_INI_WEBAPPS=/usr/local/lib/php.conf.d/50-webapps.ini
     mkdir -p /usr/local/lib/php.conf.d
   else
-    PHP_INI_WEBAPPS=/usr/local/php${OPT_PHP1_VERSION}/lib/php.conf.d/50-webapps.ini
-    mkdir -p "/usr/local/php${OPT_PHP1_VERSION}/lib/php.conf.d"
+    PHP_INI_WEBAPPS=/usr/local/php${OPT_PHP1_VER}/lib/php.conf.d/50-webapps.ini
+    mkdir -p "/usr/local/php${OPT_PHP1_VER}/lib/php.conf.d"
   fi
 
   ## Copy custom/ file (not implemented)
@@ -5891,7 +5907,7 @@ apache_host_conf() {
       ## PHP1: FPM:
       if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
         echo '  <FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
-        echo "    AddHandler \"proxy:unix:/usr/local/php${OPT_PHP1_VERSION}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${OPT_PHP1_VERSION} .phtml"
+        echo "    AddHandler \"proxy:unix:/usr/local/php${OPT_PHP1_VER}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${OPT_PHP1_VER} .phtml"
         echo "  </FilesMatch>"
       fi
 
@@ -5937,7 +5953,7 @@ apache_host_conf() {
     if [ "${OPT_PHP1_MODE}" = "fastcgi" ]; then
       {
         echo "  <IfModule mod_fcgid.c>"
-        echo "    FcgidWrapper /usr/local/safe-bin/fcgid${OPT_PHP1_VERSION}.sh .php"
+        echo "    FcgidWrapper /usr/local/safe-bin/fcgid${OPT_PHP1_VER}.sh .php"
         if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
           printf "  SuexecUserGroup %s %s\n" "${WEBAPPS_USER}" "${WEBAPPS_GROUP}"
         fi
@@ -6263,7 +6279,7 @@ do_rewrite_nginx_webapps() {
       PHP_REPLACE_STRING=php54
     fi
     if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
-      ${PERL} -pi -e "s#${PHP_REPLACE_STRING}#php${OPT_PHP1_VERSION}#" "${NGINX_PATH}/webapps_settings.conf"
+      ${PERL} -pi -e "s#${PHP_REPLACE_STRING}#php${OPT_PHP1_VER}#" "${NGINX_PATH}/webapps_settings.conf"
     fi
   fi
 }
@@ -6467,7 +6483,7 @@ rewrite_confs() {
 
     ## PHP1: mod_php
     if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
-      if [ "${OPT_PHP1_VERSION}" = "70" ]; then
+      if [ "${OPT_PHP1_VER}" = "70" ]; then
         echo "LoadModule  php7_module   ${APACHE_LIBS}/libphp7.so" >> "${PHPMODULES}"
       else
         echo "LoadModule  php5_module   ${APACHE_LIBS}/libphp5.so" >> "${PHPMODULES}"
@@ -6476,7 +6492,7 @@ rewrite_confs() {
 
     ## PHP2: mod_php
     if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${OPT_PHP2_VERSION}" != "NO" ]; then
-      if [ "${OPT_PHP2_VERSION}" = "70" ]; then
+      if [ "${OPT_PHP2_VERSION}" = "7.0" ]; then
         echo "LoadModule    php7_module             ${APACHE_LIBS}/libphp7.so" >> "${PHPMODULES}"
       else
         echo "LoadModule    php5_module             ${APACHE_LIBS}/libphp5.so" >> "${PHPMODULES}"
@@ -6559,7 +6575,7 @@ rewrite_confs() {
     cp -rf "${NGINXCONFDIR}/*" "${NGINX_PATH}"
 
     for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
-      ${PERL} -pi -e "s|/usr/local/php${php_shortrelease}/sockets/webapps.sock|/usr/local/php${OPT_PHP1_VERSION}/sockets/webapps.sock|" "${NGINX_PATH}/nginx.conf"
+      ${PERL} -pi -e "s|/usr/local/php${php_shortrelease}/sockets/webapps.sock|/usr/local/php${OPT_PHP1_VER}/sockets/webapps.sock|" "${NGINX_PATH}/nginx.conf"
     done
 
     do_rewrite_nginx_webapps
@@ -7156,15 +7172,15 @@ php_conf() {
 
     ## Custom Configuration
     if [ -e "${PB_CUSTOM}/ap2/conf/extra/httpd-php-handlers.conf" ]; then
-      cp -f "${PB_CUSTOM}/ap2/conf/extra/httpd-php-handlers.conf" "${PHP_HANDLERS_HTTPD}"
+      cp -f "${PB_CUSTOM}/ap2/conf/extra/httpd-php-handlers.conf" "${PHP_HANDLERS_CONF}"
     else
-      printf "" > "${PHP_HANDLERS_HTTPD}"
+      printf "" > "${PHP_HANDLERS_CONF}"
       {
         ## Writing data to httpd-php-handlers.conf
         echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
 
         if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
-          echo "AddHandler application/x-httpd-php .inc .php .php5 .php${OPT_PHP1_VERSION} .phtml"
+          echo "AddHandler application/x-httpd-php .inc .php .php5 .php${OPT_PHP1_VER} .phtml"
         fi
 
         if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${OPT_PHP2_VERSION}" != "NO" ]; then
@@ -7177,7 +7193,7 @@ php_conf() {
 
         echo "</FilesMatch>"
         echo "AddType text/html .php"
-      } > "${PHP_HANDLERS_HTTPD}"
+      } > "${PHP_HANDLERS_CONF}"
     fi
   fi
 
@@ -7187,10 +7203,10 @@ php_conf() {
 
   ## PHP1:
   if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
-    ## PB: Future: ${SERVICE} "php-fpm${OPT_PHP1_VERSION}" restart
+    ## PB: Future: ${SERVICE} "php-fpm${OPT_PHP1_VER}" restart
     php_fpm_restart
-    set_service "php-fpm${OPT_PHP1_VERSION}" ON
-    eval $(echo "HAVE_FPM${OPT_PHP1_VERSION}=YES")
+    set_service "php-fpm${OPT_PHP1_VER}" ON
+    eval $(echo "HAVE_FPM${OPT_PHP1_VER}=YES")
   fi
 
   ## PHP2:
@@ -7264,7 +7280,7 @@ php_conf() {
 
         ## PHP1:
         if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
-          echo "x-httpd-php${OPT_PHP1_VERSION}=\"php:/usr/local/php${OPT_PHP1_VERSION}/bin/php-cgi${OPT_PHP1_VERSION}\""
+          echo "x-httpd-php${OPT_PHP1_VER}=\"php:/usr/local/php${OPT_PHP1_VER}/bin/php-cgi${OPT_PHP1_VER}\""
         fi
 
         ## Todo: PHP2:
@@ -7284,7 +7300,7 @@ php_conf() {
         echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
 
         if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
-          echo "AddHandler x-httpd-php${OPT_PHP1_VERSION} .inc .php .php3 .php4 .php5 .php${OPT_PHP1_VERSION} .phtml"
+          echo "AddHandler x-httpd-php${OPT_PHP1_VER} .inc .php .php3 .php4 .php5 .php${OPT_PHP1_VER} .phtml"
         fi
 
         ## PHP2:
@@ -7296,19 +7312,19 @@ php_conf() {
         echo "<Location />"
         echo "suPHP_Engine on"
 
-        if [ -d "/usr/local/php${OPT_PHP1_VERSION}/lib" ]; then
-          echo "suPHP_ConfigPath /usr/local/php${OPT_PHP1_VERSION}/lib/"
-        elif [ -d "/usr/local/php${OPT_PHP2_VERSION}/lib" ]; then
-          echo "suPHP_ConfigPath /usr/local/php${OPT_PHP2_VERSION}/lib/"
+        if [ -d "/usr/local/php${OPT_PHP1_VER}/lib" ]; then
+          echo "suPHP_ConfigPath /usr/local/php${OPT_PHP1_VER}/lib/"
+        elif [ -d "/usr/local/php${OPT_PHP2_VER}/lib" ]; then
+          echo "suPHP_ConfigPath /usr/local/php${OPT_PHP2_VER}/lib/"
         fi
 
         if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
-          echo "suPHP_AddHandler x-httpd-php${OPT_PHP1_VERSION}"
+          echo "suPHP_AddHandler x-httpd-php${OPT_PHP1_VER}"
         fi
 
         ## PHP2:
         if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
-          echo "suPHP_AddHandler x-httpd-php${OPT_PHP2_VERSION}"
+          echo "suPHP_AddHandler x-httpd-php${OPT_PHP2_VER}"
         fi
 
         echo "</Location>"
@@ -7574,61 +7590,70 @@ validate_options() {
   PORT_8080=$(getDA_Opt port_8080 8080)
   PORT_8081=$(getDA_Opt port_8081 8081)
 
-  if checkyesno_opt AWSTATS; then OPT_AWSTATS="$(uc ${AWSTATS})"; fi
-  if checkyesno_opt BLOCKCRACKING; then OPT_BLOCKCRACKING="$(uc ${BLOCKCRACKING})"; fi
-  if checkyesno_opt CLAMAV; then OPT_CLAMAV="$(uc ${CLAMAV})"; fi
-  if checkyesno_opt CLAMAV_WITH_EXIM; then OPT_CLAMAV_WITH_EXIM="$(uc ${CLAMAV_WITH_EXIM})"; fi
-  if checkyesno_opt DOVECOT; then OPT_DOVECOT="$(uc ${DOVECOT})"; fi
-  if checkyesno_opt EASY_SPAM_FIGHTER; then OPT_EASY_SPAM_FIGHTER="$(uc ${EASY_SPAM_FIGHTER})"; fi
-  if checkyesno_opt EXIM; then OPT_EXIM="$(uc ${EXIM})"; fi
-  if checkyesno_opt HTSCANNER; then OPT_HTSCANNER="$(uc ${HTSCANNER})"; fi
+  if checkyesno_opt AWSTATS; then OPT_AWSTATS="$(uc ${AWSTATS})"; setOpt awstats yes; fi
+  if checkyesno_opt BLOCKCRACKING; then OPT_BLOCKCRACKING="$(uc ${BLOCKCRACKING})"; setOpt blockcracking yes; fi
+  if checkyesno_opt CLAMAV; then OPT_CLAMAV="$(uc ${CLAMAV})"; setOpt clamav yes; fi
+  if checkyesno_opt CLAMAV_WITH_EXIM; then OPT_CLAMAV_WITH_EXIM="$(uc ${CLAMAV_WITH_EXIM})"; setOpt clamav_exim yes; fi
+  if checkyesno_opt DOVECOT; then OPT_DOVECOT="$(uc ${DOVECOT})"; setOpt dovecot yes; fi
+  if checkyesno_opt EASY_SPAM_FIGHTER; then OPT_EASY_SPAM_FIGHTER="$(uc ${EASY_SPAM_FIGHTER})"; setOpt easy_spam_fighter yes; fi
+  if checkyesno_opt EXIM; then OPT_EXIM="$(uc ${EXIM})"; setOpt exim yes; fi
+  if checkyesno_opt HTSCANNER; then OPT_HTSCANNER="$(uc ${HTSCANNER})"; setOpt htscanner yes; fi
   if checkyesno_opt INSTALL_CCACHE; then OPT_INSTALL_CCACHE="$(uc ${INSTALL_CCACHE})"; fi
   if checkyesno_opt INSTALL_SYNTH; then OPT_INSTALL_SYNTH="$(uc ${INSTALL_SYNTH})"; fi
-  if checkyesno_opt LETSENCRYPT; then OPT_LETSENCRYPT="$(uc "${LETSENCRYPT}")"; fi
-  if checkyesno_opt MAJORDOMO; then OPT_MAJORDOMO="$(uc ${MAJORDOMO})"; fi
-  if checkyesno_opt MODSECURITY; then OPT_MODSECURITY="$(uc ${MODSECURITY})"; fi
+  if checkyesno_opt LETSENCRYPT; then OPT_LETSENCRYPT="$(uc "${LETSENCRYPT}")"; setOpt letsencrypt yes; fi
+  if checkyesno_opt MAJORDOMO; then OPT_MAJORDOMO="$(uc ${MAJORDOMO})"; setOpt majordomo yes; fi
+  if checkyesno_opt MODSECURITY; then OPT_MODSECURITY="$(uc ${MODSECURITY})"; setOpt modsecurity yes; fi
   if checkyesno_opt NAMED; then OPT_NAMED="$(uc ${NAMED})"; fi
   if checkyesno_opt PB_SYMLINK; then OPT_PB_SYMLINK="$(uc ${PB_SYMLINK})"; fi
-  if checkyesno_opt PHP_INI_XMAILHEADER; then OPT_PHP_INI_XMAILHEADER="$(uc ${PHP_INI_XMAILHEADER})"; fi
-  if checkyesno_opt PHPMYADMIN; then OPT_PHPMYADMIN="$(uc ${PHPMYADMIN})"; fi
-  if checkyesno_opt PIGEONHOLE; then OPT_PIGEONHOLE="$(uc ${PIGEONHOLE})"; fi
-  if checkyesno_opt PROFTPD_UPLOADSCAN; then OPT_PROFTPD_UPLOADSCAN="$(uc ${PROFTPD_UPLOADSCAN})"; fi
-  if checkyesno_opt PUREFTPD_UPLOADSCAN; then OPT_PUREFTPD_UPLOADSCAN="$(uc ${PUREFTPD_UPLOADSCAN})"; fi
-  if checkyesno_opt REDIRECT_HOST_HTTPS; then OPT_REDIRECT_HOST_HTTPS="$(uc ${REDIRECT_HOST_HTTPS})"; fi
-  if checkyesno_opt ROUNDCUBE; then OPT_ROUNDCUBE="$(uc ${ROUNDCUBE})"; fi
-  if checkyesno_opt SPAM_INBOX_PREFIX; then OPT_SPAM_INBOX_PREFIX="$(uc ${SPAM_INBOX_PREFIX})"; fi
-  if checkyesno_opt SPAMASSASSIN; then OPT_SPAMASSASSIN="$(uc ${SPAMASSASSIN})"; fi
-  if checkyesno_opt SPAMASSASSIN_UTILITIES; then OPT_SPAMASSASSIN_UTILITIES="$(uc ${SPAMASSASSIN_UTILITIES})"; fi
-  if checkyesno_opt SUHOSIN; then OPT_SUHOSIN="$(uc ${SUHOSIN})"; fi
-  if checkyesno_opt SUHOSIN_UPLOADSCAN; then OPT_SUHOSIN_UPLOADSCAN="$(uc ${SUHOSIN_UPLOADSCAN})"; fi
-  if checkyesno_opt USE_HOSTNAME_FOR_ALIAS; then OPT_USE_HOSTNAME_FOR_ALIAS="$(uc ${USE_HOSTNAME_FOR_ALIAS})"; fi
-  if checkyesno_opt USERDIR_ACCESS; then OPT_USERDIR_ACCESS="$(uc ${USERDIR_ACCESS})"; fi
-  if checkyesno_opt WEBALIZER; then OPT_WEBALIZER="$(uc ${WEBALIZER})"; fi
-  if checkyesno_opt WEBAPPS_INBOX_PREFIX; then OPT_WEBAPPS_INBOX_PREFIX="$(uc ${WEBAPPS_INBOX_PREFIX})"; fi
+  if checkyesno_opt PHP_INI_XMAILHEADER; then OPT_PHP_INI_XMAILHEADER="$(uc ${PHP_INI_XMAILHEADER})"; setOpt x_mail_header yes; fi
+  if checkyesno_opt PHP_IONCUBE; then OPT_PHP_IONCUBE="$(uc ${PHP_IONCUBE})"; setOpt ioncube yes; fi
+  if checkyesno_opt PHP_OPCACHE; then OPT_OPCACHE="$(uc ${PHP_OPCACHE})"; setOpt opcache yes; fi
+  if checkyesno_opt PHPMYADMIN; then OPT_PHPMYADMIN="$(uc ${PHPMYADMIN})"; setOpt phpmyadmin yes; fi
+  if checkyesno_opt PIGEONHOLE; then OPT_PIGEONHOLE="$(uc ${PIGEONHOLE})"; setOpt pigeonhole yes; fi
+  if checkyesno_opt PROFTPD_UPLOADSCAN; then OPT_PROFTPD_UPLOADSCAN="$(uc ${PROFTPD_UPLOADSCAN})"; setOpt proftpd_uploadscan yes; fi
+  if checkyesno_opt PUREFTPD_UPLOADSCAN; then OPT_PUREFTPD_UPLOADSCAN="$(uc ${PUREFTPD_UPLOADSCAN})"; setOpt pureftpd_uploadscan yes; fi
+  if checkyesno_opt REDIRECT_HOST_HTTPS; then OPT_REDIRECT_HOST_HTTPS="$(uc ${REDIRECT_HOST_HTTPS})"; setOpt redirect_host_https yes; fi
+  if checkyesno_opt ROUNDCUBE; then OPT_ROUNDCUBE="$(uc ${ROUNDCUBE})"; setOpt roundcube yes; fi
+  if checkyesno_opt SPAM_INBOX_PREFIX; then OPT_SPAM_INBOX_PREFIX="$(uc ${SPAM_INBOX_PREFIX})"; setOpt spam_inbox_prefix yes; fi
+  if checkyesno_opt SPAMASSASSIN; then OPT_SPAMASSASSIN="$(uc ${SPAMASSASSIN})"; setOpt spamassassin yes; fi
+  if checkyesno_opt SPAMASSASSIN_UTILITIES; then OPT_SPAMASSASSIN_UTILITIES="$(uc ${SPAMASSASSIN_UTILITIES})"; setOpt pigeonhole yes; fi
+  if checkyesno_opt SUHOSIN; then OPT_SUHOSIN="$(uc ${SUHOSIN})"; setOpt suhosin yes; fi
+  if checkyesno_opt SUHOSIN_UPLOADSCAN; then OPT_SUHOSIN_UPLOADSCAN="$(uc ${SUHOSIN_UPLOADSCAN})"; setOpt suhosin_php_uploadscan yes; fi
+  if checkyesno_opt USE_HOSTNAME_FOR_ALIAS; then OPT_USE_HOSTNAME_FOR_ALIAS="$(uc ${USE_HOSTNAME_FOR_ALIAS})"; setOpt use_hostname_for_alias yes; fi
+  if checkyesno_opt USERDIR_ACCESS; then OPT_USERDIR_ACCESS="$(uc ${USERDIR_ACCESS})"; setOpt userdir_access yes; fi
+  if checkyesno_opt WEBALIZER; then OPT_WEBALIZER="$(uc ${WEBALIZER})"; setOpt webalizer yes; fi
+  if checkyesno_opt WEBAPPS_INBOX_PREFIX; then OPT_WEBAPPS_INBOX_PREFIX="$(uc ${WEBAPPS_INBOX_PREFIX})"; setOpt webapps_inbox_prefix yes; fi
 
   ## Port/Package Options
   case ${PHP1_VERSION} in
-    "55"|"56"|"70") OPT_PHP1_VERSION=${PHP1_VERSION}
+    "5.5"|"5.6"|"7.0")
+      OPT_PHP1_VERSION="${PHP1_VERSION}"
+      OPT_PHP1_VER=$(${PHP1_VERSION} | tr -d '.')
+      setOpt php1_release ${PHP1_VERSION}
       case $(lc ${PHP1_MODE}) in
         "fpm"|"phpfpm"|"php-fpm"|"php_fpm")
           OPT_PHP1_MODE="php-fpm"
           OPT_PHP1_RELEASE="YES"
           HAVE_FPM_CGI="YES"
+          setOpt php1_mode php-fpm
           ;;
         "suphp"|"su_php"|"su-php"|"su")
           OPT_PHP1_MODE="suphp"
           OPT_PHP1_RELEASE="YES"
           HAVE_SUPHP_CGI=YES
+          setOpt php1_mode suphp
           ;;
         "modphp"|"mod_php"|"mod"|"mod-php")
           OPT_PHP1_MODE="mod_php"
           OPT_PHP1_RELEASE="YES"
           HAVE_CLI="YES"
+          setOpt php1_mode mod_php
           ;;
         "fastcgi"|"fcgi")
           OPT_PHP1_MODE="fastcgi"
           OPT_PHP1_RELEASE="YES"
           HAVE_FCGID="YES"
+          setOpt php1_mode fastcgi
           ;;
         *) printf "*** Error: Invalid PHP1_MODE value set in options.conf\n"; exit;;
       esac
@@ -7656,7 +7681,10 @@ validate_options() {
   OPT_PHP2_VERSION="NO"
   OPT_PHP2_RELEASE="NO"
   # case ${PHP2_VERSION} in
-  #   55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION} ;;
+  #   55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION}
+      #   OPT_PHP2_VER=$(${PHP2_VERSION} | tr -d '.')
+      # setOpt php2_release ${PHP2_VERSION}
+  # ;;
   #   *) echo "*** Error: Invalid PHP2_VERSION value set in options.conf"; exit ;;
   # esac
 
@@ -7672,29 +7700,60 @@ validate_options() {
   ## DUAL_PHP_MODE="YES"
 
   case $(lc ${WEBSERVER}) in
-    "apache"|"apache24") OPT_WEBSERVER="apache"; OPT_APACHE_VER="2.4";
-    case $(lc ${APACHE_MPM}) in
-      "event"|"prefork"|"worker") OPT_APACHE_MPM="${APACHE_MPM}" ;;
-      "auto") OPT_APACHE_MPM="event" ;;
-      *) printf "*** Error: Invalid APACHE_MPM value set in options.conf\n"; exit ;;
-    esac ;;
-    "nginx") OPT_WEBSERVER="nginx" ;;
-    "no"|"none") OPT_WEBSERVER="NO" ;;
+    "apache"|"apache24")
+      OPT_WEBSERVER="apache"
+      OPT_APACHE_VER="2.4"
+      setOpt webserver apache
+      setOpt apache_ver 2.4
+      case $(lc ${APACHE_MPM}) in
+        "event"|"prefork"|"worker")
+          OPT_APACHE_MPM="${APACHE_MPM}"
+          setOpt apache_mpm ${APACHE_MPM}
+          ;;
+        "auto")
+          OPT_APACHE_MPM="event"
+          setOpt apache_mpm auto
+          ;;
+        *) printf "*** Error: Invalid APACHE_MPM value set in options.conf\n"; exit ;;
+      esac
+      ;;
+    "nginx")
+      OPT_WEBSERVER="nginx"
+      setOpt webserver nginx
+      ;;
+    "nginx_apache")
+      OPT_WEBSERVER="nginx_apache"
+      setOpt webserver nginx_apache
+      ;;
+    "no"|"none")
+      OPT_WEBSERVER="NO"
+      setOpt webserver apache
+      ;;
     *) printf "*** Error: Invalid WEBSERVER value set in options.conf\n"; exit ;;
   esac
 
   case $(lc ${SQL_DB}) in
-    "mysql55"|"mysql56"|"mysql57"|"mariadb55"|"mariadb100"|"mariadb101") OPT_SQL_DB="${SQL_DB}" ;;
-    "mariadb") OPT_SQL_DB="mariadb101" ;;
-    "mysql") OPT_SQL_DB="mysql56" ;;
-    "no"|"none") OPT_SQL_DB="NO" ;;
+    "mysql55"|"mysql56"|"mysql57"|"mariadb")
+      OPT_SQL_DB="${SQL_DB}"
+      setOpt mysql_inst mysql
+      ;;
+    "mariadb55"|"mariadb100"|"mariadb101"|"mariadb")
+      OPT_SQL_DB="${SQL_DB}"
+      setOpt mysql_inst mariadb
+      ;;
+    # "mariadb") OPT_SQL_DB="mariadb101" ;;
+    # "mysql") OPT_SQL_DB="mysql56" ;;
+    "no"|"none")
+      OPT_SQL_DB="NO"
+      setOpt mysql_inst no
+      ;;
     *) printf "*** Error: Invalid SQL_DB value set in options.conf\n"; exit ;;
   esac
 
   case $(lc ${FTPD}) in
-    "pureftpd"|"pure-ftpd"|"pureftp") OPT_FTPD="pureftpd" ;;
-    "proftpd"|"pro-ftpd"|"proftp") OPT_FTPD="proftpd" ;;
-    "no"|"none") OPT_FTPD="NO" ;;
+    "pureftpd"|"pure-ftpd"|"pureftp") OPT_FTPD="pureftpd"; setOpt ftpd pureftpd ;;
+    "proftpd"|"pro-ftpd"|"proftp") OPT_FTPD="proftpd"; setOpt ftpd proftpd ;;
+    "no"|"none") OPT_FTPD="NO"; setOpt ftpd no ;;
     *) printf "*** Error: Invalid FTPD value set in options.conf\n"; exit ;;
   esac
 
