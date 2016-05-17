@@ -105,16 +105,11 @@ PB_MIRROR="http://s3.amazonaws.com/portsbuild/files"
 
 ################################################################################
 
-readonly CPU_CORES="$(${SYSCTL} -n hw.ncpu)"
-readonly SERVER_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
-
-################################################################################
-
 ###
 ### constants.conf
 ###
 
-## System User Accounts
+## System Accounts
 readonly DA_ADMIN_USER=admin
 readonly DA_SQLDB_USER=da_admin
 readonly APACHE_USER=apache    ## www
@@ -135,6 +130,7 @@ readonly EXIM_GROUP="mail"     ## mail
 # readonly ULB=/usr/local/bin
 # readonly ULS=/usr/local/sbin
 # readonly ULE=/usr/local/etc
+readonly LOGS=/var/log
 readonly CHOWN=/usr/sbin/chown
 readonly CHMOD=/bin/chmod
 readonly INITD_DIR=/usr/local/etc/rc.d
@@ -159,8 +155,9 @@ readonly WGET_CONNECT_OPTIONS="--connect-timeout=5 --read-timeout=10 --tries=3"
 readonly TAR=/usr/bin/tar
 
 readonly file_mtime="stat -f %m"
-
-readonly LOGS=/var/log
+readonly CPU_CORES=$(${SYSCTL} -n hw.ncpu)
+readonly SERVER_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
+readonly NEWSYSLOG_FILE=/usr/local/etc/newsyslog.conf.d/directadmin.conf
 
 ## DirectAdmin Paths & Files
 readonly DA_PATH=/usr/local/directadmin
@@ -175,39 +172,13 @@ readonly DA_LICENSE="${DA_PATH}/conf/license.key"
 readonly DA_SETUP_TXT="${DA_SCRIPTS_PATH}/setup.txt"
 readonly DA_TASK_QUEUE="${DA_PATH}/data/task.queue.cb"
 readonly DA_SERVICES="${DA_PATH}/data/admin/services.status"
+readonly DA_SSL_KEY="${DA_PATH}/conf/cakey.pem"
+readonly DA_SSL_CRT="${DA_PATH}/conf/cacert.pem"
+readonly DA_SSL_CA="${DA_PATH}/conf/carootcert.pem"
 
 ## CustomBuild Paths & Files
 readonly CB_PATH="${DA_PATH}/custombuild"
 readonly CB_CONF="${CB_PATH}/options.conf"
-
-################################################################################
-
-###
-### defaults.conf (default values)
-###
-
-## DA Setup
-DA_ADMIN_EMAIL="${DA_ADMIN_USER}@${SERVER_DOMAIN}"
-DA_FREEBSD_SERVICES="services_freebsd91_64.tar.gz"
-
-## DA SSL
-DA_SSL_KEY="${DA_PATH}/conf/cakey.pem"
-DA_SSL_CRT="${DA_PATH}/conf/cacert.pem"
-DA_SSL_CA="${DA_PATH}/conf/carootcert.pem"
-
-: "${DA_LAN:=0}"
-: "${DA_INSECURE:=0}"
-LAN_IP=""
-HTTP=https
-EXTRA_VALUE=""
-BIND_ADDRESS="--bind-address=${DA_SERVER_IP}"
-
-## Min and Max password lengths when used by random_pass()
-: "${MIN_PASS_LENGTH:=12}"
-: "${MAX_PASS_LENGTH:=16}"
-
-## Virtual Mail Directory (keeping this path as-is for simplicity)
-VIRTUAL_PATH=/etc/virtual
 
 ## Apache 2.4
 readonly APACHE_PATH=/usr/local/etc/apache24
@@ -228,97 +199,60 @@ readonly NGINX_CONF="${NGINX_PATH}/nginx.conf"
 readonly NGINX_SSL_KEY="${NGINX_PATH}/ssl/server.key"
 readonly NGINX_SSL_CRT="${NGINX_PATH}/ssl/server.crt"
 readonly NGINX_SSL_CA="${NGINX_PATH}/ssl/server.ca"
+# readonly NGINX_PID=/var/run/nginx.pid
 
 ## Needed?
-# NGINX_VHOSTS=${NGINX_PATH}/vhosts
+# readonly NGINX_VHOSTS=${NGINX_PATH}/vhosts
 # NGINX_VHOSTS_CONF=${NGINX_PATH}/directadmin-vhosts.conf
-# NGINX_LOG_DIR=/var/log/nginx/domains
+# NGINX_LOGS=/var/log/nginx/domains
 # NGINX_IPS_CONF=${NGINX_PATH}/directadmin-ips.conf
-# NGINX_PID=/var/run/nginx.pid
 
-## Global WWW Directory (for webmail scripts)
-readonly WWW_DIR=/usr/local/www ## Ports uses "${WWW_DIR}"
-WWW_TMP_DIR="${WWW_DIR}/tmp"
+readonly WWW_DIR=/usr/local/www         ## Ports uses "${WWW_DIR}"
+readonly WWW_TMP_DIR="${WWW_DIR}/tmp"   ## Temporary files directory
 
-WEBMAIL_PATH="${WWW_DIR}/webmail"
-WEBMAIL_TMP_DIR="${WEBMAIL_PATH}/tmp"
+readonly WEBMAIL_PATH="${WWW_DIR}/webmail"
+readonly WEBMAIL_TMP_DIR="${WEBMAIL_PATH}/tmp"
 
 ## RoundCube
-ROUNDCUBE_PATH="${WWW_DIR}/roundcube"
-ROUNDCUBE_CONF="${ROUNDCUBE_PATH}/config/config.inc.php"
-# ROUNDCUBE_CONFIG_CUSTOM="${ROUNDCUBE_CONF}"
-
-## Custom configuration files from CB2
-## Already defined in roundcube_install()
-# ROUNDCUBE_PLUGINS="${PB_CUSTOM}/roundcube/plugins"
-# ROUNDCUBE_SKINS="${PB_CUSTOM}/roundcube/skins"
-# ROUNDCUBE_PROGRAM="${PB_CUSTOM}/roundcube/program"
-# ROUNDCUBE_HTACCESS="${PB_CUSTOM}/roundcube/.htaccess"
-
-## phpMyAdmin
-PMA_PATH="${WWW_DIR}/phpMyAdmin"
-PMA_CONFIG="${PMA_PATH}/config.inc.php"
+readonly ROUNDCUBE_PATH="${WWW_DIR}/roundcube"
+readonly ROUNDCUBE_CONF="${ROUNDCUBE_PATH}/config/config.inc.php"
 
 ## PHP
-PHP1_VERSION="5.6"
-PHP1_MODE="php-fpm"
-# PHP2_VERSION="7.0"
-# PHP2_MODE="fastcgi"
-PHP_VERSION=${PHP1_VERSION}
-PHP_MODE=${PHP1_MODE}
+readonly PHP_ETC=/usr/local/etc/php
+readonly PHP_INI=/usr/local/etc/php.ini
+readonly PHP_INI_WEBAPPS="${PHP_ETC}/50-webapps.ini"
+readonly PHP_INI_EXTENSIONS="${PHP_ETC}/extensions.ini"
+readonly PHP_INI_OPCACHE="${PHP_ETC}/opcache.ini"
+readonly PHP_INI_DIRECTADMIN="${PHP_ETC}/10-directadmin.ini"
+readonly PHP1_RELEASE_SET="5.5 5.6 7.0"
+readonly PHP1_SHORTRELEASE_SET="$(echo "${PHP1_RELEASE_SET}" | tr -d '.')"
 
-PHP1_RELEASE_SET="5.5 5.6 7.0"
-PHP1_SHORTRELEASE_SET="$(echo "${PHP1_RELEASE_SET}" | tr -d '.')"
-
-PHP_ETC=/usr/local/etc/php
-PHP_INI=/usr/local/etc/php.ini
-PHP_INI_WEBAPPS="${PHP_ETC}/50-webapps.ini"
-PHP_INI_EXTENSIONS="${PHP_ETC}/extensions.ini"
-PHP_INI_OPCACHE="${PHP_ETC}/opcache.ini"
-PHP_INI_DIRECTADMIN="${PHP_ETC}/10-directadmin.ini"
+## Virtual Mail Directory
+readonly VIRTUAL_PATH=/etc/virtual
 
 ## Exim
-readonly EXIM=/usr/local/sbin/exim
-EXIM_PATH=/usr/local/etc/exim
-EXIM_CONF="${EXIM_PATH}/configure" ## required_files in rc.d/exim
-: ${EXIM_RECIPIENTS_MAX:=150}
-
-EXIM_SSL_KEY="${EXIM_PATH}/ssl/exim.key"
-EXIM_SSL_CRT="${EXIM_PATH}/ssl/exim.crt"
-EXIM_SSL_CA="${EXIM_PATH}/ssl/exim.ca"
-
-EXIM_BC_PATH="${EXIM_PATH}/bc"
-EXIM_ESF_PATH="${EXIM_PATH}/esf"
+readonly EXIM_BIN=/usr/local/sbin/exim
+readonly EXIM_PATH=/usr/local/etc/exim
+readonly EXIM_CONF="${EXIM_PATH}/configure" ## required_files in rc.d/exim
+readonly EXIM_BC_PATH="${EXIM_PATH}/bc"
+readonly EXIM_ESF_PATH="${EXIM_PATH}/esf"
+readonly EXIM_SSL_KEY="${EXIM_PATH}/ssl/exim.key"
+readonly EXIM_SSL_CRT="${EXIM_PATH}/ssl/exim.crt"
+readonly EXIM_SSL_CA="${EXIM_PATH}/ssl/exim.ca"
 
 ## Dovecot
-readonly DOVECOT=/usr/local/sbin/dovecot
-DOVECOT_PATH=/usr/local/etc/dovecot
-DOVECOT_CONF="${DOVECOT_PATH}/dovecot.conf"
-DOVECOT_CONF_SIEVE=""
+readonly DOVECOT_BIN=/usr/local/sbin/dovecot
+readonly DOVECOT_PATH=/usr/local/etc/dovecot
+readonly DOVECOT_CONF="${DOVECOT_PATH}/dovecot.conf"
+readonly DOVECOT_SSL_KEY="${DOVECOT_PATH}/ssl/dovecot.key"
+readonly DOVECOT_SSL_CRT="${DOVECOT_PATH}/ssl/dovecot.crt"
+readonly DOVECOT_SSL_CA="${DOVECOT_PATH}/ssl/dovecot.ca"
 
-DOVECOT_SSL_KEY="${DOVECOT_PATH}/ssl/dovecot.key"
-DOVECOT_SSL_CRT="${DOVECOT_PATH}/ssl/dovecot.crt"
-DOVECOT_SSL_CA="${DOVECOT_PATH}/ssl/dovecot.ca"
-
-## ClamAV
-readonly CLAMDSCAN=/usr/local/bin/clamdscan
-CLAMD_CONF=/usr/local/etc/clamd.conf
-FRESHCLAM_CONF=/usr/local/etc/freshclam.conf
-
-## ProFTPD
-PROFTPD_CONF=/usr/local/etc/proftpd.conf
-PROFTPD_ETC=/usr/local/etc/proftpd
-PROFTPD_DHPARAMS="${PROFTPD_ETC}/dhparams.pem"
-PROFTPD_CLAMAV_CONF=/usr/local/etc/proftpd.clamav.conf
-# PROFTPD_PASSWD=/usr/local/etc/proftpd.db
-
-## PureFTPD
-PUREFTPD_UPLOADSCAN=/usr/local/bin/pureftpd_uploadscan.sh
+## phpMyAdmin
+readonly PMA_PATH="${WWW_DIR}/phpMyAdmin"
+readonly PMA_CONFIG="${PMA_PATH}/config.inc.php"
 
 ## MySQL/MariaDB
-## DA default data path is: /home/mysql
-: ${SQL_DATA_PATH:=/var/db/mysql}
-MYSQL_HOST=localhost
 readonly MYSQL_CNF=/usr/local/etc/my.cnf
 readonly MYSQL=/usr/local/bin/mysql
 readonly MYSQLADMIN=/usr/local/bin/mysqladmin
@@ -331,13 +265,66 @@ readonly MYSQLSECURE=/usr/local/bin/mysql_secure_installation
 readonly MYSQLSHOW=/usr/local/bin/mysqlshow
 readonly MYSQLUPGRADE=/usr/local/bin/mysql_upgrade
 
+## ClamAV
+readonly CLAMDSCAN=/usr/local/bin/clamdscan
+readonly CLAMD_CONF=/usr/local/etc/clamd.conf
+readonly FRESHCLAM_CONF=/usr/local/etc/freshclam.conf
+
+## ProFTPD
+readonly PROFTPD_CONF=/usr/local/etc/proftpd.conf
+readonly PROFTPD_ETC=/usr/local/etc/proftpd
+readonly PROFTPD_DHPARAMS="${PROFTPD_ETC}/dhparams.pem"
+readonly PROFTPD_CLAMAV_CONF=/usr/local/etc/proftpd.clamav.conf
+# readonly PROFTPD_PASSWD=/usr/local/etc/proftpd.db
+
+## PureFTPD
+readonly PUREFTPD_UPLOADSCAN_BIN=/usr/local/bin/pureftpd_uploadscan.sh
+
+################################################################################
+
+###
+### defaults.conf (default values)
+###
+
+DA_ADMIN_EMAIL="${DA_ADMIN_USER}@${SERVER_DOMAIN}"
+DA_SERVICES_PKG="services_freebsd91_64.tar.gz"
+
+: "${MIN_PASS_LENGTH:=12}"
+: "${MAX_PASS_LENGTH:=16}"
+
+: "${DA_LAN:=0}"
+: "${DA_INSECURE:=0}"
+
+LAN_IP=""
+HTTP=https
+EXTRA_VALUE=""
+
+PHP1_VERSION="5.6"
+PHP1_MODE="php-fpm"
+# PHP2_VERSION="7.0"
+# PHP2_MODE="fastcgi"
+PHP_VERSION="${PHP1_VERSION}"
+PHP_MODE="${PHP1_MODE}"
+
+: ${EXIM_RECIPIENTS_MAX:=150}
+
+: ${SQL_DATA_PATH:=/var/db/mysql} ## DA default data path is: /home/mysql
+: ${MYSQL_HOST:=localhost}        ## SQL default hostname
+
 ## Custom SSL Certificates
 CUSTOM_SSL_KEY=/usr/local/etc/ssl/server.key
 CUSTOM_SSL_CRT=/usr/local/etc/ssl/server.crt
 CUSTOM_SSL_CA=/usr/local/etc/ssl/server.ca
 
-NEWSYSLOG_FILE=/usr/local/etc/newsyslog.conf.d/directadmin.conf
-NEWSYSLOG_DAYS=10
+: ${NEWSYSLOG_DAYS:=10}           ## Number of days to keep logs before rotating
+
+
+# ROUNDCUBE_CONFIG_CUSTOM="${ROUNDCUBE_CONF}"
+## Already defined in roundcube_install()
+# ROUNDCUBE_PLUGINS="${PB_CUSTOM}/roundcube/plugins"
+# ROUNDCUBE_SKINS="${PB_CUSTOM}/roundcube/skins"
+# ROUNDCUBE_PROGRAM="${PB_CUSTOM}/roundcube/program"
+# ROUNDCUBE_HTACCESS="${PB_CUSTOM}/roundcube/.htaccess"
 
 ################################################################################
 
@@ -396,7 +383,7 @@ COMPAT_SQL_SYMLINKS="YES"
 ###
 
 ## FreeBSD Ports path
-PORTS_BASE=/usr/ports
+readonly PORTS_BASE=/usr/ports
 # PORTS_VAR_DB=/var/db/ports
 # PKG_VAR_DB=/var/db/pkgs
 
@@ -1279,7 +1266,7 @@ global_setup() {
     if [ "${OPT_WEBSERVER}" = "apache" ]; then ( apache_install ); fi
     if [ "${OPT_PHP1_MODE}" != "NO" ]; then ( php_install ); fi
     # if [ "${OPT_PHP2_MODE}" != "NO" ]; then ( php2_install ); fi
-    if [ "${OPT_SQL_DB}" != "NO" ]; then ( install_app "${OPT_SQL_DB}" ); fi
+    if [ "${OPT_SQL_DB}" != "NO" ]; then ( sql_install ); fi
     if [ "${OPT_PHPMYADMIN}" = "YES" ]; then ( phpmyadmin_install ); fi
     if [ "${OPT_ROUNDCUBE}" = "YES" ]; then ( roundcube_install ); fi
     if [ "${OPT_SPAMASSASSIN}" = "YES" ]; then ( spamassassin_install ); fi
@@ -1543,8 +1530,8 @@ control_service() {
     "php-fpm"|"fpm"|"php") CONFIG_STATUS=$(${SERVICE} php-fpm configtest) ;;
     "apache"|"apache24"|"httpd") CONFIG_STATUS=$(${SERVICE} apache24 configtest) ;;
     "nginx") CONFIG_STATUS=$(${SERVICE} nginx configtest) ;;
-    "exim") CONFIG_STATUS=$(${EXIM} -C "${EXIM_CONF}" -bV) ;;
-    "dovecot") CONFIG_STATUS=$(${DOVECOT} -c ${DOVECOT_CONF}) ;;
+    "exim") CONFIG_STATUS=$(${EXIM_BIN} -C "${EXIM_CONF}" -bV) ;;
+    "dovecot") CONFIG_STATUS=$(${DOVECOT_BIN} -c ${DOVECOT_CONF}) ;;
     "sshd") CONFIG_STATUS=$(${SERVICE} sshd configtest) ;;
   esac
 
@@ -1667,6 +1654,9 @@ bind_setup() {
 ## DirectAdmin Installation
 ## Install DirectAdmin (replaces scripts/install.sh)
 directadmin_install() {
+
+  local BIND_ADDRESS
+  BIND_ADDRESS="--bind-address=${DA_SERVER_IP}"
 
   ### Pre-Installation Tasks (replaces setup.sh)
 
@@ -1820,7 +1810,7 @@ directadmin_install() {
     echo "netmask=${DA_SERVER_IP_MASK}"
     echo "uid=${DA_USER_ID}"
     echo "lid=${DA_LICENSE_ID}"
-    echo "services=${DA_FREEBSD_SERVICES}"
+    echo "services=${DA_SERVICES_PKG}"
   } > "${DA_SETUP_TXT}"
 
   chmod 600 "${DA_SETUP_TXT}"
@@ -1966,6 +1956,10 @@ directadmin_install() {
 
 ## Determin IP address using DA servers (from DA/scripts/getLicense.sh)
 da_myip() {
+
+  local BIND_ADDRESS DISCOVERED_IP
+
+  BIND_ADDRESS="--bind-address=${DA_SERVER_IP}"
 
   DISCOVERED_IP=$(${WGET} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
 
@@ -2358,7 +2352,7 @@ exim_install() {
   fi
 
   ## Verify Exim config:
-  ${EXIM} -C "${EXIM_CONF}" -bV
+  ${EXIM_BIN} -C "${EXIM_CONF}" -bV
 
   ## Update /etc/rc.conf
   printf "Enabling Exim startup (updating /etc/rc.conf)\n"
@@ -2378,10 +2372,10 @@ exim_install() {
   ${SERVICE} exim start
 
   printf "Updating mq_exim_bin paths in DirectAdmin template + configuration files\n"
-  setVal mq_exim_bin ${EXIM} ${DA_CONF_TEMPLATE}
+  setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_TEMPLATE}
 
   if [ -e "${DA_CONF}" ]; then
-    setVal mq_exim_bin ${EXIM} ${DA_CONF}
+    setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF}
   fi
 
   ## Todo: Cleaner version
@@ -2403,11 +2397,11 @@ exim_install() {
   fi
 
   {
-    printf "%s\t%s\n" "sendmail" "${EXIM}"
-    printf "%s\t%s\n" "send-mail" "${EXIM}"
-    printf "%s\t\t%s\n" "mailq" "${EXIM} -bp"
+    printf "%s\t%s\n" "sendmail" "${EXIM_BIN}"
+    printf "%s\t%s\n" "send-mail" "${EXIM_BIN}"
+    printf "%s\t\t%s\n" "mailq" "${EXIM_BIN} -bp"
     printf "%s\t%s\n" "newaliases" "/usr/bin/true"
-    printf "%s\t\t%s\n" "rmail" "${EXIM} -i -oee"
+    printf "%s\t\t%s\n" "rmail" "${EXIM_BIN} -i -oee"
   } > /etc/mail/mailer.conf
 
 }
@@ -2417,7 +2411,7 @@ exim_install() {
 ## Exim Restart with configuration file verification
 exim_restart() {
 
-  ${EXIM} -C "${EXIM_CONF}" -bV
+  ${EXIM_BIN} -C "${EXIM_CONF}" -bV
 
   if [ $? = "0" ]; then
     printf "Restarting Exim\n"
@@ -2426,7 +2420,7 @@ exim_restart() {
     printf "*** Warning: Aborting automatic Exim restart due to configuration verification failure.\n"
     printf "Please verify the Exim configuration file at: %s\n" ${EXIM_CONF}
     printf "You can verify the file by typing:\n"
-    printf "  %s -C %s -bV\n\n" ${EXIM} ${EXIM_CONF}
+    printf "  %s -C %s -bV\n\n" ${EXIM_BIN} ${EXIM_CONF}
     printf "You can restart Exim manually by typing:\n"
     printf "  service exim restart\n"
   fi
@@ -2594,7 +2588,7 @@ spamassassin_utilities_uninstall() {
 ## Install Exim BlockCracking (BC)
 blockcracking_install() {
 
-  if [ -x "${EXIM}" ]; then
+  if [ -x "${EXIM_BIN}" ]; then
 
     printf "Downloading BlockCracking\n"
 
@@ -2638,10 +2632,10 @@ blockcracking_install() {
 ## Install Easy Spam Figter (ESF)
 easyspamfighter_install() {
 
-  if [ -x ${EXIM} ]; then
+  if [ -x ${EXIM_BIN} ]; then
     ## See if SPF and SRS has been compiled in:
-    EXIM_SPF_SUPPORT="$(${EXIM} --version | grep -m1 -c SPF)"
-    EXIM_SRS_SUPPORT="$(${EXIM} --version | grep -m1 -c SRS)"
+    EXIM_SPF_SUPPORT="$(${EXIM_BIN} --version | grep -m1 -c SPF)"
+    EXIM_SRS_SUPPORT="$(${EXIM_BIN} --version | grep -m1 -c SRS)"
 
     if [ "${EXIM_SPF_SUPPORT}" = "0" ]; then
       printf "*** Error: Your version of Exim does not support SPF. This is needed for Easy Spam Fighter.\n"
@@ -2843,7 +2837,7 @@ dovecot_install() {
 
     ${PERL} -pi -e 's#transport = virtual_localdelivery#transport = dovecot_lmtp_udp#' ${EXIM_CONF}
 
-    cp -f "${DOVECOT_CONF_SIEVE}" ${DOVECOT_PATH}/conf.d/90-sieve.conf
+    cp -f "${PB_CONFIG}/dovecot/conf.d/90-sieve.conf" "${DOVECOT_PATH}/conf.d/90-sieve.conf"
     echo "protocols = imap pop3 lmtp sieve" > ${DOVECOT_PATH}/conf/protocols.conf
     echo "mail_plugins = \$mail_plugins quota sieve" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
   else
@@ -2919,7 +2913,7 @@ dovecot_install() {
 ## Dovecot Restart with configuration file verification
 dovecot_restart() {
 
-  ${DOVECOT} -c ${DOVECOT_CONF}
+  ${DOVECOT_BIN} -c ${DOVECOT_CONF}
 
   if [ $? = "0" ]; then
     printf "Restarting Dovecot\n"
@@ -2928,7 +2922,7 @@ dovecot_restart() {
     printf "*** Warning: Aborting automatic Dovecot restart due to configuration verification failure.\n"
     printf "Please verify the Dovecot configuration file at: %s\n" ${DOVECOT_CONF}
     printf "You can verify the file by typing:\n"
-    printf "  %s -c %s\n\n" ${DOVECOT} ${DOVECOT_CONF}
+    printf "  %s -c %s\n\n" ${DOVECOT_BIN} ${DOVECOT_CONF}
     printf "You can restart Dovecot manually by typing:\n"
     printf "  service dovecot restart\n"
   fi
@@ -3152,14 +3146,27 @@ get_sql_settings() {
 ################################################################################
 
 ## Todo:
-## SQL Post-Installation Tasks
-sql_post_install() {
+## MariaDB or MySQL Database Installation
+sql_install() {
 
   local SQL_TEMP DA_MYSQL_PATH
 
   if [ "${OPT_SQL_DB}" = "NO" ]; then
     return
   fi
+
+  printf "Starting SQL database installation\n"
+
+  set_service mysqld OFF
+
+  case "${OPT_SQL_DB}" in
+    "mariadb55") pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT} ;;
+    "mariadb100") pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT} ;;
+    "mariadb101") pkgi ${PORT_MARIADB101} ${PORT_MARIADB101_CLIENT} ;;
+    "mysql55") pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT} ;;
+    "mysql56") pkgi ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT} ;;
+    "mysql57") pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT} ;;
+  esac
 
   if [ ! -e "${MYSQL}" ]; then
     printf "*** Error: MySQL binary not found at %s\n" "${MYSQL}"
@@ -3168,8 +3175,6 @@ sql_post_install() {
   fi
 
   printf "Starting SQL database post-installation tasks\n"
-
-  set_service mysqld OFF
 
   ## Todo: Check for mysql.conf values
   # if [ "$MYSQL_USER" = "" ] || [ "$MYSQL_PASSWORD" = "" ]; then
@@ -4792,13 +4797,13 @@ pureftpd_install() {
     fi
 
     printf "Enabling Pure-FTPD upload scanning script\n"
-    cp -f "${PUREFTPD_UPLOADSCAN_SCRIPT}" "${PUREFTPD_UPLOADSCAN}"
-    chmod 711 "${PUREFTPD_UPLOADSCAN}"
+    cp -f "${PB_CONFIG}/pureftpd/pureftpd_uploadscan.sh" "${PUREFTPD_UPLOADSCAN_BIN}"
+    chmod 711 "${PUREFTPD_UPLOADSCAN_BIN}"
 
     ${SYSRC} pureftpd_upload_enable="YES"
-    ${SYSRC} pureftpd_uploadscript="${PUREFTPD_UPLOADSCAN}"
+    ${SYSRC} pureftpd_uploadscript="${PUREFTPD_UPLOADSCAN_BIN}"
   else
-    rm -f ${PUREFTPD_UPLOADSCAN}
+    rm -f ${PUREFTPD_UPLOADSCAN_BIN}
     ${SYSRC} -q -x pureftpd_upload_enable
     ${SYSRC} -q -x pureftpd_uploadscript
   fi
@@ -4855,7 +4860,7 @@ pureftpd_uninstall() {
   ${SYSRC} -q -x pureftpd_upload_enable
   ${SYSRC} -q -x pureftpd_uploadscript
 
-  rm -f ${PUREFTPD_UPLOADSCAN}
+  rm -f ${PUREFTPD_UPLOADSCAN_BIN}
 
   return
 }
@@ -7553,6 +7558,10 @@ checkyesno() {
 validate_options() {
 
   local IFS=' '
+  local BIND_ADDRESS
+
+  BIND_ADDRESS="--bind-address=${DA_SERVER_IP}"
+
 
   ## Parse Defaults and User Options, then pass computed values to PB
 
@@ -7628,7 +7637,7 @@ validate_options() {
   case ${PHP1_VERSION} in
     "5.5"|"5.6"|"7.0")
       OPT_PHP1_VERSION="${PHP1_VERSION}"
-      OPT_PHP1_VER=$(${PHP1_VERSION} | tr -d '.')
+      OPT_PHP1_VER=$(echo ${PHP1_VERSION} | tr -d '.')
       setOpt php1_release ${PHP1_VERSION}
       case $(lc ${PHP1_MODE}) in
         "fpm"|"phpfpm"|"php-fpm"|"php_fpm")
@@ -7733,16 +7742,22 @@ validate_options() {
   esac
 
   case $(lc ${SQL_DB}) in
-    "mysql55"|"mysql56"|"mysql57"|"mariadb")
-      OPT_SQL_DB="${SQL_DB}"
-      setOpt mysql_inst mysql
-      ;;
     "mariadb55"|"mariadb100"|"mariadb101"|"mariadb")
       OPT_SQL_DB="${SQL_DB}"
       setOpt mysql_inst mariadb
       ;;
-    # "mariadb") OPT_SQL_DB="mariadb101" ;;
-    # "mysql") OPT_SQL_DB="mysql56" ;;
+    "mariadb")
+      OPT_SQL_DB="mariadb101"
+      setOpt mysql_inst mariadb
+      ;;
+    "mysql55"|"mysql56"|"mysql57")
+      OPT_SQL_DB="${SQL_DB}"
+      setOpt mysql_inst mysql
+      ;;
+    "mysql")
+      OPT_SQL_DB="mysql56"
+      setOpt mysql_inst mysql
+      ;;
     "no"|"none")
       OPT_SQL_DB="NO"
       setOpt mysql_inst no
@@ -7751,9 +7766,9 @@ validate_options() {
   esac
 
   case $(lc ${FTPD}) in
-    "pureftpd"|"pure-ftpd"|"pureftp") OPT_FTPD="pureftpd"; setOpt ftpd pureftpd ;;
-    "proftpd"|"pro-ftpd"|"proftp") OPT_FTPD="proftpd"; setOpt ftpd proftpd ;;
-    "no"|"none") OPT_FTPD="NO"; setOpt ftpd no ;;
+    "pureftpd"|"pure-ftpd"|"pureftp") OPT_FTPD="pureftpd";  setOpt ftpd pureftpd ;;
+    "proftpd"|"pro-ftpd"|"proftp")    OPT_FTPD="proftpd";   setOpt ftpd proftpd ;;
+    "no"|"none")                      OPT_FTPD="NO";        setOpt ftpd no ;;
     *) printf "*** Error: Invalid FTPD value set in options.conf\n"; exit ;;
   esac
 
@@ -7824,8 +7839,6 @@ install_app() {
     APP="$2" # shift?
   fi
 
-  printf "Debug: arg1: %s\n" "${APP}"
-
   case ${APP} in
     "apache"|"apache24") apache_install ;;
     "awstats") awstats_install ;;
@@ -7839,26 +7852,7 @@ install_app() {
     "ioncube"|"ic") pkgi "${PORT_IONCUBE}" ;;
     "ipfw") ipfw_enable ;;
     "libspf2"|"libspf"|"spf") pkgi ${PORT_LIBSPF2} ;;
-    "mariadb"|"mysql") echo "Installing: ${OPT_SQL_DB}";
-      install_app "${OPT_SQL_DB}" ;;
-    "mariadb55")
-      pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT}
-      sql_post_install ;;
-    "mariadb100")
-      pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT}
-      sql_post_install ;;
-    "mariadb101")
-      pkgi ${PORT_MARIADB101} ${PORT_MARIADB101_CLIENT}
-      sql_post_install ;;
-    "mysql55")
-      pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT}
-      sql_post_install ;;
-    "mysql56")
-      pkgi ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT}
-      sql_post_install ;;
-    "mysql57")
-      pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT}
-      sql_post_install ;;
+    "mariadb"|"mysql") sql_install ;;
     "modsecurity"|"modsec"|"mod_security") modsecurity_install ;;
     "nginx") nginx_install ;;
     "php"|"ftm"|"php55"|"php56"|"php70") php_install ;;
