@@ -191,6 +191,7 @@ readonly APACHE_HTTPD=/usr/local/sbin/httpd
 readonly APACHE_SSL_KEY="${APACHE_PATH}/ssl/server.key"
 readonly APACHE_SSL_CRT="${APACHE_PATH}/ssl/server.crt"
 readonly APACHE_SSL_CA="${APACHE_PATH}/ssl/server.ca"
+readonly PHP_HANDLERS_CONF="${APACHE_EXTRAS}/httpd-php-handlers.conf"
 # readonly APACHE_PID=/var/run/httpd.pid
 
 ## Nginx
@@ -226,6 +227,10 @@ readonly PHP_INI_OPCACHE="${PHP_ETC}/opcache.ini"
 readonly PHP_INI_DIRECTADMIN="${PHP_ETC}/10-directadmin.ini"
 readonly PHP1_RELEASE_SET="5.5 5.6 7.0"
 readonly PHP1_SHORTRELEASE_SET="$(echo "${PHP1_RELEASE_SET}" | tr -d '.')"
+readonly SUPHP_CONF_FILE=/usr/local/etc/suphp.conf
+readonly SUPHP_AP2_CONF="${APACHE_EXTRAS}/httpd-suphp.conf"
+# readonly SUPHP_PATH=/usr/local/suphp
+# readonly SUPHP_SO=/usr/lib/apache/mod_suphp.so
 
 ## Virtual Mail Directory
 readonly VIRTUAL_PATH=/etc/virtual
@@ -289,35 +294,29 @@ readonly PUREFTPD_UPLOADSCAN_BIN=/usr/local/bin/pureftpd_uploadscan.sh
 DA_ADMIN_EMAIL="${DA_ADMIN_USER}@${SERVER_DOMAIN}"
 DA_SERVICES_PKG="services_freebsd91_64.tar.gz"
 
-: "${MIN_PASS_LENGTH:=12}"
-: "${MAX_PASS_LENGTH:=16}"
+: "${MIN_PASS_LENGTH:=12}"          ## Min Random Password Length
+: "${MAX_PASS_LENGTH:=16}"          ## Max Random Password Length
+: "${NEWSYSLOG_DAYS:=10}"           ## Number of days to keep logs before rotating
+: "${DA_LAN:=0}"                    ## DA LAN Mode
+: "${DA_INSECURE:=0}"               ## DA Insecure Mode
+: "${LAN_IP=""}"                    ## Server's LAN IP
 
-: "${DA_LAN:=0}"
-: "${DA_INSECURE:=0}"
-
-LAN_IP=""
-HTTP=https
-EXTRA_VALUE=""
-
-PHP1_VERSION="5.6"
-PHP1_MODE="php-fpm"
-# PHP2_VERSION="7.0"
-# PHP2_MODE="fastcgi"
+: "${PHP1_VERSION:="5.6"}"          ## PHP #1 Version
+: "${PHP1_MODE:="php-fpm"}"         ## PHP #1 Mode
+# : "${PHP2_VERSION:="7.0"}"          ## PHP #2 Version
+# : "${PHP2_MODE:="php-fpm"}""        ## PHP #2 Mode
 PHP_VERSION="${PHP1_VERSION}"
 PHP_MODE="${PHP1_MODE}"
 
-: ${EXIM_RECIPIENTS_MAX:=150}
+: ${EXIM_RECIPIENTS_MAX:=150}       ## Exim Max Recipients
 
-: ${SQL_DATA_PATH:=/var/db/mysql} ## DA default data path is: /home/mysql
-: ${MYSQL_HOST:=localhost}        ## SQL default hostname
+: ${SQL_DATA_PATH:=/var/db/mysql}   ## SQL DB files path (DA default: /home/mysql)
+: ${MYSQL_HOST:=localhost}          ## SQL default hostname
 
 ## Custom SSL Certificates
 CUSTOM_SSL_KEY=/usr/local/etc/ssl/server.key
 CUSTOM_SSL_CRT=/usr/local/etc/ssl/server.crt
 CUSTOM_SSL_CA=/usr/local/etc/ssl/server.ca
-
-: ${NEWSYSLOG_DAYS:=10}           ## Number of days to keep logs before rotating
-
 
 # ROUNDCUBE_CONFIG_CUSTOM="${ROUNDCUBE_CONF}"
 ## Already defined in roundcube_install()
@@ -388,102 +387,102 @@ readonly PORTS_BASE=/usr/ports
 # PKG_VAR_DB=/var/db/pkgs
 
 ## Ports: Dependencies
-PORT_PORTMASTER=ports-mgmt/portmaster
-PORT_SYNTH=ports-mgmt/synth
-PORT_PERL=lang/perl5.20
-PORT_AUTOCONF=devel/autoconf
-PORT_AUTOMAKE=devel/automake
-PORT_BISON=devel/bison
-PORT_CA_ROOT_NSS=security/ca_root_nss
-PORT_CURL="ftp/curl"
-PORT_LIBTOOL=devel/libtool
-PORT_LIBXML2=textproc/libxml2
-PORT_LIBXSLT=textproc/libxslt
-PORT_LIBARCHIVE=archivers/libarchive
-PORT_FREETYPE2=print/freetype2
-PORT_CYRUSSASL2=security/cyrus-sasl2
-PORT_PYTHON=lang/python
-PORT_CCACHE=devel/ccache
-PORT_CMAKE=devel/cmake
-PORT_GMAKE=devel/gmake
-PORT_WGET=ftp/wget
-PORT_FLEX=textproc/flex
-PORT_GD=graphics/gd
-PORT_SASL2=security/cyrus-sasl2
-PORT_MAILX=mail/mailx
-PORT_BIND=dns/bind99
-PORT_GCC6=lang/gcc6-aux
-PORT_NCURSES=devel/ncurses
+readonly PORT_PORTMASTER=ports-mgmt/portmaster
+readonly PORT_SYNTH=ports-mgmt/synth
+readonly PORT_PERL=lang/perl5.20
+readonly PORT_AUTOCONF=devel/autoconf
+readonly PORT_AUTOMAKE=devel/automake
+readonly PORT_BISON=devel/bison
+readonly PORT_CA_ROOT_NSS=security/ca_root_nss
+readonly PORT_CURL="ftp/curl"
+readonly PORT_LIBTOOL=devel/libtool
+readonly PORT_LIBXML2=textproc/libxml2
+readonly PORT_LIBXSLT=textproc/libxslt
+readonly PORT_LIBARCHIVE=archivers/libarchive
+readonly PORT_FREETYPE2=print/freetype2
+readonly PORT_CYRUSSASL2=security/cyrus-sasl2
+readonly PORT_PYTHON=lang/python
+readonly PORT_CCACHE=devel/ccache
+readonly PORT_CMAKE=devel/cmake
+readonly PORT_GMAKE=devel/gmake
+readonly PORT_WGET=ftp/wget
+readonly PORT_FLEX=textproc/flex
+readonly PORT_GD=graphics/gd
+readonly PORT_SASL2=security/cyrus-sasl2
+readonly PORT_MAILX=mail/mailx
+readonly PORT_BIND=dns/bind99
+readonly PORT_GCC6=lang/gcc6-aux
+readonly PORT_NCURSES=devel/ncurses
 
-PORT_DEPS="${PORT_GMAKE} ${PORT_PERL} ${PORT_WGET} ${PORT_BISON} ${PORT_FLEX} \
+readonly PORT_DEPS="${PORT_GMAKE} ${PORT_PERL} ${PORT_WGET} ${PORT_BISON} ${PORT_FLEX} \
 ${PORT_GD} ${PORT_SASL2} ${PORT_CMAKE} ${PORT_PYTHON} ${PORT_AUTOCONF} \
 ${PORT_LIBTOOL} ${PORT_LIBARCHIVE} ${PORT_MAILX} ${PORT_CA_ROOT_NSS}"
-PORT_DEPS_100="${PORT_DEPS} ${PORT_BIND}"
+readonly PORT_DEPS_100="${PORT_DEPS} ${PORT_BIND}"
 
 ## Ports: Web Servers
-PORT_APACHE24=www/apache24
-PORT_NGINX=www/nginx
-PORT_NGHTTP2=www/nghttp2
+readonly PORT_APACHE24=www/apache24
+readonly PORT_NGINX=www/nginx
+readonly PORT_NGHTTP2=www/nghttp2
 
-PORT_FASTCGI=www/mod_fastcgi
-PORT_FCGID=www/mod_fcgid
+readonly PORT_FASTCGI=www/mod_fastcgi
+readonly PORT_FCGID=www/mod_fcgid
 
 ## Ports: PHP
-PORT_PHP55=lang/php55
-PORT_PHP55_EXT=lang/php55-extensions
-PORT_PHP56=lang/php56
-PORT_PHP56_EXT=lang/php56-extensions
-PORT_PHP70=lang/php70
-PORT_PHP70_EXT=lang/php70-extensions
-PORT_MOD_PHP55=www/mod_php55
-PORT_MOD_PHP56=www/mod_php56
-PORT_MOD_PHP70=www/mod_php70
-PORT_SUPHP=www/suphp
+readonly PORT_PHP55=lang/php55
+readonly PORT_PHP55_EXT=lang/php55-extensions
+readonly PORT_PHP56=lang/php56
+readonly PORT_PHP56_EXT=lang/php56-extensions
+readonly PORT_PHP70=lang/php70
+readonly PORT_PHP70_EXT=lang/php70-extensions
+readonly PORT_MOD_PHP55=www/mod_php55
+readonly PORT_MOD_PHP56=www/mod_php56
+readonly PORT_MOD_PHP70=www/mod_php70
+readonly PORT_SUPHP=www/suphp
 
-PORT_PHPMYADMIN=databases/phpmyadmin
-PORT_IONCUBE=devel/ioncube
-PORT_SUHOSIN=security/suhosin
-PORT_HTSCANNER=devel/pecl-htscanner
-# PORT_PCRE=devel/pcre
+readonly PORT_PHPMYADMIN=databases/phpmyadmin
+readonly PORT_IONCUBE=devel/ioncube
+readonly PORT_SUHOSIN=security/suhosin
+readonly PORT_HTSCANNER=devel/pecl-htscanner
+# readonly PORT_PCRE=devel/pcre
 
 ## Ports: Mail & Related Services
-PORT_EXIM="mail/exim"
-PORT_SPAMASSASSIN="mail/spamassassin"
-PORT_SPAMASSASSIN_UTILITIES="mail/sa-utils"
-PORT_DOVECOT2="mail/dovecot2"
-PORT_PIGEONHOLE="mail/dovecot2-pigeonhole"
-PORT_CLAMAV="security/clamav"
-PORT_ROUNDCUBE="mail/roundcube"
-PORT_LIBSPF2="mail/libspf2"
-PORT_LIBDKIM="mail/libdkim"
-PORT_MAILMAN="mail/mailman"
+readonly PORT_EXIM="mail/exim"
+readonly PORT_SPAMASSASSIN="mail/spamassassin"
+readonly PORT_SPAMASSASSIN_UTILITIES="mail/sa-utils"
+readonly PORT_DOVECOT2="mail/dovecot2"
+readonly PORT_PIGEONHOLE="mail/dovecot2-pigeonhole"
+readonly PORT_CLAMAV="security/clamav"
+readonly PORT_ROUNDCUBE="mail/roundcube"
+readonly PORT_LIBSPF2="mail/libspf2"
+readonly PORT_LIBDKIM="mail/libdkim"
+readonly PORT_MAILMAN="mail/mailman"
 
 ## Ports: FTPd
-PORT_PUREFTPD="ftp/pure-ftpd"
-PORT_PROFTPD="ftp/proftpd"
-PORT_PROFTPD_CLAMAV="security/proftpd-mod_clamav"
+readonly PORT_PUREFTPD="ftp/pure-ftpd"
+readonly PORT_PROFTPD="ftp/proftpd"
+readonly PORT_PROFTPD_CLAMAV="security/proftpd-mod_clamav"
 
 ## Ports: Database Servers
-PORT_MYSQL55=databases/mysql55-server
-PORT_MYSQL56=databases/mysql56-server
-PORT_MYSQL57=databases/mysql57-server
-PORT_MARIADB55=databases/mariadb55-server
-PORT_MARIADB100=databases/mariadb100-server
-PORT_MARIADB101=databases/mariadb101-server
+readonly PORT_MYSQL55=databases/mysql55-server
+readonly PORT_MYSQL56=databases/mysql56-server
+readonly PORT_MYSQL57=databases/mysql57-server
+readonly PORT_MARIADB55=databases/mariadb55-server
+readonly PORT_MARIADB100=databases/mariadb100-server
+readonly PORT_MARIADB101=databases/mariadb101-server
 
 ## Ports: Database Clients
-PORT_MYSQL55_CLIENT=databases/mysql55-client
-PORT_MYSQL56_CLIENT=databases/mysql56-client
-PORT_MYSQL57_CLIENT=databases/mysql56-client
-PORT_MARIADB55_CLIENT=databases/mariadb55-client
-PORT_MARIADB100_CLIENT=databases/mariadb100-client
-PORT_MARIADB101_CLIENT=databases/mariadb101-client
+readonly PORT_MYSQL55_CLIENT=databases/mysql55-client
+readonly PORT_MYSQL56_CLIENT=databases/mysql56-client
+readonly PORT_MYSQL57_CLIENT=databases/mysql56-client
+readonly PORT_MARIADB55_CLIENT=databases/mariadb55-client
+readonly PORT_MARIADB100_CLIENT=databases/mariadb100-client
+readonly PORT_MARIADB101_CLIENT=databases/mariadb101-client
 
 ## Ports: Web Stats
-PORT_AWSTATS=www/awstats
-PORT_WEBALIZER=www/webalizer
+readonly PORT_AWSTATS=www/awstats
+readonly PORT_WEBALIZER=www/webalizer
 
-PORT_LETSENCRYPT="security/letsencrypt.sh"
+readonly PORT_LETSENCRYPT="security/letsencrypt.sh"
 
 ################################################################################
 
@@ -495,11 +494,11 @@ PORT_LETSENCRYPT="security/letsencrypt.sh"
 
 ## These variables are included every time 'make' is called.
 ## Default is to source /etc/make.conf
-GLOBAL_MAKE_VARS="" # e.g. WITH_OPENSSL_PORT=YES BATCH=YES WITH_CCACHE_BUILD=YES
+: ${GLOBAL_MAKE_VARS=""} # e.g. WITH_OPENSSL_PORT=YES BATCH=YES WITH_CCACHE_BUILD=YES
 
 ## These options are included every time a Port is built via 'make'.
-GLOBAL_MAKE_SET=""
-GLOBAL_MAKE_UNSET="" # EXAMPLES X11 HTMLDOCS CUPS TESTS DOCS NLS
+: ${GLOBAL_MAKE_SET=""}
+: ${GLOBAL_MAKE_UNSET=""} # EXAMPLES X11 HTMLDOCS CUPS TESTS DOCS NLS
 
 APACHE24_MAKE_SET="" # SUEXEC MPM_EVENT
 APACHE24_MAKE_UNSET="" # MPM_PREFORK
@@ -535,9 +534,9 @@ SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
 PHP70_EXT_MAKE_UNSET=""
 
 ## Prefixes for multi-PHP installations:
-PHP55_PREFIX=/usr/local/php55
-PHP56_PREFIX=/usr/local/php56
-PHP70_PREFIX=/usr/local/php70
+readonly PHP55_PREFIX=/usr/local/php55
+readonly PHP56_PREFIX=/usr/local/php56
+readonly PHP70_PREFIX=/usr/local/php70
 
 MOD_PHP55_MAKE_SET="" # MAILHEAD  AP2FILTER
 MOD_PHP55_MAKE_UNSET=""
@@ -602,12 +601,6 @@ if [ -e "${PB_CUSTOM}/ssl/openssl_req.conf" ]; then
   SSL_REQ_CONF="${PB_CUSTOM}/ssl/openssl_req.conf"
 fi
 
-PHP_HANDLERS_CONF="${APACHE_EXTRAS}/httpd-php-handlers.conf"
-SUPHP_HTTPD="${APACHE_EXTRAS}/httpd-suphp.conf"
-SUPHP_CONF_FILE=/usr/local/etc/suphp.conf
-# SUPHP_PATH=/usr/local/suphp
-# SUPHP_SO=/usr/lib/apache/mod_suphp.so
-
 ## Mod Security for Apache
 MODSECURITY_APACHE_INCLUDE="${PB_CONFIG}/ap2/conf/extra/httpd-modsecurity.conf"
 if [ -e "${PB_CUSTOM}/ap2/conf/extra/httpd-modsecurity.conf" ]; then
@@ -653,7 +646,7 @@ fi
 
 ################################################################################
 
-## Todo:
+## Todo: Recreate missing options.conf
 # if [ ! -f options.conf ]; then
 # # recreate file
 # # exit
@@ -706,7 +699,6 @@ eval_var() {
 }
 
 ################################################################################
-
 
 ## Get Option (from CB2)
 ## Used to retrieve CB options.conf
@@ -1655,8 +1647,29 @@ bind_setup() {
 ## Install DirectAdmin (replaces scripts/install.sh)
 directadmin_install() {
 
-  local BIND_ADDRESS
+  local BIND_ADDRESS HTTP DA_EXTRA_VALUE
   BIND_ADDRESS="--bind-address=${DA_SERVER_IP}"
+
+  if [ "${DA_INSECURE}" -eq 1 ]; then
+    HTTP=http
+    DA_EXTRA_VALUE='&insecure=yes'
+  fi
+
+  if [ "${DA_LAN}" -eq 1 ]; then
+    BIND_ADDRESS=""
+  fi
+
+  ## Determin IP address using DA servers (from DA/scripts/getLicense.sh)
+  da_myip() {
+    local DISCOVERED_IP
+    DISCOVERED_IP=$(${WGET} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
+    if [ "${DISCOVERED_IP}" = "" ]; then
+      printf "*** Error: Cannot determine the server's IP address via myip.directadmin.com\n"
+      return
+    fi
+    printf "Server's IP address used to connect out: %s\n" "${DISCOVERED_IP}"
+    return
+  }
 
   ### Pre-Installation Tasks (replaces setup.sh)
 
@@ -1910,14 +1923,14 @@ directadmin_install() {
 
   ## Download DirectAdmin License file
   if [ ! -e "${DA_LICENSE}" ]; then
-    ${WGET} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}&uid=${DA_USER_ID}${EXTRA_VALUE}" -O "${DA_LICENSE}" "${BIND_ADDRESS}"
+    ${WGET} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}&uid=${DA_USER_ID}${DA_EXTRA_VALUE}" -O "${DA_LICENSE}" "${BIND_ADDRESS}"
 
     if [ $? -ne 0 ]; then
       printf "*** Error: Unable to download the DirectAdmin license file.\n"
       da_myip
 
       printf "Trying the license relay server...\n"
-      ${WGET} "${HTTP}://license.directadmin.com/licenseupdate.php?lid=${DA_LICENSE_ID}&uid=${DA_USER_ID}${EXTRA_VALUE}" -O "${DA_LICENSE}" "${BIND_ADDRESS}"
+      ${WGET} "${HTTP}://license.directadmin.com/licenseupdate.php?lid=${DA_LICENSE_ID}&uid=${DA_USER_ID}${DA_EXTRA_VALUE}" -O "${DA_LICENSE}" "${BIND_ADDRESS}"
 
       if [ $? -ne 0 ]; then
         printf "*** Error: Unable to download the DirectAdmin license file from relay server as well.\n"
@@ -1948,27 +1961,6 @@ directadmin_install() {
   mkdir -p ${DA_PATH}/data/users/admin/packages
   chown diradmin:diradmin ${DA_PATH}/data/users/admin/packages
   chmod 700 ${DA_PATH}/data/users/admin/packages
-
-  return
-}
-
-################################################################
-
-## Determin IP address using DA servers (from DA/scripts/getLicense.sh)
-da_myip() {
-
-  local BIND_ADDRESS DISCOVERED_IP
-
-  BIND_ADDRESS="--bind-address=${DA_SERVER_IP}"
-
-  DISCOVERED_IP=$(${WGET} "${BIND_ADDRESS}" -qO - "${HTTP}://myip.directadmin.com")
-
-  if [ "${DISCOVERED_IP}" = "" ]; then
-    printf "*** Error: Cannot determine the server's IP address via myip.directadmin.com\n"
-    return
-  fi
-
-  printf "Server's IP address used to connect out: %s\n" "${DISCOVERED_IP}"
 
   return
 }
@@ -3098,7 +3090,7 @@ verify_my_cnf() {
 
 ################################################################################
 
-## Initialize SQL Parameters (copied from CB2)
+## Initialize SQL Parameters (from CB2)
 get_sql_settings() {
 
   ## DA_MYSQL=/usr/local/directadmin/conf/mysql.conf
@@ -3820,7 +3812,7 @@ php_upgrade() {
 
 ################################################################
 
-## Have PHP System (copied from CB2)
+## Have PHP System (from CB2)
 ## Needed?
 have_php_system() {
 
@@ -5853,8 +5845,7 @@ verify_webapps_php_ini() {
 
 ################################################################################
 
-
-## Verify Webapps Temp Directory (copied from CB2)
+## Verify Webapps Temp Directory (from CB2)
 verify_webapps_tmp() {
 
   if [ ! -d "{$WWW_TMP_DIR}" ]; then
@@ -5869,7 +5860,6 @@ verify_webapps_tmp() {
 }
 
 ################################################################################
-
 
 ## Get Webmail Link (from CB2)
 get_webmail_link() {
@@ -5890,12 +5880,12 @@ get_webmail_link() {
 
 ################################################################################
 
-
 ## Apache Host Configuration (from CB2: doApacheHostConf())
 apache_host_conf() {
 
   local APACHE_HOSTNAME_CONF SUEXEC_PER_DIR WEBAPPS_FCGID_DIR
   APACHE_HOSTNAME_CONF="${APACHE_EXTRAS}/httpd-hostname.conf"
+  WEBAPPS_FCGID_DIR=/usr/local/www/fcgid
 
   ## Copy custom/ file
   ## APACHE_HOSTNAME_CONF_CUSTOM
@@ -5947,7 +5937,6 @@ apache_host_conf() {
 
     verify_webapps_tmp
 
-    # WEBAPPS_FCGID_DIR=/var/www/fcgid
     SUEXEC_PER_DIR="0"
 
     if [ -s /usr/local/sbin/suexec ]; then
@@ -6327,8 +6316,8 @@ doApacheCheck() {
     printf "" > "${APACHE_EXTRAS}/httpd-includes.conf"
   fi
 
-  if [ ! -e "${SUPHP_HTTPD}" ]; then
-    printf "" > "${SUPHP_HTTPD}"
+  if [ ! -e "${SUPHP_AP2_CONF}" ]; then
+    printf "" > "${SUPHP_AP2_CONF}"
   fi
 
   if [ ! -e "${APACHE_EXTRAS}/httpd-php-handlers.conf" ]; then
@@ -7299,7 +7288,7 @@ php_conf() {
       } > "${SUPHP_CONF_FILE}"
 
       ## Writing data to ${APACHE_EXTRAS}/httpd-suphp.conf
-      printf "Writing data to %s\n" "${SUPHP_HTTPD}"
+      printf "Writing data to %s\n" "${SUPHP_AP2_CONF}"
       {
         echo "<IfModule mod_suphp.c>"
         echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
@@ -7334,11 +7323,11 @@ php_conf() {
 
         echo "</Location>"
         echo "</IfModule>"
-      } > "${SUPHP_HTTPD}"
+      } > "${SUPHP_AP2_CONF}"
 
       printf "Done.\n"
-    elif [ -e "${SUPHP_HTTPD}" ]; then
-      printf "" > "${SUPHP_HTTPD}"
+    elif [ -e "${SUPHP_AP2_CONF}" ]; then
+      printf "" > "${SUPHP_AP2_CONF}"
     fi
   fi
 
@@ -7558,10 +7547,6 @@ checkyesno() {
 validate_options() {
 
   local IFS=' '
-  local BIND_ADDRESS
-
-  BIND_ADDRESS="--bind-address=${DA_SERVER_IP}"
-
 
   ## Parse Defaults and User Options, then pass computed values to PB
 
@@ -7813,14 +7798,6 @@ validate_options() {
     DA_INSECURE=$(cat /root/.insecure_download)
   fi
 
-  if [ "${DA_INSECURE}" -eq 1 ]; then
-    HTTP=http
-    EXTRA_VALUE='&insecure=yes'
-  fi
-
-  if [ "${DA_LAN}" -eq 1 ]; then
-    BIND_ADDRESS=""
-  fi
 
   return
 }
