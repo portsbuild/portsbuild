@@ -19,14 +19,6 @@
 #
 # ******************************************************************************
 #
-#  ** Need help? Visit the DirectAdmin Forums and look for the PB thread *URL here*
-#
-#  ** Found a bug? Please submit an issue: https://github.com/portsbuild/portsbuild/issues
-#
-#  ** Want to contribute or improve PortsBuild? Please fork and submit a pull request. :)
-#
-# ******************************************************************************
-#
 #  Requirements:
 #  - DirectAdmin license
 #  - FreeBSD 9.3 or 10.3 (amd64 only)
@@ -45,9 +37,17 @@
 #
 #  TODO: Changelog/History: see CHANGELOG for more details
 #
+# ******************************************************************************
+#
+#  ** Need help? Visit the DirectAdmin Forums and look for the PB thread *URL here*
+#
+#  ** Found a bug? Please submit an issue: https://github.com/portsbuild/portsbuild/issues
+#
+#  ** Want to contribute or improve PortsBuild? Please fork and submit a pull request. :)
+#
 ################################################################################
 
-# Fun fact #1: root's shell is actually /bin/tcsh
+## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.0"
 PB_BUILD_DATE=20160522
@@ -4063,8 +4063,8 @@ apache_install() {
   # fi
 
   ### Main Installation
-  if [ -z "${APACHE24_MAKE_SET}" ] && [ -z "${APACHE24_MAKE_UNSET}" ] \
-    && [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "NO" ]; then
+  if [ -z "${APACHE24_MAKE_SET}" ] && [ -z "${APACHE24_MAKE_UNSET}" ] &&
+    [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "NO" ]; then
     pkgi "${PORT_APACHE24}"
   else
     ## Todo: Harden Symlinks Patch for Apache 2.4
