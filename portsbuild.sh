@@ -50,7 +50,7 @@
 # Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160517
+PB_BUILD_DATE=20160522
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -99,6 +99,7 @@ fi
 readonly PB_CONF="${PB_PATH}/options.conf"
 readonly PB_CONFIG="${PB_PATH}/configure"
 readonly PB_CUSTOM="${PB_PATH}/custom"
+readonly PB_SETUP=/root/portsbuild.txt
 
 ## PortsBuild Remote File Repository
 PB_MIRROR="http://s3.amazonaws.com/portsbuild/files"
@@ -154,8 +155,7 @@ readonly WGET=/usr/local/bin/wget
 readonly WGET_CONNECT_OPTIONS="--connect-timeout=5 --read-timeout=10 --tries=3"
 readonly TAR=/usr/bin/tar
 
-readonly file_mtime="stat -f %m"
-readonly CPU_CORES=$(${SYSCTL} -n hw.ncpu)
+readonly CPU_CORES=$("${SYSCTL}" -n hw.ncpu)
 readonly SERVER_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
 readonly NEWSYSLOG_FILE=/usr/local/etc/newsyslog.conf.d/directadmin.conf
 
@@ -1006,7 +1006,6 @@ update_hosts() {
 
 ################################################################################
 
-
 ## Get System Timezone (from CB2)
 getTimezone() {
 
@@ -1022,7 +1021,6 @@ getTimezone() {
 }
 
 ################################################################################
-
 
 ## Add (new) User to (new) Group (from CB2)
 addUserGroup() {
@@ -1044,10 +1042,9 @@ addUserGroup() {
 ## Random Password Generator (from CB2)
 random_pass() {
 
-  # local min_pass_length="${1}"
-  # MIN_PASS_LENGTH=${min_pass_length:=12}
+  local min="$1"
 
-  MIN_PASS_LENGTH="${1:=12}"
+  MIN_PASS_LENGTH="${min:=12}"
 
   ${PERL} -le"print map+(A..Z,a..z,0..9)[rand 62],0..${MIN_PASS_LENGTH}"
 }
@@ -1647,7 +1644,8 @@ bind_setup() {
 ## Install DirectAdmin (replaces scripts/install.sh)
 directadmin_install() {
 
-  local BIND_ADDRESS HTTP DA_EXTRA_VALUE
+  local BIND_ADDRESS HTTP DA_EXTRA_VALUE HOME_FOUND PROCFS_NUM AUTH_COUNT
+  local RC_ETH_DEV ETH_COUNT SSHROOT
   BIND_ADDRESS="--bind-address=${DA_SERVER_IP}"
 
   if [ "${DA_INSECURE}" -eq 1 ]; then
@@ -1696,8 +1694,8 @@ directadmin_install() {
   ## 2016-03-07: Need to create a blank /etc/auth.conf file for DA compatibility
   printf "Checking for /etc/auth.conf\n"
   if [ ! -e /etc/auth.conf ]; then
-    /usr/bin/touch /etc/auth.conf
-    /bin/chmod 644 /etc/auth.conf
+    touch /etc/auth.conf
+    ${CHMOD} 644 /etc/auth.conf
   fi
 
   ## Update /etc/aliases:
@@ -1736,8 +1734,8 @@ directadmin_install() {
     exit 3
   fi
 
-  COUNT=$(head -n 4 ${DA_PATH}/update.tar.gz | grep -c "* You are not allowed to run this program *");
-  if [ "$COUNT" -ne 0 ]; then
+  AUTH_COUNT=$(head -n 4 ${DA_PATH}/update.tar.gz | grep -c "* You are not allowed to run this program *");
+  if [ "${AUTH_COUNT}" -ne 0 ]; then
     printf "*** \nError: You are not authorized to download the update package with that Client ID and License ID from this IP address.\n"
     exit 4
   fi
@@ -1770,7 +1768,7 @@ directadmin_install() {
   ## The following lines were in DA's install/setup do_checks():
   ## Check for a separate /home partition (for quota support)
   HOME_FOUND=$(grep -c /home /etc/fstab)
-  if [ "$HOME_FOUND" -lt "1" ]; then
+  if [ "${HOME_FOUND}" -lt "1" ]; then
     printf "Setting quota_partition=/ in DirectAdmin's Configuration Template File\n"
     setVal quota_partition "/" "${DA_CONF_TEMPLATE}"
   fi
@@ -1778,10 +1776,11 @@ directadmin_install() {
   ## 2016-05-13: From scripts/fstab.sh (/proc is needed)
   ## PB: Verify: Add quota support to fstab
   ${PERL} -pi -e 's/[\ \t]+\/home[\ \t]+ufs[\ \t]+rw[\ \t]+/\t\t\/home\t\t\tufs\trw,userquota,groupquota\t/' /etc/fstab
-  ${PERL} -pi -e 's/[\ \t]+\/[\ \t]+ufs[\ \t]+rw[\ \t]+/\t\t\t\/\t\t\tufs\trw,userquota,groupquota\t/' /etc/fstab
+  ${PERL} -pi -e 's/[\ \t]+\/[\ \t]+ufs[\ \t]+rw[\ \t]+/\t\/\tufs\trw,userquota,groupquota\t/' /etc/fstab
 
   PROCFS_NUM=$(grep -c procfs /etc/fstab)
-  if [ "$PROCFS_NUM" -eq 0 ]; then
+  if [ "${PROCFS_NUM}" -eq 0 ]; then
+    printf "Adding /proc to /etc/fstab\n"
     printf "proc\t\t/proc\t\tprocfs\trw\t0\t0\n" >> /etc/fstab
     /sbin/mount procfs /proc
   fi
@@ -1805,7 +1804,7 @@ directadmin_install() {
   DA_ADMIN_EMAIL=${DA_ADMIN_EMAIL:=${DA_ADMIN_USER}@${SERVER_DOMAIN}}
 
   # DB_ROOT_PASS=`perl -le'print map+(A..Z,a..z,0..9)[rand 62],0..7'`;
-  printf "Generating random passwords for SQL DB and DirectAdmin user\n"
+  printf "Generating random passwords for SQL DB and DirectAdmin admin user\n"
   DA_SQLDB_PASSWORD=$(random_pass) ## Used as root SQL password
   DA_ADMIN_PASSWORD=$(random_pass) ## Used as da_admin SQL password
 
@@ -1826,7 +1825,7 @@ directadmin_install() {
     echo "services=${DA_SERVICES_PKG}"
   } > "${DA_SETUP_TXT}"
 
-  chmod 600 "${DA_SETUP_TXT}"
+  ${CHMOD} 600 "${DA_SETUP_TXT}"
 
   ## Add the DirectAdmin user & group:
   ${PW} groupadd diradmin 2>&1
@@ -1853,7 +1852,7 @@ directadmin_install() {
   fi
 
   ## Set DirectAdmin Folder permissions:
-  chmod -f 755 ${DA_PATH}
+  ${CHMOD} -f 755 ${DA_PATH}
   chown -f diradmin:diradmin ${DA_PATH}
 
   ## Create directories and set permissions:
@@ -1862,8 +1861,8 @@ directadmin_install() {
 
   chown -f diradmin:diradmin ${DA_PATH}/*
   chown -f diradmin:diradmin /var/log/directadmin
-  chmod -f 700 ${DA_PATH}/conf
-  chmod -f 700 /var/log/directadmin
+  ${CHMOD} -f 700 ${DA_PATH}/conf
+  ${CHMOD} -f 700 /var/log/directadmin
 
   #mkdir -p ${DA_PATH}/scripts/packages
   mkdir -p ${DA_PATH}/data/admin
@@ -1874,16 +1873,16 @@ directadmin_install() {
 
   ## No conf files in a fresh install:
   chown -f diradmin:diradmin ${DA_PATH}/conf/* 2> /dev/null > /dev/null
-  chmod -f 600 ${DA_PATH}/conf/* 2> /dev/null > /dev/null
+  ${CHMOD} -f 600 ${DA_PATH}/conf/* 2> /dev/null > /dev/null
 
   ## Create logs directory:
   mkdir -p /var/log/httpd/domains
-  chmod 700 /var/log/httpd
+  ${CHMOD} 700 /var/log/httpd
 
   ## NOTE: /home => /usr/home
   mkdir -p /home/tmp
-  chmod -f 1777 /home/tmp
-  chmod 711 /home
+  ${CHMOD} -f 1777 /home/tmp
+  ${CHMOD} 711 /home
 
   ## PB: Create User and Reseller Welcome message (need to download/copy these files):
   ## 2016-03-22: Needed?
@@ -1904,7 +1903,7 @@ directadmin_install() {
     } >> /etc/ssh/sshd_config
 
     ## Set SSH folder permissions (needed?):
-    chmod 710 /etc/ssh
+    ${CHMOD} 710 /etc/ssh
   fi
 
   ## Testing mode: create a fake license.key file
@@ -1998,10 +1997,10 @@ basic_system_security() {
   printf "Running Basic System Security Tasks\n"
 
   printf "Setting security.bsd.see_other_uids to 0\n"
-  sysrc -f /etc/sysctl.conf security.bsd.see_other_uids=0
+  ${SYSRC} -f /etc/sysctl.conf security.bsd.see_other_uids=0
 
   printf "Setting security.bsd.see_other_gids to 0\n"
-  sysrc -f /etc/sysctl.conf security.bsd.see_other_gids=0
+  ${SYSRC} -f /etc/sysctl.conf security.bsd.see_other_gids=0
 
 # setVal enforce_difficult_passwords 1 ${DA_CONF_TEMPLATE}
 # setVal enforce_difficult_passwords 1 ${DA_CONF}
@@ -2348,8 +2347,8 @@ exim_install() {
 
   ## Update /etc/rc.conf
   printf "Enabling Exim startup (updating /etc/rc.conf)\n"
-  sysrc exim_enable="YES"
-  sysrc exim_flags="-bd -q1h"
+  ${SYSRC} exim_enable="YES"
+  ${SYSRC} exim_flags="-bd -q1h"
 
   if [ ! -e /etc/periodic.conf ]; then
     printf "Creating /etc/periodic.conf\n"
@@ -2357,8 +2356,8 @@ exim_install() {
   fi
 
   printf "Updating /etc/periodic.conf\n"
-  sysrc -f /etc/periodic.conf daily_status_include_submit_mailq="NO"
-  sysrc -f /etc/periodic.conf daily_clean_hoststat_enable="NO"
+  ${SYSRC} -f /etc/periodic.conf daily_status_include_submit_mailq="NO"
+  ${SYSRC} -f /etc/periodic.conf daily_clean_hoststat_enable="NO"
 
   printf "Starting Exim\n"
   ${SERVICE} exim start
@@ -2558,6 +2557,7 @@ spamassassin_utilities_install() {
 
 ################################################################
 
+## Uninstall SpamAssassin Utilities
 spamassassin_utilities_uninstall() {
 
   printf "Uninstalling SpamAssassin Utilities\n"
@@ -2574,7 +2574,6 @@ spamassassin_utilities_uninstall() {
 
 
 ################################################################################
-
 
 ## Todo:
 ## Install Exim BlockCracking (BC)
@@ -2618,7 +2617,6 @@ blockcracking_install() {
 }
 
 ################################################################################
-
 
 ## Todo:
 ## Install Easy Spam Figter (ESF)
@@ -2685,7 +2683,6 @@ easyspamfighter_install() {
 }
 
 ################################################################################
-
 
 ## Dovecot2 Installation Tasks
 dovecot_install() {
@@ -2764,9 +2761,13 @@ dovecot_install() {
   if [ "${DOVECOT2_MAKE_SET}" = "" ] && [ "${DOVECOT2_MAKE_UNSET}" = "" ] ; then
     pkgi ${PORT_DOVECOT2}
   else
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" mail_dovecot2_SET="${DOVECOT2_MAKE_SET}" mail_dovecot2_UNSET="${DOVECOT2_MAKE_UNSET}" \
-    OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" rmconfig
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_DOVECOT2}" \
+    mail_dovecot2_SET="${DOVECOT2_MAKE_SET}" \
+    mail_dovecot2_UNSET="${DOVECOT2_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" \
+    OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" \
+    reinstall clean
   fi
 
   ## Update directadmin.conf:
@@ -2895,7 +2896,7 @@ dovecot_install() {
   set_service vm-pop3d delete
 
   printf "Enabling Dovecot startup (upating /etc/rc.conf)\n"
-  sysrc dovecot_enable="YES"
+  ${SYSRC} dovecot_enable="YES"
 
   dovecot_restart
 }
@@ -2932,9 +2933,9 @@ dovecot_uninstall() {
 
   ${SERVICE} dovecot stop
 
-  sysrc -x dovecot_enable
+  ${SYSRC} -x dovecot_enable
 
-  ${PKG} delete -f ${PORT_DOVECOT2}
+  pkgd ${PORT_DOVECOT2}
 
   return
 }
@@ -2956,16 +2957,19 @@ pigeonhole_install() {
   if [ "${PIGEONHOLE_MAKE_SET}" = "" ] && [ "${PIGEONHOLE_MAKE_UNSET}" = "" ] ; then
     pkgi ${PORT_WEBALIZER}
   else
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PIGEONHOLE}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PIGEONHOLE}" mail_dovecot2_pigeonhole_SET="${PIGEONHOLE_MAKE_SET}" mail_dovecot2_pigeonhole_UNSET="${PIGEONHOLE_MAKE_UNSET}" \
-    OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PIGEONHOLE}" rmconfig
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PIGEONHOLE}" \
+    mail_dovecot2_pigeonhole_SET="${PIGEONHOLE_MAKE_SET}" \
+    mail_dovecot2_pigeonhole_UNSET="${PIGEONHOLE_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" \
+    OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" \
+    reinstall clean
   fi
 
   return
 }
 
 ################################################################################
-
 
 ## Todo:
 ## Webalizer Installation
@@ -2979,11 +2983,15 @@ webalizer_install() {
   printf "Starting Webalizer installation\n"
 
   ### Main Installation
-  if [ "${WEBALIZER_MAKE_SET}" = "" ] && [ "${WEBALIZER_MAKE_UNSET}" = "" ] ; then
+  if [ -z "${WEBALIZER_MAKE_SET}" ] && [ -z "${WEBALIZER_MAKE_UNSET}" ] ; then
     pkgi ${PORT_WEBALIZER}
   else
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" www_webalizer_SET="${WEBALIZER_MAKE_SET}" www_webalizer_UNSET="${WEBALIZER_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_WEBALIZER}" rmconf\
+    www_webalizer_SET="${WEBALIZER_MAKE_SET}" \
+    www_webalizer_UNSET="${WEBALIZER_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" \
+    OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" \
+    reinstall clean
   fi
 
   ### Post-Installation Tasks
@@ -3020,8 +3028,13 @@ awstats_install() {
   if [ "${AWSTATS_MAKE_SET}" = "" ] && [ "${AWSTATS_MAKE_UNSET}" = "" ] ; then
     pkgi ${PORT_AWSTATS}
   else
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" rmconfig
-    make -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" www_awstats_SET="${AWSTATS_MAKE_SET}" www_awstats_UNSET="${AWSTATS_MAKE_UNSET}" OPTIONS_SET="${GLOBAL_MAKE_SET}" OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" reinstall clean
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" rmconfig
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_AWSTATS}" \
+    www_awstats_SET="${AWSTATS_MAKE_SET}" \
+    www_awstats_UNSET="${AWSTATS_MAKE_UNSET}" \
+    OPTIONS_SET="${GLOBAL_MAKE_SET}" \
+    OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" \
+    reinstall clean
   fi
   ### Post-Installation Tasks
 
@@ -3042,47 +3055,55 @@ awstats_install() {
 
 ################################################################################
 
-## Verify my.cnf (from CB2)
-## Update $1 if $4 is newer.
+## Verify my.cnf (from CB2: verify_my_cnf())
 verify_my_cnf() {
 
   local MY_CNF="$1"
-  local USER="$2"
-  local PASS="$3"
+  local SQL_USER="$2"
+  local SQL_PASS="$3"
   local SRC_CNF="$4"
-  local W MY_CNF_TS SRC_CNF_TS
+  local WRITE_NEW MY_CNF_TS SRC_CNF_TS
+
+  file_mtime="/usr/bin/stat -f %m"
 
   ## CB2 Note: SQL server hostname will be on the command line (that's how DA does it).
+  ## Update $1 if $4 is newer.
 
-  ## See if file exists and is not zero bytes, else we'll create a new one
-  W=0
+  ## See if file exists and is not zero bytes, else we'll create a new one.
+  WRITE_NEW=0
   if [ ! -s "${MY_CNF}" ]; then
-    W=1
+    WRITE_NEW=1
   fi
 
   ## Compare timestamps
-  if [ "${W}" = "0" ] && [ -n "${SRC_CNF}" ]; then
+  if [ "${WRITE_NEW}" = "0" ] && [ -z "${SRC_CNF}" ]; then
     if [ ! -s "${SRC_CNF}" ]; then
-      echo "*** Notice: verify_my_cnf(): Cannot find ${SRC_CNF}"
-      W=1
+      printf "*** Notice: verify_my_cnf(): Cannot find %s\n" "${SRC_CNF}"
+      WRITE_NEW=1
     else
       ## Compare timestamps
-      MY_CNF_TS=$("${file_mtime} ${MY_CNF}")
-      SRC_CNF_TS=$("${file_mtime} ${SRC_CNF}")
+      printf "Comparing files %s and %s\n" "${MY_CNF}" "${SRC_CNF}"
+      MY_CNF_TS=$($file_mtime $MY_CNF)
+      SRC_CNF_TS=$($file_mtime $SRC_CNF)
+
+      # debug: echo "${MY_CNF_TS} and ${SRC_CNF_TS}"
 
       if [ "${MY_CNF_TS}" -lt "${SRC_CNF_TS}" ]; then
-        printf "*** Notice: Found outdated %s. Rewriting from %s\n" "${MY_CNF}" "${SRC_CNF}."
-        W=1
+        printf "*** Notice: Found outdated file: %s\n" "${MY_CNF}"
+        printf "*** Notice: Rewriting from file: %s\n" "${SRC_CNF}."
+        WRITE_NEW=1
       fi
     fi
   fi
 
   ## Create new .cnf file
-  if [ "${W}" = "1" ]; then
-    echo '[client]' > "${MY_CNF}"
+  if [ "${WRITE_NEW}" = "1" ]; then
+    {
+      printf "[client]\n"
+      printf "user=%s\n" "${SQL_USER}"
+      printf "password=%s\n" "${SQL_PASS}"
+    } > "${MY_CNF}"
     ${CHMOD} 600 "${MY_CNF}"
-    printf "user=%s\n" "${USER}" >> "${MY_CNF}"
-    printf "password=%s\n" "${PASS}" >> "${MY_CNF}"
   fi
 
   return
@@ -3090,20 +3111,32 @@ verify_my_cnf() {
 
 ################################################################################
 
-## Initialize SQL Parameters (from CB2)
+## Initialize SQL Parameters (from CB2: initMySQL())
 get_sql_settings() {
+
+  # local SQL_USER SQL_PASS
 
   ## DA_MYSQL=/usr/local/directadmin/conf/mysql.conf
   ## Use: ${DA_MYSQL_CONF}
 
+  ## Grab credentials from mysql.conf
   if [ -s "${DA_MYSQL_CONF}" ]; then
     MYSQL_USER=$(grep -m1 "^user=" ${DA_MYSQL_CONF} | cut -d= -f2)
     MYSQL_PASS=$(grep -m1 "^passwd=" ${DA_MYSQL_CONF} | cut -d= -f2)
   else
+    printf "*** Notice: mysql.conf doesn't exist. Generating a new file.\n"
     MYSQL_USER='da_admin'
-    MYSQL_PASS='nothing'
+    # MYSQL_PASS='nothing'
+    MYSQL_PASS=$(random_pass)
+
+    touch ${DA_MYSQL_CONF}
+    {
+      printf "user=%s\n" "${MYSQL_USER}"
+      printf "password=%s\n" "${MYSQL_PASS}"
+    } > "${DA_MYSQL_CONF}"
   fi
 
+  ## Grab SQL server IP from mysql.conf
   if [ -s "${DA_MYSQL_CONF}" ] && [ "$(grep -m1 -c -e "^host=" ${DA_MYSQL_CONF})" -gt "0" ]; then
     MYSQL_HOST=$(grep -m1 "^host=" ${DA_MYSQL_CONF} | cut -d= -f2)
   else
@@ -3112,7 +3145,7 @@ get_sql_settings() {
 
   ## Where connections to MySQL are coming from. Usualy the server IP, unless on a LAN.
   MYSQL_ACCESS_HOST=localhost
-  if [ "$MYSQL_HOST" != "localhost" ]; then
+  if [ "${MYSQL_HOST}" != "localhost" ]; then
     SERVER_HOSTNAME=$(hostname)
     MYSQL_ACCESS_HOST="$(grep -r -l -m1 '^status=server$' /usr/local/directadmin/data/admin/ips | cut -d/ -f8)"
     if [ "${MYSQL_ACCESS_HOST}" = "" ]; then
@@ -3137,50 +3170,48 @@ get_sql_settings() {
 
 ################################################################################
 
-## Todo:
 ## MariaDB or MySQL Database Installation
 sql_install() {
 
-  local SQL_TEMP DA_MYSQL_PATH
+  local SQL_TEMP_FILE DA_MYSQL_PATH
 
   if [ "${OPT_SQL_DB}" = "NO" ]; then
+    printf "*** Notice: OPT_SQL_DB not set in options.conf\n"
     return
   fi
 
-  printf "Starting SQL database installation\n"
+  printf "Starting SQL database installation: %s\n" "${OPT_SQL_DB}"
 
   set_service mysqld OFF
 
+  ## Retrieve: $MYSQL_USER, $MYSQL_PASS, $MYSQL_HOST, $MYSQL_ACCESS_HOST
+  get_sql_settings
+
   case "${OPT_SQL_DB}" in
-    "mariadb55") pkgi ${PORT_MARIADB55} ${PORT_MARIADB55_CLIENT} ;;
+    "mariadb55")  pkgi ${PORT_MARIADB55}  ${PORT_MARIADB55_CLIENT}  ;;
     "mariadb100") pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT} ;;
     "mariadb101") pkgi ${PORT_MARIADB101} ${PORT_MARIADB101_CLIENT} ;;
-    "mysql55") pkgi ${PORT_MYSQL55} ${PORT_MYSQL55_CLIENT} ;;
-    "mysql56") pkgi ${PORT_MYSQL56} ${PORT_MYSQL56_CLIENT} ;;
-    "mysql57") pkgi ${PORT_MYSQL57} ${PORT_MYSQL57_CLIENT} ;;
+    "mysql55")    pkgi ${PORT_MYSQL55}    ${PORT_MYSQL55_CLIENT}    ;;
+    "mysql56")    pkgi ${PORT_MYSQL56}    ${PORT_MYSQL56_CLIENT}    ;;
+    "mysql57")    pkgi ${PORT_MYSQL57}    ${PORT_MYSQL57_CLIENT}    ;;
+    *) printf "*** Error: Script error at sql_install()\n"; exit    ;;
   esac
 
   if [ ! -e "${MYSQL}" ]; then
-    printf "*** Error: MySQL binary not found at %s\n" "${MYSQL}"
-    printf "Aborting post-installation tasks.\n"
-    exit 1
+    printf "*** Error: MySQL binary not found at %s\nAborting post-installation tasks." "${MYSQL}"
+    err 1 "MySQL binary was not found."
   fi
 
   printf "Starting SQL database post-installation tasks\n"
 
-  ## Todo: Check for mysql.conf values
-  # if [ "$MYSQL_USER" = "" ] || [ "$MYSQL_PASSWORD" = "" ]; then
-  #   echo "*** Error: MySQL username or password is blank in ${DA_MYSQL_CONF}"
-  #   echo "Aborting post-installation tasks."
-  #   exit 1
-  # fi
-
   ## Remove /etc/my.cnf if it exists (not compliant with FreeBSD's hier(7)):
   if [ -e /etc/my.cnf ]; then
+    printf "*** Notice: Found an existing my.cnf file in /etc, however this is not recommended.\n"
+    printf "*** Notice: Moving /etc/my.cnf to /etc/my.cnf.disabled\n"
     mv /etc/my.cnf /etc/my.cnf.disabled
   fi
 
-  printf "Updating /etc/rc.conf\n"
+  printf "Updating /etc/rc.conf:\n"
   ${SYSRC} mysql_enable="YES"
   ${SYSRC} mysql_dbdir="${SQL_DATA_PATH}"
   ${SYSRC} mysql_optfile="/usr/local/etc/my.cnf"
@@ -3188,66 +3219,50 @@ sql_install() {
   printf "Starting %s\n" "${OPT_SQL_DB}"
   ${SERVICE} mysql-server start
 
-  ## Secure Installation (replace it with scripted method below)
-  ## /usr/local/bin/mysql_secure_installation
-  # echo "Securing SQL installation"
-  # ${MYSQLSECURE}
-
   if [ -e "${MYSQLUPGRADE}" ]; then
     ${MYSQLUPGRADE} --defaults-extra-file="${DA_MYSQL_CNF}"
-  elif [ -e "${MYSQLFIX}" ]; then
-    ${MYSQLFIX} --defaults-extra-file="${DA_MYSQL_CNF}"
+  else
+    printf "*** Warning: The mysqlupgrade binary was not found on this system.\n"
   fi
 
-  ## From CB2 (skipped, 5.1 is outdated):
-  # if [ -e /usr/local/mysql/bin/mysqlcheck ] && [ "${OPT_MYSQL}" = "5.1" ] && [ "${OPT_MYSQL_INST}" != "mariadb" ]; then
-  #   /usr/local/mysql/bin/mysqlcheck --defaults-extra-file=${DA_MYSQL_CNF} --fix-db-names --fix-table-names -A
-  # fi
+  ## If first-time installation, create mysql.conf
+  if [ ! -s ${DA_MYSQL_CONF} ]; then
+    ## Note: there are two (2) super SQL users with different passwords:
+    ## 1) root     + adminpass  (from: setup.txt)
+    ## 2) da_admin + passwd     (from: mysql.conf/my.cnf)
 
-  ## Manual/CLI method:
-  # '/usr/local/bin/mysqladmin' -u root password 'new-password'
-  # '/usr/local/bin/mysqladmin' -u root -h myserver.example.com password 'new-password'
-  # ${MYSQLADMIN} --user=root --password="${DA_SQLDB_PASSWORD}" 1> /dev/null 2> /dev/null
+    ## Prepare a temporary SQL file with our credentials for import.
+    SQL_TEMP_FILE="${PB_PATH}/temp.sql"
+    touch "${SQL_TEMP_FILE}"
+    ${CHMOD} 600 "${SQL_TEMP_FILE}"
+    {
+      ## root user password:
+      printf "UPDATE mysql.user SET password=PASSWORD('%s') WHERE user='root';\n" "${MYSQL_PASS}"
+      printf "UPDATE mysql.user SET password=PASSWORD('%s') WHERE password='';\n" "${MYSQL_PASS}"
+      printf "DROP DATABASE IF EXISTS test;\nFLUSH PRIVILEGES;\n"
+      ## Add the `da_admin` user to MySQL:
+      printf "GRANT CREATE, DROP ON *.* TO %s@%s IDENTIFIED BY '%s' WITH GRANT OPTION;\n" \
+      "${MYSQL_USER}" "${MYSQL_ACCESS_HOST}" "${MYSQL_PASS}"
+      printf "GRANT ALL PRIVILEGES ON *.* TO %s@%s IDENTIFIED BY '%s' WITH GRANT OPTION;\n" \
+      "${MYSQL_USER}" "${MYSQL_ACCESS_HOST}" "${MYSQL_PASS}"
+    } > "${SQL_TEMP_FILE}"
 
-  ## Verify: Note: there are two (2) users (with different passwords):
-  ##  root+adminpass (setup.txt) and da_admin+passwd (mysql.conf/my.cnf)
+    ${MYSQL} --user=root < "${SQL_TEMP_FILE}"
 
-  SQL_TEMP="${PB_PATH}/temp.sql"
+    rm -f "${SQL_TEMP_FILE}"
 
-  ## Prepare a temporary file with the root password
-  {
-    printf "UPDATE mysql.user SET password=PASSWORD('%s') WHERE user='root';\n" "${DA_SQLDB_PASSWORD}"
-    printf "UPDATE mysql.user SET password=PASSWORD('%s') WHERE password='';\n" "${DA_SQLDB_PASSWORD}"
-    printf "DROP DATABASE IF EXISTS test;\n"
-    printf "FLUSH PRIVILEGES;\n"
-    ## Add the `da_admin` user to MySQL (replace the variables!):
-    printf "GRANT CREATE, DROP ON *.* TO %s@%s IDENTIFIED BY '%s' WITH GRANT OPTION;\n" "${DA_SQLDB_USER}" "${MYSQL_ACCESS_HOST}" "${DA_SQLDB_PASSWORD}"
-    printf "GRANT ALL PRIVILEGES ON *.* TO %s@%s IDENTIFIED BY '%s' WITH GRANT OPTION;\n" "${DA_SQLDB_USER}" "${MYSQL_ACCESS_HOST}" "${DA_SQLDB_PASSWORD}"
-  } > "${SQL_TEMP}"
+    ## Add DirectAdmin 'da_admin' SQL database credentials to 'mysql.conf':
+    {
+      printf "user=%s\n" "${MYSQL_USER}"
+      printf "passwd=%s\n" "${MYSQL_PASS}"
+    } > "${DA_MYSQL_CONF}"
 
-  #${MYSQL} --user=root --password="${DA_SQLDB_PASSWORD}" < mysql.temp
-  ${MYSQL} --user=root < "${SQL_TEMP}"
-
-  rm -f "${SQL_TEMP}"
-
-  #${MYSQL} --user=root --password="${DA_SQLDB_PASSWORD}" < "${SQL_TEMP}"
-
-  ## CLI method (incomplete):
-  # ${MYSQL} --user=root --password="${DA_SQLDB_PASSWORD}" \
-  # "GRANT CREATE, DROP ON *.* TO ${DA_SQLDB_USER}@${MYSQL_ACCESS_HOST} \
-  # IDENTIFIED BY '${DA_SQLDB_PASSWORD}' WITH GRANT OPTION;"
-
-  ## Add DirectAdmin 'da_admin' SQL database credentials to 'mysql.conf':
-  {
-    printf "user=%s\n" "${DA_SQLDB_USER}"
-    printf "passwd=%s\n" "${DA_SQLDB_PASSWORD}"
-  } > "${DA_MYSQL_CONF}"
+  fi
 
   ${CHOWN} diradmin:diradmin ${DA_MYSQL_CONF}
   ${CHMOD} 400 ${DA_MYSQL_CONF}
 
   ## Reference CNF files: /usr/local/share/mysql/*.cnf
-
   if [ ! -e "${MYSQL_CNF}" ]; then
     case ${DEFAULT_MY_CNF} in
       "my-huge.cnf" \
@@ -3256,15 +3271,16 @@ sql_install() {
       |"my-small.cnf" \
       |"my-large.cnf")
         cp /usr/local/share/mysql/${DEFAULT_MY_CNF} "${MYSQL_CNF}"
-        ;;
+      ;;
       "my-huge" \
       |"my-medium" \
       |"my-innodb-heavy-4G" \
       |"my-small" \
       |"my-large")
         cp /usr/local/share/mysql/${DEFAULT_MY_CNF}.cnf "${MYSQL_CNF}"
-        ;;
-      "custom") cp -f "${CUSTOM_MYSQL_CNF}" "${MYSQL_CNF}" ;;
+      ;;
+      "custom") cp -f "${CUSTOM_MYSQL_CNF}" "${MYSQL_CNF}"
+      ;;
       *)
         touch "${MYSQL_CNF}"
         printf "[mysqld]\nlocal-infile=0\ninnodb_file_per_table\n" > ${MYSQL_CNF}
@@ -3274,7 +3290,7 @@ sql_install() {
   fi
 
   ## Todo: comment out thread_concurrency in my.cnf to prevent deprecation warnings
-  ## thread_concurrency = 8
+  ## e.g. thread_concurrency = 8
 
   if [ "${COMPAT_SQL_SYMLINKS}" = "YES" ]; then
     DA_MYSQL_PATH=/usr/local/mysql/bin
@@ -3305,7 +3321,6 @@ sql_install() {
 }
 
 ################################################################################
-
 
 ## Todo: Verify:
 ## FPM Check (from CB2: fpmCheck())
@@ -3357,7 +3372,6 @@ fpmCheck() {
 }
 
 ################################################################################
-
 
 ## Todo: Verify:
 ## FPM Checks (from CB2: fpmChecks())
@@ -3413,7 +3427,6 @@ fpmChecks() {
 }
 
 ################################################################################
-
 
 ## Dovecot Checks (from CB2: dovecotChecks())
 dovecotChecks() {
@@ -8076,12 +8089,6 @@ show_rewrite_menu() {
 
 ## Show Installation Menu
 show_install_menu() {
-
-#  ( printf "Package Version Origin\n" ;
-#  pkg query -i -x "%n %v %o" '(www/apache24|www/nginx
-#  |lang/php54|lang/php55|lang/php56|ftp/curl|mail/exim
-#  |mail/dovecot2|lang/perl5|mail/roundcube|/www/phpMyAdmin
-#  |mail/spamassassin|ftp/wget)' ) | column -t
 
   printf "\n"
   printf "  Install a Package (Application or Service)\n\n"
