@@ -4,15 +4,15 @@ PHP_VER=55
 
 OPTIONS=
 if [ "$1" != "" ]; then
-        if [ -s "$1" ]; then
-                OPTIONS=" -c ${1} ${OPTIONS}"
-        fi
-        shift
+  if [ -s "$1" ]; then
+          OPTIONS=" -c ${1} ${OPTIONS}"
+  fi
+  shift
 fi
 
 SENDMAIL_FROM="`echo $@ | grep -o 'sendmail_from=[^ ]*' | cut -d'\"' -f2`"
 if [ "${SENDMAIL_FROM}" != "" ]; then
-        SENDMAIL_ADD="-f ${SENDMAIL_FROM}"
+  SENDMAIL_ADD="-f ${SENDMAIL_FROM}"
 fi
 
 # http://httpd.apache.org/mod_fcgid/mod/mod_fcgid.html
