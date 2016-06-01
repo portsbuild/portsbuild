@@ -10,8 +10,8 @@
 ## 2016-05-13: PortsBuild version
 ## PB: Verify:
 
-DA_PATH=/usr/local/directadmin
-DA_USERS_DIR=${DA_PATH}/data/users
+readonly DA_PATH=/usr/local/directadmin
+readonly DA_USERS_DIR=${DA_PATH}/data/users
 
 TTL=14400
 
