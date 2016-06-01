@@ -50,7 +50,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.0"
-PB_BUILD_DATE=20160523
+PB_BUILD_DATE=20160531
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -342,18 +342,17 @@ WITH_OPENSSL_PORT="$(${SYSRC} -q -e -f /etc/make.conf WITH_OPENSSL_PORT)"
 ## Use either BASE or PORT OpenSSL libraries.
 ## The latter only if make.conf contains WITH_OPENSSL_PORT=YES
 if [ -x /usr/local/bin/openssl ] && [ "${WITH_OPENSSL_PORT}" ]; then
-  readonly OPENSSL=/usr/local/bin/openssl
+  OPENSSL=/usr/local/bin/openssl
   # GLOBAL_MAKE_VARIABLES="${GLOBAL_MAKE_VARIABLES} WITH_OPENSSL_PORT=YES"
 elif [ -x /usr/bin/openssl ]; then
-  readonly OPENSSL=/usr/bin/openssl
+  OPENSSL=/usr/bin/openssl
   # GLOBAL_MAKE_VARIABLES="${GLOBAL_MAKE_VARIABLES} WITH_OPENSSL_BASE=YES"
 else
   printf "*** Error: OpenSSL binary not found. Does /usr/bin/openssl exist?\n"
   exit 0
 fi
 
-setVal openssl ${OPENSSL} ${DA_CONF_TEMPLATE}
-setVal openssl ${OPENSSL} ${DA_CONF}
+readonly OPENSSL
 
 ## Check for this file and append to OpenSSL calls using -config:
 # OPENSSL_EXTRA="-config ${PB_PATH}/custom/ssl/openssl_req.conf"
@@ -364,10 +363,12 @@ OPENSSL_EXTRA=""
 
 ## See if IPV6 is enabled in DirectAdmin:
 if [ -e "${DA_BIN}" ]; then
-  readonly IPV6=$(${DA_BIN} c | grep -m1 '^ipv6=' | cut -d= -f2)
+  IPV6=$(${DA_BIN} c | grep -m1 '^ipv6=' | cut -d= -f2)
 else
-  readonly IPV6=0
+  IPV6=0
 fi
+
+readonly IPV6
 
 ################################################################################
 ## PortsBuild Compatibility Settings
@@ -8313,6 +8314,21 @@ validate_options() {
 
 
   return
+}
+
+################################################################################
+##
+## Todo: Update directadmin.conf (and the template)
+##
+################################################################################
+
+update_da_conf() {
+
+  setVal openssl ${OPENSSL} ${DA_CONF_TEMPLATE}
+  setVal openssl ${OPENSSL} ${DA_CONF}
+
+  return
+
 }
 
 ################################################################################
