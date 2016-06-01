@@ -49,7 +49,7 @@
 
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
-PB_VER="0.1.0"
+PB_VER="0.1.1"
 PB_BUILD_DATE=20160531
 
 IFS="$(printf '\n\t')"
@@ -102,7 +102,7 @@ fi
 readonly PB_PATH
 readonly PB_CONF="${PB_PATH}/options.conf"
 readonly PB_CONFIG="${PB_PATH}/configure"
-readonly PB_CUSTOM="${PB_PATH}/custom"
+readonly PB_CUSTOM="${PB_CUSTOM}"
 readonly PB_PATCHES="${PB_PATH}/patches"
 readonly PB_SETUP=/root/portsbuild.txt
 
@@ -166,6 +166,7 @@ readonly TAR=/usr/bin/tar
 readonly CPU_CORES=$("${SYSCTL}" -n hw.ncpu)
 readonly SERVER_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
 readonly NEWSYSLOG_FILE=/usr/local/etc/newsyslog.conf.d/directadmin.conf
+readonly SSHD_CONFIG=/etc/ssh/sshd_config
 
 ## DirectAdmin Paths & Files
 readonly DA_PATH=/usr/local/directadmin
@@ -355,8 +356,8 @@ fi
 readonly OPENSSL
 
 ## Check for this file and append to OpenSSL calls using -config:
-# OPENSSL_EXTRA="-config ${PB_PATH}/custom/ssl/openssl_req.conf"
-# -config ${PB_PATH}/custom/ssl/openssl_req.conf
+# OPENSSL_EXTRA="-config ${PB_CUSTOM}/ssl/openssl_req.conf"
+# -config ${PB_CUSTOM}/ssl/openssl_req.conf
 OPENSSL_EXTRA=""
 
 ################################################################################
@@ -814,6 +815,7 @@ setVal() {
 ################################################################################
 ##
 ## Get Value ($1) from file ($2)
+## Returns 0 if option is undefined (doesn't exist or is blank).
 ##
 ################################################################################
 
@@ -823,8 +825,6 @@ getVal() {
   local OPTION_FILE="$2"
   local GET_VALUE
 
-  ## Returns 0 if option is undefined (doesn't exist or blank)
-
   ## Check if file exists:
   if [ ! -e "${OPTION_FILE}" ]; then
     return
@@ -833,7 +833,7 @@ getVal() {
   GET_VALUE="$(grep -v "^${OPTION_NAME}=$" "${OPTION_FILE}" | grep -m1 "^${OPTION_NAME}=" | cut -d= -f2 | tr -d '"')"
   if [ -z "${GET_VALUE}" ]; then
     echo "0"
-    #GET_VALUE=0
+    # GET_VALUE=0
   else
     echo "${GET_VALUE}"
   fi
@@ -844,7 +844,7 @@ getVal() {
 ################################################################################
 ##
 ## Used to set values ON/OFF in the services.status (from CB2)
-## set_service name ON|OFF|delete
+## Usage: set_service name ON|OFF|delete
 ##
 ################################################################################
 
@@ -886,7 +886,8 @@ set_service() {
 ################################################################################
 ##
 ## Todo: Get File from PB Mirror
-## e.g. getFile configure/proftpd/proftpd.conf ${PROFTPD_CONF}
+## $1 = source and $2 = target
+## Usage: getFile configure/proftpd/proftpd.conf ${PROFTPD_CONF}
 ##
 ################################################################################
 
@@ -938,6 +939,7 @@ uc() {
 ################################################################################
 ##
 ## Ask User a Question
+## Usage: ask_user "Question"
 ##
 ################################################################################
 
@@ -961,6 +963,25 @@ ask_user() {
 
 ################################################################################
 ##
+## Update /usr/ports via portsnap
+##
+################################################################################
+
+ports_update() {
+
+  if [ ! -d "${PORTS_BASE}" ]; then
+    printf "Setting up %s for the first time.\n" ${PORTS_BASE}
+    ${PORTSNAP} fetch extract
+  fi
+
+  printf "Updating /usr/ports\n"
+  ${PORTSNAP} fetch update
+
+  return
+}
+
+################################################################################
+##
 ## pkg shortcuts
 ##
 ################################################################################
@@ -971,6 +992,7 @@ pkgd() { ${PKG} delete -f "$@"; }
 pkgq() { ${PKG} query "$@"; }
 
 pkg_update() { ${PKG} update; }
+pkg_update_force() { ${PKG} update -f; }
 
 ################################################################################
 ##
@@ -980,24 +1002,13 @@ pkg_update() { ${PKG} update; }
 
 synth_prepare() { ${SYNTH} prepare-system; }
 synth_upgrade() { ${SYNTH} upgrade-system; }
+synth_status() { ${SYNTH} status; }
 
 ################################################################################
 ##
 ## portmaster shortcuts
 ##
 ################################################################################
-
-## Update /usr/ports
-ports_update() {
-
-  if [ ! -d "${PORTS_BASE}" ]; then
-    printf "Setting up %s for the first time\n" ${PORTS_BASE}
-    ${PORTSNAP} fetch extract
-  fi
-
-  printf "Updating /usr/ports\n"
-  ${PORTSNAP} fetch update
-}
 
 ## Clean stale ports (deprecate soon)
 clean_stale_ports() {
@@ -1222,7 +1233,7 @@ global_setup() {
     ports_update
 
     ## Install Dependencies
-    printf "Installing required dependencies and compatibility libraries (misc/compats)\n"
+    printf "Installing initial required dependencies and compatibility libraries (misc/compats)\n"
     if [ "${OS_MAJ}" -eq 10 ]; then
       pkgi "${PORT_DEPS_100}" misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
     elif [ "${OS_MAJ}" -eq 9 ]; then
@@ -1263,7 +1274,7 @@ global_setup() {
     fi
 
     ## Symlink Perl for DA compat
-    printf "Pre-Install Task: checking for /usr/bin/perl symlink\n"
+    printf "Checking for the /usr/bin/perl => /usr/local/bin/perl symlink\n"
 
     if [ ! -e /usr/bin/perl ]; then
       if [ -e "${PERL}" ]; then
@@ -1277,7 +1288,7 @@ global_setup() {
     fi
 
     ## IPV6 settings suggested by DA
-    printf "Pre-Install Task: Setting ipv6_ipv4mapping=YES in /etc/rc.conf\n"
+    printf "Setting ipv6_ipv4mapping=YES in /etc/rc.conf\n"
     ${SYSRC} ipv6_ipv4mapping="YES"
     ${SYSRC} -f /etc/sysctl.conf net.inet6.ip6.v6only=0
     ${SYSCTL} net.inet6.ip6.v6only=0
@@ -1298,7 +1309,7 @@ global_setup() {
       ${SYSRC} sendmail_msp_queue_enable="NO"
     fi
 
-    ## Ethernet Device checking here
+    ## Ethernet Device checking goes here.
     ## Skipping/avoiding this step as it's not that reliable of a process,
     ## especially if you have multiple interfaces.
 
@@ -1339,10 +1350,10 @@ global_setup() {
     fi
 
     if [ ! -e "${CB_CONF}" ]; then
-      if [ ! -e "${PB_PATH}/custombuild/options.conf" ]; then
+      if [ ! -e "${PB_CUSTOM}build/options.conf" ]; then
         ${WGET} -O "${CB_CONF}" "${PB_MIRROR}/custombuild/options.conf"
       else
-        cp "${PB_PATH}/custombuild/options.conf" "${CB_CONF}"
+        cp "${PB_CUSTOM}build/options.conf" "${CB_CONF}"
       fi
     fi
 
@@ -1401,6 +1412,7 @@ global_setup() {
 
     bfm_setup
 
+    ## Todo:
     # ipfw_enable
 
     basic_system_security
@@ -1627,7 +1639,7 @@ control_service() {
 
 ################################################################################
 ##
-## Setup BIND (named)
+## Setup BIND (named) for DNS services
 ##
 ################################################################################
 
@@ -1718,7 +1730,7 @@ bind_setup() {
 ################################################################################
 ##
 ## DirectAdmin Installation
-## Install DirectAdmin (replaces scripts/install.sh)
+## Replaces scripts/install.sh
 ##
 ################################################################################
 
@@ -1750,8 +1762,6 @@ directadmin_install() {
     printf "Server's IP address used to connect out: %s\n" "${DISCOVERED_IP}"
     return
   }
-
-  ### Pre-Installation Tasks (replaces setup.sh)
 
   ## From DA's setup.sh:
   if [ -e "${DA_CONF}" ]; then
@@ -1791,6 +1801,7 @@ directadmin_install() {
     /usr/bin/newaliases
   fi
 
+  ## Packages directory (not really needed?)
   mkdir -p "${DA_PATH}"
   mkdir -p "${DA_PATH}/packages"
 
@@ -1884,8 +1895,8 @@ directadmin_install() {
   DA_ADMIN_EMAIL=${DA_ADMIN_EMAIL:=${DA_ADMIN_USER}@${SERVER_DOMAIN}}
 
   printf "Generating random passwords for SQL DB and DirectAdmin admin user\n"
-  DA_SQLDB_PASSWORD=$(random_pass) ## Used as root SQL password
-  DA_ADMIN_PASSWORD=$(random_pass) ## Used as da_admin SQL password
+  DA_SQLDB_PASSWORD=$(random_pass) ## Used as 'root' SQL password
+  DA_ADMIN_PASSWORD=$(random_pass) ## Also used as 'da_admin' SQL password
 
   ## From DA/setup.sh: generate scripts/setup.txt
   {
@@ -1912,12 +1923,13 @@ directadmin_install() {
 
   ## Mail User & Group creation
   ## PB: NOTE: FreeBSD already comes with a "mail" group (ID: 6) and a "mailnull" user (ID: 26)
+  ##           so this step is somewhat pointless.
   ${PW} groupadd mail 2> /dev/null
   ${PW} useradd -g mail -u 12 -n mail -d /var/mail -s /sbin/nologin 2> /dev/null
 
   ## PB: FreeBSD already includes a "ftp" group (ID: 14)
-  # /usr/sbin/pw groupadd ftp 2> /dev/null
-  # /usr/sbin/pw useradd -g ftp -n ftp -s /sbin/nologin 2> /dev/null
+  # ${PW} groupadd ftp 2> /dev/null
+  # ${PW} useradd -g ftp -n ftp -s /sbin/nologin 2> /dev/null
 
   ## Apache user/group creation (changed /var/www to /usr/local/www)
   ## PB: NOTE: Using "apache" user instead of "www" for now
@@ -1926,15 +1938,15 @@ directadmin_install() {
 
   ## Webapps user/group creation
   if [ "$(grep -c -m1 -e "^${WEBAPPS_USER}:" /etc/passwd)" = "0" ]; then
-      ${PW} groupadd ${WEBAPPS_GROUP} 2> /dev/null
-      ${PW} useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin 2> /dev/null
+    ${PW} groupadd ${WEBAPPS_GROUP} 2> /dev/null
+    ${PW} useradd -g ${WEBAPPS_GROUP} -n ${WEBAPPS_USER} -b ${WWW_DIR} -s /sbin/nologin 2> /dev/null
   fi
 
   ## Set DirectAdmin Folder permissions:
   ${CHMOD} -f 755 ${DA_PATH}
   ${CHOWN} -f diradmin:diradmin ${DA_PATH}
 
-  ## Create directories and set permissions:
+  ## Create directories (logs and conf) and set permissions:
   mkdir -p "${LOGS}/directadmin"
   mkdir -p "${DA_PATH}/conf"
 
@@ -1971,7 +1983,7 @@ directadmin_install() {
   ## PB: Verify: Create backup.conf (wasn't created?)
   # ${CHOWN} -f diradmin:diradmin ${DA_PATH}/data/users/admin/backup.conf
 
-  SSHROOT=$(grep -c 'AllowUsers root' /etc/ssh/sshd_config)
+  SSHROOT=$(grep -c 'AllowUsers root' ${SSHD_CONFIG})
   if [ "${SSHROOT}" = 0 ]; then
     printf "*** Notice: Adding the 'root' user to the sshd configuration's AllowUsers list.\n"
     {
@@ -1979,7 +1991,7 @@ directadmin_install() {
       printf "AllowUsers %s\n" "${DA_ADMIN_USER}"
       printf "AllowUsers %s\n" "$(logname)"
       ## printf "AllowUsers %s\n" "${YOUR_OTHER_ADMIN_ACCOUNT}""
-    } >> /etc/ssh/sshd_config
+    } >> ${SSHD_CONFIG}
 
     ## Set SSH folder permissions (needed?):
     ${CHMOD} 710 /etc/ssh
@@ -2020,7 +2032,7 @@ directadmin_install() {
     fi
   fi
 
-  ## Set permissions on license.key
+  ## Set permissions on license.key:
   ${CHMOD} 600 ${DA_LICENSE}
   ${CHOWN} diradmin:diradmin ${DA_LICENSE}
 
@@ -2081,7 +2093,7 @@ basic_system_security() {
 # setVal enforce_difficult_passwords 1 ${DA_CONF}
 
   printf "\n *** Heads up! *** \n"
-  printf "Please note that 'AllowUsers root' was added to /etc/ssh/sshd_config as a precautionary step (in case you get locked out).\n"
+  printf "Please note that 'AllowUsers root' was added to %s as a precautionary step (in case you get locked out).\n" "${SSHD_CONFIG}"
   printf "This means the root user can remotely login to this machine via SSH.\n"
   printf "You may want to modify this value/file later on when setting up this machine for production use.\n\n"
 
@@ -2225,12 +2237,10 @@ newsyslog_setup() {
 
   ## PureFTPD
   if [ "${OPT_FTPD}" = "pureftpd" ]; then
-    addLog "/var/log/pureftp.log" '' - /var/run/pure-ftpd.pid
+    addLog "${LOGS}/pureftp.log" '' - /var/run/pure-ftpd.pid
   fi
 
   ## PHP-FPM
-  ## PB: Verify:
-  ## PB: Todo: PHP2
   if [ "${OPT_PHP1_MODE}" = "php-fpm" ] || [ "${OPT_PHP2_MODE}" = "php-fpm" ]; then
     if [ -x "${RCD}/php-fpm55" ]; then
       addLog "${LOGS}/php-fpm55.log" '' - "/var/run/php-fpm55.pid\t30"
@@ -2306,29 +2316,30 @@ freebsd_set_newsyslog() {
 
 verify_webapps_logrotate() {
 
-    # By default it sets each log to webapps:webapps.
-    # Swap it to apache:apache if needed
-    # else swap it to webapps:webapps from apache:apache... or do nothing
+  ## CB2:
+  # By default it sets each log file's permissions to webapps:webapps
+  # Swap it to apache:apache if needed,
+  # else swap it to webapps:webapps from apache:apache... or do nothing
 
-    NSL_VALUE="${WEBAPPS_USER}:${WEBAPPS_GROUP}"
+  local NSL_VALUE="${WEBAPPS_USER}:${WEBAPPS_GROUP}"
 
-    if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
-      NSL_VALUE="${APACHE_USER}:${APACHE_GROUP}"
-    fi
+  if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
+    NSL_VALUE="${APACHE_USER}:${APACHE_GROUP}"
+  fi
 
-    if [ "${OPT_ROUNDCUBE}" = "YES" ]; then
-      freebsd_set_newsyslog "${WWW_DIR}/roundcube/logs/errors" ${NSL_VALUE}
-    fi
+  if [ "${OPT_ROUNDCUBE}" = "YES" ]; then
+    freebsd_set_newsyslog "${WWW_DIR}/roundcube/logs/errors" ${NSL_VALUE}
+  fi
 
-    if [ "${OPT_PHPMYADMIN}" = "YES" ]; then
-      freebsd_set_newsyslog "${WWW_DIR}/phpMyAdmin/log/auth.log" ${NSL_VALUE}
-    fi
+  if [ "${OPT_PHPMYADMIN}" = "YES" ]; then
+    freebsd_set_newsyslog "${WWW_DIR}/phpMyAdmin/log/auth.log" ${NSL_VALUE}
+  fi
 
-    if [ "${OPT_SQUIRRELMAIL}" = "YES" ]; then
-      freebsd_set_newsyslog "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" ${NSL_VALUE}
-    fi
+  if [ "${OPT_SQUIRRELMAIL}" = "YES" ]; then
+    freebsd_set_newsyslog "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" ${NSL_VALUE}
+  fi
 
-    return
+  return
 }
 
 ################################################################################
@@ -2338,6 +2349,8 @@ verify_webapps_logrotate() {
 ################################################################################
 
 exim_install() {
+
+  local virtual_files
 
   if [ "${OPT_EXIM}" != "YES" ]; then
     printf "*** Notice: EXIM is disabled in options.conf\n"
@@ -2461,7 +2474,8 @@ exim_install() {
   fi
 
   ## Todo: Cleaner version
-  ## Replace sendmail programs with Exim binaries.
+  ## Replace sendmail programs with Exim binaries (see: mailwrapper)
+  ## Verify: Modify /usr/local/etc/mailer.conf instead?
   if [ ! -e /etc/mail/mailer.conf ]; then
     printf "Creating /etc/mail/mailer.conf\n"
     touch /etc/mail/mailer.conf
@@ -2486,6 +2500,7 @@ exim_install() {
     printf "%s\t\t%s\n" "rmail" "${EXIM_BIN} -i -oee"
   } > /etc/mail/mailer.conf
 
+  return
 }
 
 ################################################################################
@@ -4240,16 +4255,16 @@ apache_install() {
   #   cd ../../
   # fi
 
-  #   echo "Patching apache to suexec safedir path..."
-  #   if [ ! -s ../patches/suexec-safe.patch ]; then
+  #   printf "Patching Apache 2.4 with suexec safedir patch.\n"
+  #   if [ ! -s ${PB_PATCHES}/suexec-safe.patch ]; then
   #     echo "Error with patches/suexec-safe.patch. File is missing or empty"
   #   else
   #     patch -p1 < ../patches/suexec-safe.patch
   #   fi
 
-  # echo "Patching apache to allow SuexecUserGroup in Directory context..."
-  # if [ ! -s ../patches/mod_suexec_directory.patch ]; then
-  #   echo "Error with patches/mod_suexec_directory.patch. File is missing or empty"
+  # printf "Patching Apache 2.4 to allow SuexecUserGroup in a Directory context.\n"
+  # if [ ! -s "${PB_PATCHES}/mod_suexec_directory.patch" ]; then
+  #   printf "Error with %s/mod_suexec_directory.patch. File is missing or empty.\n" "${PB_PATCHES}"
   # else
   #   patch -p1 < ../patches/mod_suexec_directory.patch
   # fi
@@ -4276,6 +4291,8 @@ apache_install() {
 
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" rmconfig
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" \
+    # -DEXTRA_PATCHES+="${PB_PATCHES}/mod_suexec_directory.patch" \
+    # -DEXTRA_PATCHES+="${PB_PATCHES}/suexec-safe.patch" \
     www_apache24_SET="${APACHE24_MAKE_SET}" \
     www_apache24_UNSET="${APACHE24_MAKE_UNSET}" \
     OPTIONS_SET="${GLOBAL_MAKE_SET}" \
@@ -4295,10 +4312,10 @@ apache_install() {
   fi
 
   ## Copy over modified (custom) configuration files to etc/apache24/:
-  if [ -d "${PB_PATH}/custom/ap2/conf/" ]; then
-    cp -rf "${PB_PATH}/custom/ap2/conf/" ${APACHE_PATH}/
-    # cp -f "${PB_PATH}/custom/ap2/conf/httpd.conf" "${APACHE_CONF}"
-    # cp -f "${PB_PATH}/custom/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRAS}/httpd-mpm.conf
+  if [ -d "${PB_CUSTOM}/ap2/conf/" ]; then
+    cp -rf "${PB_CUSTOM}/ap2/conf/" ${APACHE_PATH}/
+    # cp -f "${PB_CUSTOM}/ap2/conf/httpd.conf" "${APACHE_CONF}"
+    # cp -f "${PB_CUSTOM}/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRAS}/httpd-mpm.conf
   fi
 
   ## This is already done (Apache 2.4 default)
@@ -6279,11 +6296,12 @@ apache_host_conf() {
 
     SUEXEC_PER_DIR=0
 
+    ## PB: Note: Need CB2 patch else it doesn't work.
     if [ -s /usr/local/sbin/suexec ]; then
       SUEXEC_PER_DIR="$(/usr/local/sbin/suexec -V 2>&1 | grep -c 'AP_PER_DIR')"
     fi
 
-    ## PHP1: fcgid: (not FastCGI):
+    ## PHP1: fcgid: (technically not FastCGI):
     if [ "${OPT_PHP1_MODE}" = "fastcgi" ]; then
       {
         echo "  <IfModule mod_fcgid.c>"
@@ -6876,8 +6894,8 @@ rewrite_confs() {
           cp -f "${PB_PATH}/configure/fastcgi/fcgid${php_shortrelease}.sh" "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
 
           ## Custom configuration
-          if [ -e "${PB_PATH}/custom/fastcgi/fcgid${php_shortrelease}.sh" ]; then
-            cp -f "${PB_PATH}/custom/fastcgi/fcgid${php_shortrelease}.sh" "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
+          if [ -e "${PB_CUSTOM}/fastcgi/fcgid${php_shortrelease}.sh" ]; then
+            cp -f "${PB_CUSTOM}/fastcgi/fcgid${php_shortrelease}.sh" "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
           fi
           ${CHOWN} "${APACHE_USER}:${APACHE_GROUP}" "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
           ${CHMOD} 555 "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
