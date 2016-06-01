@@ -507,8 +507,6 @@ readonly PORT_LETSENCRYPT='security/letsencrypt.sh'
 
 APACHE24_MAKE_SET="SUEXEC" # MPM_EVENT
 APACHE24_MAKE_UNSET="" # MPM_PREFORK
-
-## Todo: Harden symlinks patch
 # APACHE24_EXTRA_PATCHES=""
 
 NGINX_MAKE_SET=""
@@ -4237,10 +4235,10 @@ phpmyadmin_upgrade() {
 
 apache_install() {
 
-  local APACHE_HSP PHPMODULES ADMIN_HTTP HAVE_DACONF HDC WWW_APACHE24_PATCHDIR
+  local PHPMODULES ADMIN_HTTP HAVE_DACONF HDC WWW_APACHE24_PATCHDIR
 
   if [ "${OPT_WEBSERVER}" != "apache" ]; then
-    printf "***\n Error: Can't install Apache 2.4 because it hasn't been enabled in options.conf"
+    printf "***\n Error: Can't install Apache %s because it hasn't been enabled in options.conf\n" "${OPT_APACHE_VER}"
     return
   fi
 
@@ -4255,52 +4253,37 @@ apache_install() {
   #   cd ../../
   # fi
 
-  #   printf "Patching Apache 2.4 with suexec safedir patch.\n"
-  #   if [ ! -s ${PB_PATCHES}/suexec-safe.patch ]; then
-  #     echo "Error with patches/suexec-safe.patch. File is missing or empty"
-  #   else
-  #     patch -p1 < ../patches/suexec-safe.patch
-  #   fi
-
-  # printf "Patching Apache 2.4 to allow SuexecUserGroup in a Directory context.\n"
-  # if [ ! -s "${PB_PATCHES}/mod_suexec_directory.patch" ]; then
-  #   printf "Error with %s/mod_suexec_directory.patch. File is missing or empty.\n" "${PB_PATCHES}"
-  # else
-  #   patch -p1 < ../patches/mod_suexec_directory.patch
-  # fi
-
   ### Main Installation
   if [ -z "${APACHE24_MAKE_SET}" ] && [ -z "${APACHE24_MAKE_UNSET}" ] &&
-    [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "NO" ]; then
+    [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "NO" ] && [ "${OPT_SUEXEC}" = "NO" ]; then
     pkgi "${PORT_APACHE24}"
   else
-    ## Todo: Harden Symlinks Patch for Apache 2.4
-    if [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "YES" ]; then
-      if [ "${OPT_APACHE_VER}" = "2.4" ]; then
-        APACHE_HSP="${PB_PATCHES}/harden-symlinks-2.4.patch"
-
-        if [ -s "${APACHE_HSP}" ]; then
-          printf "Applying Apache 2.4 Hardened Symlinks Patch\n"
-          ## Copy into /usr/ports/www/apache24/files
-        else
-          printf "*** Error: Cannot apply the Apache 2.4 Hardened Symlinks Patch\n."
-          printf "File %s does not exist.\n" "${APACHE_HSP}"
-        fi
-      fi
-    fi
-
     WWW_APACHE24_PATCHDIR=$(${MAKE} -C ${PORTS_BASE}/${PORT_APACHE24} make -V PATCHDIR)
-
-    ## make patch?
-    # -DEXTRA_PATCHES+="${PB_PATCHES}/${PORT_APACHE24}/patch-modules_generators_mod__suexec.c" \
-    # -DEXTRA_PATCHES+="${PB_PATCHES}/${PORT_APACHE24}/patch-support_suexec.c" \
 
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" distclean clean
 
-    # -DEXTRA_PATCHES_TREE+="${PB_PATCHES}" \
-    printf "Copying Apache 2.4 suexec patches to %s\n" "${WWW_APACHE24_PATCHDIR}"
-    cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-modules_generators_mod__suexec.c" "${WWW_APACHE24_PATCHDIR}"
-    cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-support_suexec.c" "${WWW_APACHE24_PATCHDIR}"
+    if [ "${OPT_APACHE_VER}" = "2.4" ]; then
+      ## Harden Symlinks Patch for Apache 2.4
+      if [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "YES" ]; then
+          printf "Copying Apache 2.4 Harden Symlink patches to %s\n" "${WWW_APACHE24_PATCHDIR}"
+          cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-include_http__core.h" "${WWW_APACHE24_PATCHDIR}"
+          cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-server_core.c" "${WWW_APACHE24_PATCHDIR}"
+      fi
+
+      printf "Copying Apache 2.4 suexec patches to %s\n" "${WWW_APACHE24_PATCHDIR}"
+      cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-modules_generators_mod__suexec.c" "${WWW_APACHE24_PATCHDIR}"
+      cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-support_suexec.c" "${WWW_APACHE24_PATCHDIR}"
+
+      ## Todo:
+      # printf "Patching Apache 2.4 to allow SuexecUserGroup in a Directory context.\n"
+      # cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-mod_suexec_directory" "${WWW_APACHE24_PATCHDIR}"
+
+      # printf "Patching Apache 2.4 with suexec safedir patch.\n"
+      # cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-suexec-safe" "${WWW_APACHE24_PATCHDIR}"
+    fi
+
+    ## Research: patch for users override
+    # USERS=${APACHE_USER} GROUPS=${APACHE_GROUP}
 
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" rmconfig
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" \
@@ -4311,15 +4294,12 @@ apache_install() {
     reinstall clean
   fi
 
-  ## Research: For Makefile override?
-  # USERS=${APACHE_USER} GROUPS=${APACHE_GROUP}
-
   ## PB: Verify:
   ## Copy over base configuration files to etc/apache24/:
-  if [ -d "${PB_PATH}/configure/ap2/conf/" ]; then
-    cp -rf "${PB_PATH}/configure/ap2/conf/" ${APACHE_PATH}/
-    # cp -f "${PB_PATH}/configure/ap2/conf/httpd.conf" "${APACHE_CONF}"
-    # cp -f "${PB_PATH}/configure/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRAS}/httpd-mpm.conf
+  if [ -d "${PB_CONFIG}/ap2/conf/" ]; then
+    cp -rf "${PB_CONFIG}/ap2/conf/" ${APACHE_PATH}/
+    # cp -f "${PB_CONFIG}/ap2/conf/httpd.conf" "${APACHE_CONF}"
+    # cp -f "${PB_CONFIG}/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRAS}/httpd-mpm.conf
   fi
 
   ## Copy over modified (custom) configuration files to etc/apache24/:
