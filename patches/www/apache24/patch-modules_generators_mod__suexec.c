@@ -1,6 +1,6 @@
---- modules/generators/mod_suexec.c.old    2011-12-05 01:08:01.000000000 +0100
-+++ modules/generators/mod_suexec.c    2014-09-11 00:16:21.444000009 +0200
-@@ -59,7 +59,7 @@
+--- modules/generators/mod_suexec.c.orig        2016-06-01 14:25:43 UTC
++++ modules/generators/mod_suexec.c
+@@ -59,7 +59,7 @@ static const char *set_suexec_ugid(cmd_p
                                     const char *uid, const char *gid)
  {
      suexec_config_t *cfg = (suexec_config_t *) mconfig;
@@ -9,7 +9,7 @@
 
      if (err != NULL) {
          return err;
-@@ -116,7 +116,7 @@
+@@ -116,7 +116,7 @@ static const command_rec suexec_cmds[] =
  {
      /* XXX - Another important reason not to allow this in .htaccess is that
       * the ap_[ug]name2id() is not thread-safe */
@@ -18,13 +18,3 @@
        "User and group for spawned processes"),
      { NULL }
  };
---- support/suexec.c.old   2014-10-10 11:48:20.388000025 +0200
-+++ support/suexec.c   2014-10-10 11:50:30.757000025 +0200
-@@ -308,6 +308,7 @@
- #ifdef AP_SUEXEC_UMASK
-         fprintf(stderr, " -D AP_SUEXEC_UMASK=%03o\n", AP_SUEXEC_UMASK);
- #endif
-+        fprintf(stderr, " -D AP_PER_DIR=\"yes\"\n");
- #ifdef AP_UID_MIN
-         fprintf(stderr, " -D AP_UID_MIN=%d\n", AP_UID_MIN);
- #endif

@@ -50,7 +50,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20160531
+PB_BUILD_DATE=20160601
 
 IFS="$(printf '\n\t')"
 LANG=C
