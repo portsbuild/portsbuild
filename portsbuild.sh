@@ -505,7 +505,7 @@ readonly PORT_LETSENCRYPT='security/letsencrypt.sh'
 : "${GLOBAL_MAKE_SET=""}"
 : "${GLOBAL_MAKE_UNSET=""}" # EXAMPLES X11 HTMLDOCS CUPS TESTS DOCS NLS
 
-APACHE24_MAKE_SET="" # SUEXEC MPM_EVENT
+APACHE24_MAKE_SET="SUEXEC" # MPM_EVENT
 APACHE24_MAKE_UNSET="" # MPM_PREFORK
 
 ## Todo: Harden symlinks patch
@@ -4237,7 +4237,7 @@ phpmyadmin_upgrade() {
 
 apache_install() {
 
-  local APACHE_HSP PHPMODULES ADMIN_HTTP HAVE_DACONF HDC
+  local APACHE_HSP PHPMODULES ADMIN_HTTP HAVE_DACONF HDC WWW_APACHE24_PATCHDIR
 
   if [ "${OPT_WEBSERVER}" != "apache" ]; then
     printf "***\n Error: Can't install Apache 2.4 because it hasn't been enabled in options.conf"
@@ -4277,7 +4277,7 @@ apache_install() {
     ## Todo: Harden Symlinks Patch for Apache 2.4
     if [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "YES" ]; then
       if [ "${OPT_APACHE_VER}" = "2.4" ]; then
-        APACHE_HSP="${PB_PATH}/patches/harden-symlinks-2.4.patch"
+        APACHE_HSP="${PB_PATCHES}/harden-symlinks-2.4.patch"
 
         if [ -s "${APACHE_HSP}" ]; then
           printf "Applying Apache 2.4 Hardened Symlinks Patch\n"
@@ -4289,10 +4289,21 @@ apache_install() {
       fi
     fi
 
+    WWW_APACHE24_PATCHDIR=$(${MAKE} -C ${PORTS_BASE}/${PORT_APACHE24} make -V PATCHDIR)
+
+    ## make patch?
+    # -DEXTRA_PATCHES+="${PB_PATCHES}/${PORT_APACHE24}/patch-modules_generators_mod__suexec.c" \
+    # -DEXTRA_PATCHES+="${PB_PATCHES}/${PORT_APACHE24}/patch-support_suexec.c" \
+
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" distclean clean
+
+    # -DEXTRA_PATCHES_TREE+="${PB_PATCHES}" \
+    printf "Copying Apache 2.4 suexec patches to %s\n" "${WWW_APACHE24_PATCHDIR}"
+    cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-modules_generators_mod__suexec.c" "${WWW_APACHE24_PATCHDIR}"
+    cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-support_suexec.c" "${WWW_APACHE24_PATCHDIR}"
+
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" rmconfig
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" \
-    # -DEXTRA_PATCHES+="${PB_PATCHES}/mod_suexec_directory.patch" \
-    # -DEXTRA_PATCHES+="${PB_PATCHES}/suexec-safe.patch" \
     www_apache24_SET="${APACHE24_MAKE_SET}" \
     www_apache24_UNSET="${APACHE24_MAKE_UNSET}" \
     OPTIONS_SET="${GLOBAL_MAKE_SET}" \
@@ -4665,10 +4676,10 @@ apache_install() {
 
   ## CB2: Make sure there is no SSLMutex in /usr/local/etc/apache24/extra/httpd-ssl.conf
   ## CB2: Make sure there is no LockFile in /usr/local/etc/apache24/extra/httpd-mpm.conf
-  # if [ "${OPT_APACHE_VER}" = "2.4" ]; then
-  ${PERL} -pi -e 's/^SSLMutex/#SSLMutex/' "${APACHE_EXTRAS}/httpd-ssl.conf"
-  ${PERL} -pi -e 's/^LockFile/#LockFile/' "${APACHE_EXTRAS}/httpd-mpm.conf"
-  # fi
+  if [ "${OPT_APACHE_VER}" = "2.4" ]; then
+    ${PERL} -pi -e 's/^SSLMutex/#SSLMutex/' "${APACHE_EXTRAS}/httpd-ssl.conf"
+    ${PERL} -pi -e 's/^LockFile/#LockFile/' "${APACHE_EXTRAS}/httpd-mpm.conf"
+  fi
 
   ## Disable UserDir access if userdir_access=no is set in the options.conf file
   if [ "${OPT_USERDIR_ACCESS}" = "NO" ]; then
@@ -4682,7 +4693,6 @@ apache_install() {
   ## CB2: ldconfig
 
   if [ "${COMPAT_APACHE24_SYMLINKS}" = "YES" ]; then
-
     printf "PortsBuild+DirectAdmin Compatibility mode: Creating symlinks for Apache\n"
 
     ## 2016-03-05: no longer needed?
@@ -4731,7 +4741,6 @@ apache_install() {
   fi
 
   return
-
 }
 
 ################################################################################
@@ -4748,8 +4757,8 @@ apache_uninstall() {
 
   pkgd apache24
 
-  sysrc -q -x apache24_enable
-  sysrc -q -x apache24_http_accept_enable
+  ${SYSRC} -q -x apache24_enable
+  ${SYSRC} -q -x apache24_http_accept_enable
 
   return
 }
@@ -6162,18 +6171,17 @@ update_modsecurity_rules() {
 
 verify_webapps_php_ini() {
 
-  local PHP_INI_WEBAPPS
-
-  # ${PHP_INI_WEBAPPS} = /usr/local/etc/php/50-webapps.ini
+  # ${PHP_INI_WEBAPPS = /usr/local/etc/php/50-webapps.ini
   # ${WWW_TMP_DIR} = /usr/local/www/tmp
 
-  if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
-    PHP_INI_WEBAPPS=/usr/local/lib/php.conf.d/50-webapps.ini
-    mkdir -p /usr/local/lib/php.conf.d
-  else
-    PHP_INI_WEBAPPS=/usr/local/php${OPT_PHP1_VER}/lib/php.conf.d/50-webapps.ini
-    mkdir -p "/usr/local/php${OPT_PHP1_VER}/lib/php.conf.d"
-  fi
+  ## PB: 2016-06-01: No longer needed.
+  # if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
+  #   PHP_INI_WEBAPPS=/usr/local/lib/php.conf.d/50-webapps.ini
+  #   mkdir -p /usr/local/lib/php.conf.d
+  # else
+  #   PHP_INI_WEBAPPS=/usr/local/php${OPT_PHP1_VER}/lib/php.conf.d/50-webapps.ini
+  #   mkdir -p "/usr/local/php${OPT_PHP1_VER}/lib/php.conf.d"
+  # fi
 
   ## Copy custom/ file (not implemented)
   if [ -e "${PHP_CUSTOM_PHP_CONF_D_INI_PATH}/50-webapps.ini" ]; then
@@ -6184,7 +6192,9 @@ verify_webapps_php_ini() {
       printf "[PATH=%s]\n" "${WWW_DIR}"
       printf "session.save_path=%s\n" "${WWW_TMP_DIR}"
       printf "upload_tmp_dir=%s\n" "${WWW_TMP_DIR}"
-      printf "disable_functions=exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname\n"
+      printf "disable_functions=exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,\
+      proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,\
+      posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname\n"
     } > "${PHP_INI_WEBAPPS}"
   fi
 
@@ -6240,8 +6250,8 @@ get_webmail_link() {
 
 apache_host_conf() {
 
-  local APACHE_HOSTNAME_CONF SUEXEC_PER_DIR WEBAPPS_FCGID_DIR
-  APACHE_HOSTNAME_CONF="${APACHE_EXTRAS}/httpd-hostname.conf"
+  local SUEXEC_PER_DIR WEBAPPS_FCGID_DIR
+  # already defined: APACHE_HOSTNAME_CONF="${APACHE_EXTRAS}/httpd-hostname.conf"
   WEBAPPS_FCGID_DIR=/usr/local/www/fcgid
 
   ## Copy custom/ file
@@ -7403,7 +7413,8 @@ tokenize_ports() {
         ${PERL} -pi -e "s/^Listen ${PORT_8081}$/Listen ${PORT_443}/" "${TOKENFILE_APACHE}"
       fi
 
-      SSLFILE=${APACHE_PATH}/extra/httpd-ssl.conf
+      SSLFILE="${APACHE_EXTRAS}/httpd-ssl.conf"
+
       STR="${PERL} -pi -e \"s/\|PORT_443\|/${PORT_443}/\" ${SSLFILE}"
       eval "${STR}"
       ${PERL} -pi -e "s/:${PORT_8081}\>/:${PORT_443}\>/" "${SSLFILE}"
@@ -7511,7 +7522,8 @@ tokenize_ports() {
       ${PERL} -pi -e "s/:${PORT_80}\>/:${PORT_8080}\>/" "${APACHE_CONF}"
       ${PERL} -pi -e "s/^Listen ${PORT_80}$/Listen ${PORT_8080}/" "${APACHE_CONF}"
 
-      SSLFILE=${APACHE_EXTRAS}/httpd-ssl.conf
+      SSLFILE="${APACHE_EXTRAS}/httpd-ssl.conf"
+
       STR="${PERL} -pi -e \"s/\|PORT_443\|/${PORT_8081}/\" ${SSLFILE}"
       eval "${STR}"
       ${PERL} -pi -e "s/:${PORT_443}\>/:${PORT_8081}\>/" "${SSLFILE}"
