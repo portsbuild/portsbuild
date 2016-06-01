@@ -284,6 +284,9 @@ readonly CLAMDSCAN=/usr/local/bin/clamdscan
 readonly CLAMD_CONF=/usr/local/etc/clamd.conf
 readonly FRESHCLAM_CONF=/usr/local/etc/freshclam.conf
 
+## ModSecurity
+# readonly MODSECURITY_PATH=/usr/local/etc/modsecurity.d
+
 ## ProFTPD
 readonly PROFTPD_CONF=/usr/local/etc/proftpd.conf
 readonly PROFTPD_ETC=/usr/local/etc/proftpd
@@ -372,7 +375,7 @@ fi
 readonly IPV6
 
 ################################################################################
-## PortsBuild Compatibility Settings
+## PortsBuild Compatibility Switches
 ################################################################################
 readonly COMPAT_APACHE24_SYMLINKS="NO"
 readonly COMPAT_DOVECOT_SYMLINKS="YES"
@@ -400,25 +403,25 @@ readonly PORT_AUTOCONF=devel/autoconf
 readonly PORT_AUTOMAKE=devel/automake
 readonly PORT_BISON=devel/bison
 readonly PORT_CA_ROOT_NSS=security/ca_root_nss
-readonly PORT_CURL="ftp/curl"
+readonly PORT_CURL='ftp/curl'
 readonly PORT_LIBTOOL=devel/libtool
 readonly PORT_LIBXML2=textproc/libxml2
 readonly PORT_LIBXSLT=textproc/libxslt
 readonly PORT_LIBARCHIVE=archivers/libarchive
 readonly PORT_FREETYPE2=print/freetype2
 readonly PORT_CYRUSSASL2=security/cyrus-sasl2
-readonly PORT_PYTHON=lang/python
-readonly PORT_CCACHE=devel/ccache
-readonly PORT_CMAKE=devel/cmake
-readonly PORT_GMAKE=devel/gmake
-readonly PORT_WGET=ftp/wget
-readonly PORT_FLEX=textproc/flex
-readonly PORT_GD=graphics/gd
-readonly PORT_SASL2=security/cyrus-sasl2
-readonly PORT_MAILX=mail/mailx
-readonly PORT_BIND=dns/bind99
-readonly PORT_GCC6=lang/gcc6-aux
-readonly PORT_NCURSES=devel/ncurses
+readonly PORT_PYTHON='lang/python'
+readonly PORT_CCACHE='devel/ccache'
+readonly PORT_CMAKE='devel/cmake'
+readonly PORT_GMAKE='devel/gmake'
+readonly PORT_WGET='ftp/wget'
+readonly PORT_FLEX='textproc/flex'
+readonly PORT_GD='graphics/gd'
+readonly PORT_SASL2='security/cyrus-sasl2'
+readonly PORT_MAILX='mail/mailx'
+readonly PORT_BIND='dns/bind99'
+readonly PORT_GCC6='lang/gcc6-aux'
+readonly PORT_NCURSES='devel/ncurses'
 
 readonly PORT_DEPS="${PORT_GMAKE} ${PORT_PERL} ${PORT_WGET} ${PORT_BISON} \
 ${PORT_FLEX} ${PORT_GD} ${PORT_SASL2} ${PORT_CMAKE} ${PORT_PYTHON} \
@@ -426,31 +429,31 @@ ${PORT_AUTOCONF} ${PORT_LIBTOOL} ${PORT_LIBARCHIVE} ${PORT_MAILX} ${PORT_CA_ROOT
 readonly PORT_DEPS_100="${PORT_DEPS} ${PORT_BIND}"
 
 ## Ports: Web Servers
-readonly PORT_APACHE24=www/apache24
-readonly PORT_NGINX=www/nginx
-readonly PORT_NGHTTP2=www/nghttp2
+readonly PORT_APACHE24='www/apache24'
+readonly PORT_NGINX='www/nginx'
+readonly PORT_NGHTTP2='www/nghttp2'
 
-readonly PORT_FASTCGI=www/mod_fastcgi
-readonly PORT_FCGID=www/mod_fcgid
+readonly PORT_FASTCGI='www/mod_fastcgi'
+readonly PORT_FCGID='www/mod_fcgid'
 
 ## Ports: PHP
-readonly PORT_PHP55=lang/php55
-readonly PORT_PHP55_EXT=lang/php55-extensions
-readonly PORT_PHP56=lang/php56
-readonly PORT_PHP56_EXT=lang/php56-extensions
-readonly PORT_PHP70=lang/php70
-readonly PORT_PHP70_EXT=lang/php70-extensions
-readonly PORT_MOD_PHP55=www/mod_php55
-readonly PORT_MOD_PHP56=www/mod_php56
-readonly PORT_MOD_PHP70=www/mod_php70
-readonly PORT_SUPHP=www/suphp
+readonly PORT_PHP55='lang/php55'
+readonly PORT_PHP55_EXT='lang/php55-extensions'
+readonly PORT_PHP56='lang/php56'
+readonly PORT_PHP56_EXT='lang/php56-extensions'
+readonly PORT_PHP70='lang/php70'
+readonly PORT_PHP70_EXT='lang/php70-extensions'
+readonly PORT_MOD_PHP55='www/mod_php55'
+readonly PORT_MOD_PHP56='www/mod_php56'
+readonly PORT_MOD_PHP70='www/mod_php70'
+readonly PORT_SUPHP='www/suphp'
 
-readonly PORT_PHPMYADMIN=databases/phpmyadmin
-readonly PORT_IONCUBE=devel/ioncube
-readonly PORT_SUHOSIN=security/suhosin
-readonly PORT_HTSCANNER=devel/pecl-htscanner
-readonly PORT_MOD_SECURITY=www/mod_security
-# readonly PORT_PCRE=devel/pcre
+readonly PORT_PHPMYADMIN='databases/phpmyadmin'
+readonly PORT_IONCUBE='devel/ioncube'
+readonly PORT_SUHOSIN='security/suhosin'
+readonly PORT_HTSCANNER='devel/pecl-htscanner'
+readonly PORT_MOD_SECURITY='www/mod_security'
+# readonly PORT_PCRE='devel/pcre'
 
 ## Ports: Mail & Related Services
 readonly PORT_EXIM='mail/exim'
@@ -5893,7 +5896,7 @@ configure_php_ini() {
   fi
 
   if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
-    cp -f php.ini-${OPT_PHP_INI_TYPE} ${PHP_INI}
+    cp -f "php.ini-${OPT_PHP_INI_TYPE}" ${PHP_INI}
     ## CB2: writeLog "${PHP_INI} installed"
   elif [ "${OPT_PHP1_MODE}" = "php-fpm" ] || [ "${OPT_PHP1_MODE}" = "fastcgi" ] || [ "${OPT_PHP1_MODE}" = "suphp" ]; then
     PHP_INI_VAR=PHP_INI_FPM${PHP1_SHORTRELEASE}
@@ -6113,11 +6116,11 @@ update_modsecurity_rules() {
     if [ -e /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.example ]; then
       mv -f /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.example /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.main
     fi
-    ${PERL} -pi -e 's|^SecDefaultAction|#SecDefaultAction|' /etc/modsecurity.d/modsecurity_crs_10_setup.conf.main
+    ${PERL} -pi -e 's|^SecDefaultAction|#SecDefaultAction|' /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.main
   fi
 
   if [ "${OPT_WEBSERVER}" = "apache" ]; then
-    MODSECURITY_CONF_FILE=${APACHE_EXTRAS}/httpd-modsecurity.conf
+    MODSECURITY_CONF_FILE="${APACHE_EXTRAS}/httpd-modsecurity.conf"
   else
     MODSECURITY_CONF_FILE=/usr/local/etc/nginx/nginx-modsecurity.conf
   fi
