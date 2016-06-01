@@ -2,23 +2,23 @@
 # newsyslog.sh
 # 2016-05-12: PortsBuild version
 
-CONF=/usr/local/etc/newsyslog.conf.d/directadmin.conf
+readonly DA_CONF=/usr/local/etc/newsyslog.conf.d/directadmin.conf
 INIT_DIR=/usr/local/etc/rc.d
-LOG_DIR=/var/log
+readonly LOG_DIR=/var/log
 
-if [ ! -e $CONF ]; then
+if [ ! -e $DA_CONF ]; then
   printf "Creating newsyslog configuration for DirectAdmin.\n"
-  printf "File: %s\n" "${CONF}"
-  touch "${CONF}"
+  printf "File: %s\n" "${DA_CONF}"
+  touch "${DA_CONF}"
 fi
 
 ## addLog /file user:group flag pid
 addLog() {
-  COUNT=$(grep -c "$1" ${CONF})
+  COUNT=$(grep -c "$1" ${DA_CONF})
   if [ "$COUNT" -ne 0 ]; then
     return
   fi
-  printf "%s\t%s\t600\t7\t*\t@T00\t%s\t%s\n" "$1" "$2" "$3" "$4" >> "${CONF}"
+  printf "%s\t%s\t600\t7\t*\t@T00\t%s\t%s\n" "$1" "$2" "$3" "$4" >> "${DA_CONF}"
 }
 
 # addLog "${LOG_DIR}/chrootshell.log" '' -

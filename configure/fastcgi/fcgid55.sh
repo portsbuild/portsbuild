@@ -5,7 +5,7 @@ PHP_VER=55
 OPTIONS=
 if [ "$1" != "" ]; then
   if [ -s "$1" ]; then
-          OPTIONS=" -c ${1} ${OPTIONS}"
+    OPTIONS=" -c ${1} ${OPTIONS}"
   fi
   shift
 fi

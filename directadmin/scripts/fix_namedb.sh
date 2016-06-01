@@ -25,6 +25,8 @@ else
   NAMED_DIR=/etc/namedb
 fi
 
+readonly NAMED_DIR
+
 NS1=$(grep ns1= "${DA_PATH}/conf/directadmin.conf" | cut -d= -f2)
 NS2=$(grep ns2= "${DA_PATH}/conf/directadmin.conf" | cut -d= -f2)
 

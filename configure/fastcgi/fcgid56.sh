@@ -12,7 +12,7 @@ fi
 
 SENDMAIL_FROM="`echo $@ | grep -o 'sendmail_from=[^ ]*' | cut -d'\"' -f2`"
 if [ "${SENDMAIL_FROM}" != "" ]; then
-        SENDMAIL_ADD="-f ${SENDMAIL_FROM}"
+  SENDMAIL_ADD="-f ${SENDMAIL_FROM}"
 fi
 
 # http://httpd.apache.org/mod_fcgid/mod/mod_fcgid.html
