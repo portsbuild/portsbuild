@@ -1,0 +1,28 @@
+|?NS_TIME=14400|
+|?A_TIME=14400|
+|?MX_TIME=14400|
+|?CNAME_TIME=14400|
+|?PTR_TIME=14400|
+|?TXT_TIME=14400|
+|?AAAA_TIME=14400|
+|?SRV_TIME=14400|
+|?SPF_TIME=14400|
+|?DS_TIME=14400|
+$TTL 14400
+@       IN      SOA     |NS1|      |EMAIL| (
+                                                |SERIAL|
+                                                14400
+                                                3600
+                                                1209600
+                                                86400 )
+
+|NS|
+|A|
+|MX|
+|CNAME|
+|PTR|
+|TXT|
+|AAAA|
+|SRV|
+|SPF|
+|DS|
