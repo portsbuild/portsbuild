@@ -2,10 +2,11 @@
 
 The following table shows if the differently configured software stacks have been tested or not.
 
-#   | Webserver     | PHP #1   | SQL
+
+No. | Webserver     | PHP #1   | SQL
 --- | -----------   | ---      | ---
 1   | Apache 2.4    | FPM      | MariaDB 10.1
-2   | Apache 2.4    | FCGI     | MariaDB 
+2   | Apache 2.4    | FCGI     | MariaDB 10.1
 
 
 Service         | Versions      | Status
@@ -19,7 +20,7 @@ Exim            | 4.8x          | Supported
 SpamBlocker     | 4.3.x         | Supported
 ClamAV          | 0.9x          | Supported
 SpamAssassin    | 3.4           | Supported
-RoundCube       | 1.1.x         | In progress
+RoundCube       | 1.1.x         | Supported
 phpMyAdmin      | 4.5.x         | Supported
 proftpd         | 1.3.5a        | Supported
 pure-FTPd       | 1.0.42        | Supported
