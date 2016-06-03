@@ -6869,7 +6869,7 @@ rewrite_confs() {
 
     if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
       ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' "${APACHE_CONF}"
-      echo "LoadModule  suphp_module    ${APACHE_LIBS}/mod_suphp.so" >> "${PHPMODULES}"
+      printf "LoadModule suphp_module %s/mod_suphp.so\n" "${APACHE_LIBS}" >> "${PHPMODULES}"
     fi
 
     ## mod_security:
@@ -6884,7 +6884,7 @@ rewrite_confs() {
     if [ "${OPT_HTSCANNER}" = "YES" ]; then
       if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
         ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' "${APACHE_CONF}"
-        echo "LoadModule  htscanner_module    ${APACHE_LIBS}/mod_htscanner2.so" >> "${PHPMODULES}"
+        echo "LoadModule htscanner_module ${APACHE_LIBS}/mod_htscanner2.so" >> "${PHPMODULES}"
       fi
     fi
 
