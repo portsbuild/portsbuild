@@ -50,7 +50,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20160601
+PB_BUILD_DATE=20160603
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -163,7 +163,7 @@ readonly WGET_CONNECT_OPTIONS="--connect-timeout=5 --read-timeout=10 --tries=3"
 readonly TAR=/usr/bin/tar
 
 ## Runtime Discovery
-readonly CPU_CORES=$("${SYSCTL}" -n hw.ncpu)
+readonly CPU_CORES="$("${SYSCTL}" -n hw.ncpu)"
 readonly SERVER_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
 readonly NEWSYSLOG_FILE=/usr/local/etc/newsyslog.conf.d/directadmin.conf
 readonly SSHD_CONFIG=/etc/ssh/sshd_config
@@ -201,6 +201,7 @@ readonly APACHE_HTTPD=/usr/local/sbin/httpd
 readonly APACHE_SSL_KEY="${APACHE_PATH}/ssl/server.key"
 readonly APACHE_SSL_CRT="${APACHE_PATH}/ssl/server.crt"
 readonly APACHE_SSL_CA="${APACHE_PATH}/ssl/server.ca"
+readonly APACHE_SUEXEC=/usr/local/sbin/suexec
 readonly PHP_HANDLERS_CONF="${APACHE_EXTRAS}/httpd-php-handlers.conf"
 # readonly APACHE_PID=/var/run/httpd.pid
 
@@ -235,6 +236,8 @@ readonly PHP_INI_WEBAPPS="${PHP_ETC}/50-webapps.ini"
 readonly PHP_INI_EXTENSIONS="${PHP_ETC}/extensions.ini"
 readonly PHP_INI_OPCACHE="${PHP_ETC}/opcache.ini"
 readonly PHP_INI_DIRECTADMIN="${PHP_ETC}/10-directadmin.ini"
+readonly PHP_FPM_CONF="${PHP_ETC}/php-fpm.conf"
+readonly PHP_SOCKETS_PATH=/var/run/php/sockets
 readonly PHP1_RELEASE_SET="5.5 5.6 7.0"
 readonly PHP1_SHORTRELEASE_SET="$(echo "${PHP1_RELEASE_SET}" | tr -d '.')"
 readonly SUPHP_CONF_FILE=/usr/local/etc/suphp.conf
@@ -3540,54 +3543,90 @@ sql_install() {
 
 ################################################################################
 ##
-## Todo: Verify: FPM Check (from CB2: fpmCheck())
+## Verify: FPM Check (from CB2: fpmCheck())
 ## Checks to see if any changes were done (e.g. converting between web server softwares)
 ##
 ################################################################################
 
 fpmCheck() {
 
-  local ARG="$1"
-  local CHANGED COUNT FPM_SOCK_CHMOD
+  local ARG="$1" ## PHP version (dual PHP mode)
+  local WEB_SERVER_CHANGED COUNT FPM_SOCK_CHMOD
 
-  CHANGED=0
-  COUNT="$(grep -m1 -c nginx "/usr/local/php${ARG}/etc/php-fpm.conf")"
+  readonly FPM_SOCK_CHMOD=700
+
+  WEB_SERVER_CHANGED=0
+
+  if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    COUNT="$(grep -m1 -c nginx "/usr/local/php${ARG}/etc/php-fpm.conf")"
+  else
+    COUNT="$(grep -m1 -c nginx "${PHP_FPM_CONF}")"
+  fi
 
   ## PB: Select appropriate web user depending on chosen web server
   if [ "${OPT_WEBSERVER}" = "apache" ] ||  [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     CHOWN_USER="${APACHE_USER}"
   elif [ "${OPT_WEBSERVER}" = "nginx" ]; then
     CHOWN_USER="${NGINX_USER}"
-  else
+  else ## Verify: Better to exit with error?
     CHOWN_USER="${OPT_WEBSERVER}"
   fi
 
-  ${CHOWN} "${CHOWN_USER}:${CHOWN_USER}" "/usr/local/php${ARG}/sockets"
+  if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    ${CHOWN} "${CHOWN_USER}:${CHOWN_USER}" "/usr/local/php${ARG}/sockets"
+  else
+    ${CHOWN} "${CHOWN_USER}:${CHOWN_USER}" "${PHP_SOCKETS_PATH}"
+  fi
 
-  FPM_SOCK_CHMOD=700
 
-  ${CHMOD} ${FPM_SOCK_CHMOD} "/usr/local/php${ARG}/sockets"
+  if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    ${CHMOD} ${FPM_SOCK_CHMOD} "/usr/local/php${ARG}/sockets"
+  else
+    ${CHMOD} ${FPM_SOCK_CHMOD} "${PHP_SOCKETS_PATH}"
+  fi
 
   if [ "${OPT_WEBSERVER}" = "nginx" ] && [ "${COUNT}" -eq 0 ]; then
-    ${PERL} -pi -e 's/apache/nginx/' "/usr/local/php${ARG}/etc/php-fpm.conf"
-    CHANGED=1
+    if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+      ${PERL} -pi -e 's/apache/nginx/' "/usr/local/php${ARG}/etc/php-fpm.conf"
+    else
+      ${PERL} -pi -e 's/apache/nginx/' "${PHP_FPM_CONF}"
+    fi
+    WEB_SERVER_CHANGED=1
   elif [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     if [ "${COUNT}" -gt 0 ]; then
-      ${PERL} -pi -e 's/nginx/apache/' "/usr/local/php${ARG}/etc/php-fpm.conf"
-      CHANGED=1
+      if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+        ${PERL} -pi -e 's/nginx/apache/' "/usr/local/php${ARG}/etc/php-fpm.conf"
+      else
+        ${PERL} -pi -e 's/nginx/apache/' "${PHP_FPM_CONF}"
+      fi
+      WEB_SERVER_CHANGED=1
     fi
   fi
 
-  if [ -d "/usr/local/php${ARG}/sockets" ]; then
-    if [ "${OPT_WEBSERVER}" = "nginx" ]; then
-      ${CHOWN} -R ${NGINX_USER}:${NGINX_GROUP} "/usr/local/php${ARG}/sockets"
-    elif [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-      ${CHOWN} -R ${APACHE_USER}:${APACHE_GROUP} "/usr/local/php${ARG}/sockets"
+  if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    if [ -d "/usr/local/php${ARG}/sockets" ]; then
+      if [ "${OPT_WEBSERVER}" = "nginx" ]; then
+        ${CHOWN} -R ${NGINX_USER}:${NGINX_GROUP} "/usr/local/php${ARG}/sockets"
+      elif [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+        ${CHOWN} -R ${APACHE_USER}:${APACHE_GROUP} "/usr/local/php${ARG}/sockets"
+      fi
+    fi
+  else
+    if [ -d "${PHP_SOCKETS_PATH}" ]; then
+      if [ "${OPT_WEBSERVER}" = "nginx" ]; then
+        ${CHOWN} -R ${NGINX_USER}:${NGINX_GROUP} "${PHP_SOCKETS_PATH}"
+      elif [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+        ${CHOWN} -R ${APACHE_USER}:${APACHE_GROUP} "${PHP_SOCKETS_PATH}"
+      fi
     fi
   fi
 
-  if [ ${CHANGED} -eq 1 ]; then
-    ${SERVICE} "php-fpm${ARG}" restart
+  if [ ${WEB_SERVER_CHANGED} -eq 1 ]; then
+    if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+      ${SERVICE} "php-fpm${ARG}" restart
+    else
+      ${SERVICE} php-fpm restart
+    fi
   fi
 
   return
@@ -3601,20 +3640,27 @@ fpmCheck() {
 
 fpmChecks() {
 
-  # if [ ${DUAL_PHP_MODE} = "YES" ]; then
-
   local IFS=' '
   local PHP_REPLACE_STRING
   local php_shortrelease
 
-  for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
-    EVAL_CHECK_VAR="HAVE_FPM${php_shortrelease}_CGI"
-    EVAL_COPY_VAR="PHP${php_shortrelease}_FPM_CONF"
-    if [ "$(eval_var "${EVAL_CHECK_VAR}")" = "YES" ] && [ -d "/usr/local/php${php_shortrelease}/sockets" ]; then
-      cp -f "$(eval_var "${EVAL_COPY_VAR}")" "/usr/local/php${php_shortrelease}/etc/php-fpm.conf"
-      fpmCheck "${php_shortrelease}"
+  ## PB: For dual PHP installations:
+  if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
+      EVAL_CHECK_VAR="HAVE_FPM${php_shortrelease}_CGI"
+      EVAL_COPY_VAR="PHP${php_shortrelease}_FPM_CONF"
+      if [ "$(eval_var "${EVAL_CHECK_VAR}")" = "YES" ] && [ -d "/usr/local/php${php_shortrelease}/sockets" ]; then
+        cp -f "$(eval_var "${EVAL_COPY_VAR}")" "/usr/local/php${php_shortrelease}/etc/php-fpm.conf"
+        fpmCheck "${php_shortrelease}"
+      fi
+    done
+  else
+    EVAL_CHECK_VAR="HAVE_FPM${OPT_PHP1_VERSION}_CGI"
+    if [ "$(eval_var "${EVAL_CHECK_VAR}")" = "YES" ] && [ -d "/var/run/php/sockets" ]; then
+      ## Todo: cp -f ${}
+      fpmCheck "${OPT_PHP1_VER}"
     fi
-  done
+  fi
 
   if [ "${HAVE_FPM_CGI}" = "YES" ]; then
     if [ "${OPT_WEBSERVER}" = "nginx" ]; then
@@ -3690,9 +3736,9 @@ dovecot_checks() {
 
 php_install() {
 
-  local COUNT PHPMODULES
+  local PHPMODULES COUNT_SUPHP COUNT_MODSEC COUNT_HTSCANNER
 
-  ## Install Web Server first
+  ## Install Web Server(s) first
 
   ## Apache / Nginx+Apache:
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
@@ -3713,12 +3759,12 @@ php_install() {
   if [ "${HAVE_CLI}" = "YES" ] && [ -e "${PHPMODULES}" ]; then
     if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
       if grep -m1 -q "LoadModule mpm_event_module ${APACHE_LIBS}/mod_mpm_event.so" ${PHPMODULES}; then
-        printf "Switching Apache Event MPM to Prefork (mod_php requirement).\n"
+        printf "*** Notice: Switching Apache Event MPM to Prefork (mod_php requirement).\n"
         ${PERL} -pi -e "s#LoadModule mpm_event_module ${APACHE_LIBS}/mod_mpm_event.so#LoadModule mpm_prefork_module ${APACHE_LIBS}/mod_mpm_prefork.so#" ${PHPMODULES}
         ${SERVICE} apache24 restart
       fi
       if grep -m1 -q "LoadModule mpm_worker_module ${APACHE_LIBS}/mod_mpm_worker.so" ${PHPMODULES}; then
-        printf "Switching Apache Worker MPM to Prefork (mod_php requirement).\n"
+        printf "*** Notice: Switching Apache Worker MPM to Prefork (mod_php requirement).\n"
         ${PERL} -pi -e "s#LoadModule mpm_worker_module ${APACHE_LIBS}/mod_mpm_worker.so#LoadModule mpm_prefork_module ${APACHE_LIBS}/mod_mpm_prefork.so#" ${PHPMODULES}
         ${SERVICE} apache24 restart
       fi
@@ -3807,37 +3853,43 @@ php_install() {
   printf "Starting PHP installation\n"
 
   if [ -z "${PHP_MAKE_SET}" ] && [ -z "${PHP_MAKE_UNSET}" ]; then
+    ## Base PHP Installation (includes FPM, CGI, CLI modes)
+    pkgi "${PORT_PHP}" "${PHP_EXT_LIST}"
+
     case ${OPT_PHP1_MODE} in
-      "fpm") pkgi ${PORT_PHP} "${PHP_EXT_LIST}" ;;
-      "mod_php") pkgi ${PORT_MOD_PHP} ;;
-      # fastcgi) echo "not done" ;;
-      # fcgid) echo "not done" ;;
-      "suphp") pkgi ${PORT_SUPHP} ;;
+      # "fpm") # moved out of case ;;
+      "mod_php") pkgi "${PORT_MOD_PHP}" ;;
+      # fastcgi) echo "not done"; pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
+      # fcgid) echo "not done"; pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
+      "suphp") pkgi "${PORT_SUPHP}" ;;
     esac
   else
+    ## Base PHP Installation (includes FPM, CGI, CLI modes)
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" rmconfig
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" \
+    OPTIONS_SET="${PHP_MAKE_SET} ${GLOBAL_MAKE_SET}" \
+    OPTIONS_UNSET="${PHP_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
+    reinstall clean
+
+    ## PHP Extensions:
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" rmconfig
+    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" \
+    OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" \
+    OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
+    reinstall clean
+
     case ${OPT_PHP1_MODE} in
-      "fpm")
-          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" rmconfig
-          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" \
-          OPTIONS_SET="${PHP_MAKE_SET} ${GLOBAL_MAKE_SET}" \
-          OPTIONS_UNSET="${PHP_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
-          reinstall clean
-          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" rmconfig
-          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" \
-          OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" \
-          OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
-          reinstall clean
-          ;;
+      # "fpm") # moved out of case ;;
       "mod_php")
           ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" rmconfig
           ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" \
           OPTIONS_SET="${PHP_MOD_MAKE_SET} ${GLOBAL_MAKE_SET}" \
           OPTIONS_UNSET="${PHP_MOD_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
           reinstall clean
-          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" \
-          OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" \
-          OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
-          reinstall clean
+          # ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" \
+          # OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" \
+          # OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
+          # reinstall clean
           ;;
       # fastcgi) echo "not done" ;;
       # fcgid) echo "not done" ;;
@@ -3857,55 +3909,56 @@ php_install() {
     printf "" > "${PHPMODULES}"
 
     if [ -e "${PHPMODULES}" ]; then
-      COUNT="$(grep -m1 -c 'suphp_module' ${PHPMODULES})"
-      if [ "${HAVE_SUPHP_CGI}" = "YES" ] && [ "${COUNT}" -eq 0 ]; then
+      COUNT_SUPHP="$(grep -m1 -c 'suphp_module' ${PHPMODULES})"
+      if [ "${HAVE_SUPHP_CGI}" = "YES" ] && [ "${COUNT_SUPHP}" -eq 0 ]; then
         ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' ${APACHE_CONF}
-        echo "LoadModule  suphp_module    ${APACHE_LIBS}/mod_suphp.so" >> ${PHPMODULES}
+        echo "LoadModule suphp_module ${APACHE_LIBS}/mod_suphp.so" >> ${PHPMODULES}
       fi
 
-      COUNT="$(grep -m1 -c 'httpd-modsecurity' ${PHPMODULES})"
+      COUNT_MODSEC="$(grep -m1 -c 'httpd-modsecurity' ${PHPMODULES})"
       if [ "${OPT_MODSECURITY}" = "YES" ] && [ ! -e "${APACHE_LIBS}/mod_security2.so" ]; then
         modsecurity_install
       fi
 
-      if [ "${OPT_MODSECURITY}" = "YES" ]  && [ "${COUNT}" -eq 0 ] && [ "${OPT_WEBSERVER}" = "apache" ]; then
+      if [ "${OPT_MODSECURITY}" = "YES" ]  && [ "${COUNT_MODSEC}" -eq 0 ] && [ "${OPT_WEBSERVER}" = "apache" ]; then
         ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' ${APACHE_CONF}
         echo "Include ${APACHE_EXTRAS}/httpd-modsecurity.conf" >> ${PHPMODULES}
         cp -pf "${MODSECURITY_APACHE_INCLUDE}" "${APACHE_EXTRAS}/httpd-modsecurity.conf"
       fi
 
       if [ "${HAVE_CLI}" = "NO" ]; then
-        COUNT="$(grep -m1 -c 'htscanner_module' ${PHPMODULES})"
-        if [ "${OPT_HTSCANNER}" = "YES" ] && [ "${COUNT}" -eq 0 ]; then
+        COUNT_HTSCANNER="$(grep -m1 -c 'htscanner_module' ${PHPMODULES})"
+        if [ "${OPT_HTSCANNER}" = "YES" ] && [ "${COUNT_HTSCANNER}" -eq 0 ]; then
           ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
-          echo "LoadModule  htscanner_module    ${APACHE_LIBS}/mod_htscanner2.so" >> ${PHPMODULES}
+          echo "LoadModule htscanner_module ${APACHE_LIBS}/mod_htscanner2.so" >> ${PHPMODULES}
         fi
       elif [ "${HAVE_CLI}" = "YES" ]; then
-        COUNT="$(grep -m1 -c 'htscanner_module' ${PHPMODULES})"
-        if [ "${OPT_HTSCANNER}" = "YES" ] && [ "${COUNT}" -gt 0 ]; then
+        COUNT_HTSCANNER="$(grep -m1 -c 'htscanner_module' ${PHPMODULES})"
+        if [ "${OPT_HTSCANNER}" = "YES" ] && [ "${COUNT_HTSCANNER}" -gt 0 ]; then
           ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
           ${PERL} -pi -e 's|^LoadModule htscanner_module|^#LoadModule htscanner_module' ${PHPMODULES}
         fi
       fi
     fi
 
-    if ! grep -m1 -q '/usr/local/libexec/apache24/mod_mpm_' ${PHPMODULES}; then
-      if [ "${OPT_APACHE_MPM}" = "auto" ]; then
-        ## CB2: Use Event MPM for CGI (FPM) and Prefork for CLI (mod_php)
-        if [ "${HAVE_CLI}" = "NO" ]; then
-          ## CB2: Add to httpd-phpmodules.conf
-          echo "LoadModule mpm_event_module ${APACHE_LIBS}/mod_mpm_event.so" >> ${PHPMODULES}
+    ## Determine Apache MPM + Generate httpd-phpmodules.conf
+    if ! grep -m1 -q "${APACHE_LIBS}/mod_mpm_" "${PHPMODULES}"; then
+      {
+        if [ "${OPT_APACHE_MPM}" = "auto" ]; then
+          ## CB2: Use Event MPM for CGI (FPM) and Prefork for CLI (mod_php)
+          if [ "${HAVE_CLI}" = "NO" ]; then
+            printf "LoadModule mpm_event_module %s/mod_mpm_event.so\n" "${APACHE_LIBS}"
+          else
+            printf "LoadModule mpm_prefork_module %s/mod_mpm_prefork.so\n" "${APACHE_LIBS}"
+          fi
+        elif [ "${OPT_APACHE_MPM}" = "event" ]; then
+          printf "LoadModule mpm_event_module %s/mod_mpm_event.so\n" "${APACHE_LIBS}"
+        elif [ "${OPT_APACHE_MPM}" = "worker" ]; then
+          printf "LoadModule mpm_worker_module %s/mod_mpm_worker.so\n" "${APACHE_LIBS}"
         else
-          ## CB2: Add to httpd-phpmodules.conf
-          echo "LoadModule mpm_prefork_module ${APACHE_LIBS}/mod_mpm_prefork.so" >> ${PHPMODULES}
+          printf "LoadModule mpm_prefork_module %s/mod_mpm_prefork.so\n" ${APACHE_LIBS}
         fi
-      elif [ "${OPT_APACHE_MPM}" = "event" ]; then
-        echo "LoadModule mpm_event_module ${APACHE_LIBS}/mod_mpm_event.so" >> ${PHPMODULES}
-      elif [ "${OPT_APACHE_MPM}" = "worker" ]; then
-        echo "LoadModule mpm_worker_module ${APACHE_LIBS}/mod_mpm_worker.so" >> ${PHPMODULES}
-      else
-        echo "LoadModule mpm_prefork_module ${APACHE_LIBS}/mod_mpm_prefork.so" >> ${PHPMODULES}
-      fi
+      } >> ${PHPMODULES}
     fi
   fi
 
@@ -3918,18 +3971,18 @@ php_install() {
   ## PHP1: mod_php:
   if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
     if [ "${OPT_PHP1_RELEASE}" = "7.0" ]; then
-      echo "LoadModule  php7_module       ${APACHE_LIBS}/libphp7.so" >> ${PHPMODULES}
+      printf "LoadModule php7_module %s/libphp7.so\n" ${APACHE_LIBS} >> ${PHPMODULES}
     else
-      echo "LoadModule  php5_module       ${APACHE_LIBS}/libphp5.so" >> ${PHPMODULES}
+      printf "LoadModule php5_module %s/libphp5.so\n" ${APACHE_LIBS} >> ${PHPMODULES}
     fi
   fi
 
   ## PHP2: mod_php:
   if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
     if [ "${OPT_PHP2_RELEASE}" = "7.0" ]; then
-      echo "LoadModule  php7_module       ${APACHE_LIBS}/libphp7.so" >> ${PHPMODULES}
+      printf "LoadModule php7_module %s/libphp7.so\n" ${APACHE_LIBS} >> ${PHPMODULES}
     else
-      echo "LoadModule  php5_module       ${APACHE_LIBS}/libphp5.so" >> ${PHPMODULES}
+      printf "LoadModule php5_module %s/libphp5.so\n" ${APACHE_LIBS} >> ${PHPMODULES}
     fi
   fi
 
@@ -3939,18 +3992,17 @@ php_install() {
       if [ ! -s "${APACHE_LIBS}/mod_fcgid.so" ]; then
         install_mod_fcgid
       fi
-
       if ! grep -m1 -q 'fcgid_module' ${PHPMODULES}; then
-        ${PERL} -pi -e 's|^LoadModule  mod_fcgid|#LoadModule   mod_fcgid|' ${APACHE_CONF}
-        echo "LoadModule  fcgid_module    ${APACHE_LIBS}/mod_fcgid.so" >> ${PHPMODULES}
+        ${PERL} -pi -e 's|^LoadModule mod_fcgid|#LoadModule mod_fcgid|' ${APACHE_CONF}
+        printf "LoadModule fcgid_module %s/mod_fcgid.so\n" ${APACHE_LIBS} >> ${PHPMODULES}
       fi
-
       if ! grep -m1 -c 'httpd-fcgid.conf' ${PHPMODULES}; then
-        echo "Include ${APACHE_EXTRAS}/httpd-fcgid.conf" >> ${PHPMODULES}
+        printf "Include %s/httpd-fcgid.conf\n" ${APACHE_EXTRAS} >> ${PHPMODULES}
       fi
     fi
   fi
 
+  ## HTScanner
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
       if [ "${OPT_HTSCANNER}" = "YES" ] && [ ! -e "${APACHE_LIBS}/mod_htscanner2.so" ]; then
@@ -3968,34 +4020,36 @@ php_install() {
   fpmChecks
 
   if [ "${OPT_WEBSERVER}" = "apache" ]  || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    echo "Rewriting all users httpd.conf files, please wait..."
+    printf "Rewriting all users httpd.conf files, please wait...\n"
     echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
   elif [ "${OPT_WEBSERVER}" = "nginx" ]; then
-    echo "Rewriting all users nginx.conf files, please wait..."
+    printf "Rewriting all users nginx.conf files, please wait...\n"
     echo "action=rewrite&value=nginx" >> ${DA_TASK_QUEUE}
   fi
 
   run_dataskq d
 
-  ## PHP1: FPM:
-  if [ "${OPT_PHP1_MODE}" = "php-fpm" ] || [ "${OPT_PHP1_MODE}" = "suphp" ] || [ "${OPT_PHP1_MODE}" = "fastcgi" ]; then
-    ## Verify: Possible symlink conflict with single mode PHP installation
-    ## PB: ln -sf "/usr/local/php${PHP1_SHORTRELEASE}/bin/php${PHP1_SHORTRELEASE}" /usr/local/bin/php
+  if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    ## PHP1: FPM:
+    if [ "${OPT_PHP1_MODE}" = "php-fpm" ] || [ "${OPT_PHP1_MODE}" = "suphp" ] || [ "${OPT_PHP1_MODE}" = "fastcgi" ]; then
+      ## Verify: Possible symlink conflict with single mode PHP installation
+      ## PB: ln -sf "/usr/local/php${PHP1_SHORTRELEASE}/bin/php${PHP1_SHORTRELEASE}" /usr/local/bin/php
+      if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
+        echo "Restarting php-fpm${PHP1_SHORTRELEASE}."
+        control_service "php-fpm${PHP1_SHORTRELEASE}" restart
+      fi
+    fi
+
+    ## PHP2: FPM:
+    if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
+      printf "Restarting php-fpm%s\n" "${PHP2_SHORTRELEASE}"
+      control_service "php-fpm${PHP2_SHORTRELEASE}" restart
+    fi
+  else
     if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
-      echo "Restarting php-fpm${PHP1_SHORTRELEASE}."
-      control_service "php-fpm${PHP1_SHORTRELEASE}" restart
+      php_fpm_restart
     fi
   fi
-
-  ## PHP2: FPM:
-  if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
-    printf "Restarting php-fpm%s\n" "${PHP2_SHORTRELEASE}"
-    control_service "php-fpm${PHP2_SHORTRELEASE}" restart
-  fi
-
-  # if [ -s /usr/local/bin/php ] && [ ! -e /bin/php ]; then
-  #   ln -s /usr/local/bin/php /bin/php
-  # fi
 
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     echo "Restarting Apache"
@@ -4020,27 +4074,29 @@ php_install() {
 
 php_fpm_restart() {
 
-  ## ${OPT_PHP1_VERSION}
+  ## local PHP_ARG = $1 ## ${OPT_PHP1_VERSION}
+
+  ## Check for graceful restarts?
 
   if [ -x /usr/local/sbin/php-fpm ]; then
     /usr/local/sbin/php-fpm --test
-  # else
-  #   /usr/local/sbin/php-fpm --test
   fi
 
   if [ "$?" = "0" ]; then
-    if [ -x /usr/local/etc/rc.d/php-fpm55 ]; then
-      ${SERVICE} php-fpm55 reload
-    elif [ -x /usr/local/etc/rc.d/php-fpm56 ]; then
-      ${SERVICE} php-fpm56 reload
-    elif [ -x /usr/local/etc/rc.d/php-fpm70 ]; then
-      ${SERVICE} php-fpm70 reload
-    else
+    # if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    #   if [ -x /usr/local/etc/rc.d/php-fpm55 ]; then
+    #     ${SERVICE} php-fpm55 reload
+    #   elif [ -x /usr/local/etc/rc.d/php-fpm56 ]; then
+    #     ${SERVICE} php-fpm56 reload
+    #   elif [ -x /usr/local/etc/rc.d/php-fpm70 ]; then
+    #     ${SERVICE} php-fpm70 reload
+    #   fi
+    # else
       ${SERVICE} php-fpm reload
-    fi
+    # fi
   else
     printf "*** Warning: Aborting automatic PHP-FPM restart due to configuration verification failure.\n"
-    printf "Please verify the PHP-FPM configuration file at: %s\n" "/usr/local/etc/php-fpm.conf" ## ${PHP1_FPM_CONF}
+    printf "Please verify the PHP-FPM configuration file at: %s\n" "${PHP_FPM_CONF}"
     printf "You can verify the file by typing:\n"
     printf "  %s --test\n\n" "/usr/local/sbin/php-fpm"
     printf "You can restart PHP-FPM manually by typing:\n"
@@ -4074,7 +4130,7 @@ php_upgrade() {
 
 have_php_system() {
 
-  local COUNT
+  local COUNT_FUNCTIONS
 
   ## Checks to see if we can use system() based on the disable_functions
   if [ ! -s "${PHP_INI}" ]; then
@@ -4082,14 +4138,14 @@ have_php_system() {
     return
   fi
 
-  COUNT="$(grep -m1 -c ^disable_functions "${PHP_INI}")"
-  if [ "${COUNT}" -eq 0 ]; then
+  COUNT_FUNCTIONS="$(grep -m1 -c ^disable_functions "${PHP_INI}")"
+  if [ "${COUNT_FUNCTIONS}" -eq 0 ]; then
     echo 1
     return
   fi
 
-  COUNT="$(grep -m1 ^disable_functions "${PHP_INI}" | grep -m1 -c system)"
-  if [ "${COUNT}" -eq 1 ]; then
+  COUNT_FUNCTIONS="$(grep -m1 ^disable_functions "${PHP_INI}" | grep -m1 -c system)"
+  if [ "${COUNT_FUNCTIONS}" -eq 1 ]; then
     echo 0
     return
   fi
@@ -4107,7 +4163,7 @@ have_php_system() {
 phpmyadmin_install() {
 
   if [ "${OPT_PHPMYADMIN}" != "YES" ]; then
-    printf "*** Notice: PHPMYADMIN not enabled in options.conf\n"
+    printf "*** Notice: PHPMYADMIN is not enabled in options.conf\n"
     return
   fi
 
@@ -4239,7 +4295,8 @@ phpmyadmin_upgrade() {
 
 apache_install() {
 
-  local PHPMODULES ADMIN_HTTP HAVE_DACONF HDC WWW_APACHE24_PATCHDIR FIRST_TIME_INSTALL
+  local PHPMODULES ADMIN_HTTP HAVE_DACONF HDC WWW_APACHE24_PATCHDIR
+  local FIRST_TIME_INSTALL
 
   if [ "${OPT_WEBSERVER}" != "apache" ]; then
     printf "***\n Error: Can't install Apache %s because it hasn't been enabled in options.conf\n" "${OPT_APACHE_VER}"
@@ -4248,7 +4305,8 @@ apache_install() {
 
   printf "Starting Apache installation\n"
 
-  if [ ! -x /usr/local/sbin/httpd ]; then
+  ## PB: Verify: Needed?
+  if [ ! -x "${APACHE_HTTPD}" ]; then
     FIRST_TIME_INSTALL="YES"
   else
     FIRST_TIME_INSTALL="NO"
@@ -4259,7 +4317,7 @@ apache_install() {
     [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "NO" ] && [ "${OPT_SUEXEC}" = "NO" ]; then
     pkgi "${PORT_APACHE24}"
   else
-    WWW_APACHE24_PATCHDIR=$(${MAKE} -C ${PORTS_BASE}/${PORT_APACHE24} make -V PATCHDIR)
+    readonly WWW_APACHE24_PATCHDIR=$(${MAKE} -C ${PORTS_BASE}/${PORT_APACHE24} make -V PATCHDIR)
 
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" distclean clean
 
@@ -4305,14 +4363,14 @@ apache_install() {
   ## PB: Verify:
   ## Copy over base configuration files to etc/apache24/:
   if [ -d "${PB_CONFIG}/ap2/conf/" ]; then
-    cp -rf "${PB_CONFIG}/ap2/conf/" ${APACHE_PATH}/
+    cp -rf "${PB_CONFIG}/ap2/conf/" "${APACHE_PATH}/"
     # cp -f "${PB_CONFIG}/ap2/conf/httpd.conf" "${APACHE_CONF}"
     # cp -f "${PB_CONFIG}/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRAS}/httpd-mpm.conf
   fi
 
   ## Copy over modified (custom) configuration files to etc/apache24/:
   if [ -d "${PB_CUSTOM}/ap2/conf/" ]; then
-    cp -rf "${PB_CUSTOM}/ap2/conf/" ${APACHE_PATH}/
+    cp -rf "${PB_CUSTOM}/ap2/conf/" "${APACHE_PATH}/"
     # cp -f "${PB_CUSTOM}/ap2/conf/httpd.conf" "${APACHE_CONF}"
     # cp -f "${PB_CUSTOM}/ap2/conf/extra/httpd-mpm.conf" ${APACHE_EXTRAS}/httpd-mpm.conf
   fi
@@ -4422,7 +4480,7 @@ apache_install() {
   # htcacheclean_interval="${htcacheclean_interval:-"60"}"
   # htcacheclean_args="${htcacheclean_args:-"-t -n -i"}"
 
-  ## PB: Verify:
+  ## PB: Verify: Needed?
   if [ "${FIRST_TIME_INSTALL}" = "NO" ]; then
     ## Start Apache
     ${SERVICE} apache24 start
@@ -4463,8 +4521,11 @@ apache_install() {
   #   directadmin_restart
   # fi
 
+  ## PB: Verify: Still need to reference httpd-directories-old.conf?
   ## CB2: Copy the new configs if needed
-  if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRAS}/directadmin-vhosts.conf")" = "0" ] || [ ! -e "${APACHE_EXTRAS}/directadmin-vhosts.conf" ]; then
+  if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRAS}/directadmin-vhosts.conf")" = "0" ] ||
+    [ ! -e "${APACHE_EXTRAS}/directadmin-vhosts.conf" ]; then
+
     cp -rf "${PB_PATH}/configure/ap2/conf" "${APACHE_PATH}"
 
     HDC="${APACHE_EXTRAS}/httpd-directories-old.conf"
@@ -4473,7 +4534,7 @@ apache_install() {
 
     apache_host_conf
 
-    ## Custom Configurations
+    ## Verify: Custom Configurations
     if [ "${APCUSTOMCONFDIR}" != "0" ]; then
       cp -rf "${APCUSTOMCONFDIR}" "${APACHE_PATH}"
     fi
@@ -6237,60 +6298,63 @@ get_webmail_link() {
 ################################################################################
 ##
 ## Apache Host Configuration (from CB2: doApacheHostConf())
+## Generates extra/httpd-hostname.conf
 ##
 ################################################################################
 
 apache_host_conf() {
 
   local SUEXEC_PER_DIR WEBAPPS_FCGID_DIR
-  # already defined: APACHE_HOSTNAME_CONF="${APACHE_EXTRAS}/httpd-hostname.conf"
-  WEBAPPS_FCGID_DIR=/usr/local/www/fcgid
 
-  ## Copy custom/ file
-  ## APACHE_HOSTNAME_CONF_CUSTOM
+  ## Already defined: APACHE_HOSTNAME_CONF="${APACHE_EXTRAS}/httpd-hostname.conf"
+  ## PB: Not used? WEBAPPS_FCGID_DIR=/usr/local/www/fcgid
+
+  ## Custom Configurations
+  ## Target: APACHE_HOSTNAME_CONF_CUSTOM
   if [ -e "${PB_CUSTOM}/ap2/conf/extra/httpd-hostname.conf" ]; then
     cp -pf "${PB_CUSTOM}/ap2/conf/extra/httpd-hostname.conf" "${APACHE_HOSTNAME_CONF}"
   else
     {
       if [ "${HAVE_FPM_CGI}" = "YES" ]; then
-        echo 'SetEnvIfNoCase ^Authorization$ "(.+)" HTTP_AUTHORIZATION=$1'
+        printf "SetEnvIfNoCase ^Authorization\$ \"(.+)\" HTTP_AUTHORIZATION=\$1\n"
       fi
 
-      echo "<Directory ${WWW_DIR}>"
+      printf "<Directory %s>\n" "${WWW_DIR}"
 
       ## PHP1: FPM:
       if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
-        echo '  <FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
-        echo "    AddHandler \"proxy:unix:/usr/local/php${OPT_PHP1_VER}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${OPT_PHP1_VER} .phtml"
-        echo "  </FilesMatch>"
+        printf "  <FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)\$\">\n"
+        ## PB: Single PHP installation for now:
+        ## echo "    AddHandler \"proxy:unix:/usr/local/php${OPT_PHP1_VER}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${OPT_PHP1_VER} .phtml"
+        printf "    AddHandler \"proxy:unix:/usr/local/php/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php%s .phtml\n" "${OPT_PHP1_VER}"
+        printf "  </FilesMatch>"
       fi
 
       ## PHP2: FPM:
       if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
-        echo "<FilesMatch \"\.php${OPT_PHP2_VERSION}\$\">"
-        echo "AddHandler \"proxy:unix:/usr/local/php${OPT_PHP2_VERSION}/sockets/webapps.sock|fcgi://localhost\" .php${OPT_PHP2_VERSION}"
-        echo '</FilesMatch>'
+        printf "  <FilesMatch \"\.php%s\$\">\n" "${OPT_PHP2_VER}"
+        printf "    AddHandler \"proxy:unix:/usr/local/php%s/sockets/webapps.sock|fcgi://localhost\" .php%s\n" "${OPT_PHP2_VER}" "${OPT_PHP2_VER}"
+        printf "  </FilesMatch>\n"
       fi
 
-      echo "  Options +SymLinksIfOwnerMatch +IncludesNoExec"
-      echo "  AllowOverride AuthConfig FileInfo Indexes Limit Options=Includes,IncludesNOEXEC,Indexes,ExecCGI,MultiViews,SymLinksIfOwnerMatch,None"
-      echo ""
-      echo "  Order Allow,Deny"
-      echo "  Allow from all"
-      echo "  <IfModule mod_suphp.c>"
-      echo "    suPHP_Engine On"
-      echo "    suPHP_UserGroup ${WEBAPPS_USER} ${WEBAPPS_GROUP}"
-      echo "  </IfModule>"
+      printf "  Options +SymLinksIfOwnerMatch +IncludesNoExec\n"
+      printf "  AllowOverride AuthConfig FileInfo Indexes Limit Options=Includes,IncludesNOEXEC,Indexes,ExecCGI,MultiViews,SymLinksIfOwnerMatch,None\n\n"
+      printf "  Order Allow,Deny\n"
+      printf "  Allow from all\n"
+      printf "  <IfModule mod_suphp.c>\n"
+      printf "    suPHP_Engine On\n"
+      printf "    suPHP_UserGroup %s %s\n" "${WEBAPPS_USER}" "${WEBAPPS_GROUP}"
+      printf "  </IfModule>\n"
 
       if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
-        echo '  <IfModule mod_php5.c>'
-        echo "    php_admin_value session.save_path ${WWW_TMP_DIR}"
-        echo "    php_admin_value upload_tmp_dir ${WWW_TMP_DIR}"
-        echo '  </IfModule>'
-        echo '  <IfModule mod_php7.c>'
-        echo "    php_admin_value session.save_path ${WWW_TMP_DIR}"
-        echo "    php_admin_value upload_tmp_dir ${WWW_TMP_DIR}"
-        echo '  </IfModule>'
+        printf "  <IfModule mod_php5.c>\n"
+        printf "    php_admin_value session.save_path %s\n" "${WWW_TMP_DIR}"
+        printf "    php_admin_value upload_tmp_dir %s\n" "${WWW_TMP_DIR}"
+        printf "  </IfModule>\n"
+        printf "  <IfModule mod_php7.c>\n"
+        printf "    php_admin_value session.save_path %s\n" "${WWW_TMP_DIR}"
+        printf "    php_admin_value upload_tmp_dir %s\n" "${WWW_TMP_DIR}"
+        printf "  </IfModule>\n"
       fi
     } > "${APACHE_HOSTNAME_CONF}"
 
@@ -6298,44 +6362,44 @@ apache_host_conf() {
 
     SUEXEC_PER_DIR=0
 
-    ## PB: Note: Need CB2 patch else it doesn't work.
-    if [ -s /usr/local/sbin/suexec ]; then
-      SUEXEC_PER_DIR="$(/usr/local/sbin/suexec -V 2>&1 | grep -c 'AP_PER_DIR')"
+    ## PB: Note: Need CB2 Apache 2.4 patches or else this doesn't work.
+    if [ -s "${APACHE_SUEXEC}" ]; then
+      SUEXEC_PER_DIR="$(${APACHE_SUEXEC} -V 2>&1 | grep -c 'AP_PER_DIR')"
     fi
 
-    ## PHP1: fcgid: (technically not FastCGI):
+    ## PHP1: FastCGI: (technically fcgid)
     if [ "${OPT_PHP1_MODE}" = "fastcgi" ]; then
       {
-        echo "  <IfModule mod_fcgid.c>"
-        echo "    FcgidWrapper /usr/local/safe-bin/fcgid${OPT_PHP1_VER}.sh .php"
+        printf "  <IfModule mod_fcgid.c>\n"
+        printf "    FcgidWrapper /usr/local/safe-bin/fcgid%s.sh .php\n" ${OPT_PHP1_VER}
         if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
           printf "  SuexecUserGroup %s %s\n" "${WEBAPPS_USER}" "${WEBAPPS_GROUP}"
         fi
-        echo '    <FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
-        echo "      Options +ExecCGI"
-        echo "      AddHandler fcgid-script .php"
-        echo "    </FilesMatch>"
-        echo "  </IfModule>"
+        printf "    <FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)\$\">\n" "${OPT_PHP1_VER}"
+        printf "      Options +ExecCGI\n"
+        printf "      AddHandler fcgid-script .php\n"
+        printf "    </FilesMatch>\n"
+        printf "  </IfModule>\n"
       } >> "${APACHE_HOSTNAME_CONF}"
     fi
 
-    ## PHP2: fcgid: (not FastCGI):
+    ## PHP2: FastCGI: (technically fcgid)
     if [ "${OPT_PHP2_MODE}" = "fastcgi" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
       {
-        echo "  <IfModule mod_fcgid.c>"
-        echo "    FcgidWrapper /usr/local/safe-bin/fcgid${OPT_PHP2_VERSION}.sh .php${OPT_PHP2_VERSION}"
+        printf "  <IfModule mod_fcgid.c>\n"
+        printf "   FcgidWrapper /usr/local/safe-bin/fcgid%s.sh .php%s\n" "${OPT_PHP2_VER}" "${OPT_PHP2_VER}"
         if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
           printf "  SuexecUserGroup %s %s\n" "${WEBAPPS_USER}" "${WEBAPPS_GROUP}"
         fi
-        echo "  <FilesMatch \"\.php${OPT_PHP2_VERSION}\$\">"
-        echo "      Options +ExecCGI"
-        echo "      AddHandler fcgid-script .php${OPT_PHP2_VERSION}"
-        echo "    </FilesMatch>"
-        echo "  </IfModule>"
+        printf "  <FilesMatch \"\.php%s\$\">\n" "${OPT_PHP2_VER}"
+        printf "      Options +ExecCGI\n"
+        printf "      AddHandler fcgid-script .php%s\n" "${OPT_PHP2_VERSION}"
+        printf "    </FilesMatch>\n"
+        printf "  </IfModule>\n"
         } >> "${APACHE_HOSTNAME_CONF}"
     fi
 
-    echo "</Directory>" >> "${APACHE_HOSTNAME_CONF}"
+    printf "</Directory>\n" >> "${APACHE_HOSTNAME_CONF}"
   fi
 
   return
@@ -6428,9 +6492,9 @@ do_rewrite_httpd_alias() {
       add_alias_redirect ${HA} roundcube roundcube
     fi
 
-    WEBMAILLINK=$(get_webmail_link)
-    if [ -e "${WWW_DIR}/${WEBMAILLINK}" ]; then
-      add_alias_redirect ${HA} webmail "${WEBMAILLINK}"
+    WEBMAIL_LINK=$(get_webmail_link)
+    if [ -e "${WWW_DIR}/${WEBMAIL_LINK}" ]; then
+      add_alias_redirect ${HA} webmail "${WEBMAIL_LINK}"
     fi
 
     if [ "${OPT_PHPMYADMIN}" = "YES" ]; then
@@ -6481,14 +6545,13 @@ do_rewrite_httpd_alias() {
 
 add_nginx_alias_redirect() {
 
-  ## CB2: A fake P real
   local FILE=$1
-  local A=$2
-  local P=$3
+  local ALIAS=$2
+  local PATH=$3
 
   {
-    printf "\tlocation /%s {\n" "${A}"
-    printf "\t\trewrite ^/* /%s last;\n" "${P}"
+    printf "\tlocation /%s {\n" "${ALIAS}"
+    printf "\t\trewrite ^/* /%s last;\n" "${PATH}"
     printf "\t}\n"
   } >> "${FILE}"
 }
@@ -6509,11 +6572,11 @@ add_nginx_alias() {
       printf "\tlocation /%s {\n" "${ALIAS}"
       printf "\t\troot %s;\n" "${WWW_DIR}"
       printf "\t\tindex index.php index.html index.htm;\n"
-      printf "\t\tlocation ~ ^/%s/(.+\.php)\$ {\n" "${ALIAS}"
+      printf "\t\tlocation ~ ^/%s/(.+\\.php)\$ {\n" "${ALIAS}"
       printf "\t\t\tinclude %s/webapps_settings.conf;\n" "${NGINX_PATH}"
       printf "\t\t}\n"
       printf "\t\tlocation ~* ^/%s/(.+\\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))\$ {\n" "${ALIAS}"
-      printf "\t\t\troot /usr/local/www/;\n"
+      printf "\t\t\troot %s;\n" "${WWW_DIR}/"
       printf "\t\t}\n"
       printf "\t}\n"
     } >> "${FILE}"
@@ -6522,10 +6585,10 @@ add_nginx_alias() {
       printf "\tlocation /%s {\n" "${ALIAS}"
       printf "\t\troot %s/;\n" "${WWW_DIR}"
       printf "\t\tindex index.php index.html index.htm;\n"
-      printf "\t\tlocation ~ ^/%s/ {\n" "${A}"
+      printf "\t\tlocation ~ ^/%s/ {\n" "${ALIAS}"
       printf "\t\t\taccess_log off;\n"
       printf "\t\tset \$my_server_addr \$server_addr;\n"
-      printf "\t\tif (\$server_addr ~ ^[0-9a-fA-F:]+$) { set \$my_server_addr [\$server_addr]; }\n"
+      printf "\t\tif (\$server_addr ~ ^[0-9a-fA-F:]+\$) { set \$my_server_addr [\$server_addr]; }\n"
       printf "\t\t\tproxy_pass http://\$my_server_addr:%s;\n" "${PORT_8080}"
       printf "\t\t\tproxy_set_header X-Client-IP      \$remote_addr;\n"
       printf "\t\t\tproxy_set_header X-Accel-Internal /%s/nginx_static_files;\n" "${ALIAS}"
@@ -6533,7 +6596,7 @@ add_nginx_alias() {
       printf "\t\t\tproxy_set_header X-Forwarded-For  \$proxy_add_x_forwarded_for;\n"
       printf "\t\t}\n"
       printf "\t\tlocation ~ ^/%s/nginx_static_files/ {\n" "${ALIAS}"
-      printf "\t\t\taccess_log  /var/log/nginx/access_log_proxy;\n"
+      printf "\t\t\taccess_log  %s/nginx/access_log_proxy;\n" ${LOGS}
       printf "\t\t\talias       %s/;\n" "${WWW_DIR}"
       printf "\t\t\tinternal;\n"
       printf "\t\t}\n"
@@ -6563,7 +6626,7 @@ do_rewrite_nginx_webapps() {
     : > ${NW}
 
     ## For Let's Encrypt challenges
-    LETSENCRYPT=$(getDA_Opt letsencrypt 0)
+    LETSENCRYPT="$(getDA_Opt letsencrypt 0)"
     if [ "${LETSENCRYPT}" = "1" ]; then
       add_nginx_alias "${NW}" .well-known
     fi
@@ -6588,13 +6651,13 @@ do_rewrite_nginx_webapps() {
     fi
 
     {
-      printf '\tif ($request_method !~ ^(GET|HEAD|POST)$ ) {\n'
-      printf '\t\treturn 444;\n'
-      printf '\t}\n'
+      printf "\tif (\$request_method !~ ^(GET|HEAD|POST)\$ ) {\n"
+      printf "\t\treturn 444;\n"
+      printf "\t}\n"
       ## CB2: block .htaccess and .user.ini
-      printf '\tlocation ~ /(\\.htaccess|\\.htpasswd|\\.user\\.ini) {\n'
-      printf '\t\tdeny all;\n'
-      printf '\t}\n'
+      printf "\tlocation ~ /(\\.htaccess|\\.htpasswd|\\.user\\.ini) {\n"
+      printf "\t\tdeny all;\n"
+      printf "\t}\n"
     } >> "${NW}"
   fi
 
@@ -6618,13 +6681,13 @@ do_rewrite_nginx_webapps() {
     fi
 
     {
-      printf '\tif ($request_method !~ ^(GET|HEAD|POST)$ ) {\n'
-      printf '\t\treturn 444;\n'
-      printf '\t}\n'
+      printf "\tif (\$request_method !~ ^(GET|HEAD|POST)\$ ) {\n"
+      printf "\t\treturn 444;\n"
+      printf "\t}\n"
       ## CB2: block .htaccess and .user.ini
-      printf '\tlocation ~ /(\\.htaccess|\\.htpasswd|\\.user\\.ini) {\n'
-      printf '\t\tdeny all;\n'
-      printf '\t}\n'
+      printf "\tlocation ~ /(\\.htaccess|\\.htpasswd|\\.user\\.ini) {\n"
+      printf "\t\tdeny all;\n"
+      printf "\t}\n"
     } >> "${NW_HOSTNAME}"
   fi
 
@@ -6663,14 +6726,14 @@ create_httpd_nginx() {
 
   if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     {
-      printf 'AccelRedirectSet On\n'
-      printf 'AccelRedirectSize 1k\n'
-      printf 'RemoteIPHeader X-Client-IP\n'
-      printf 'RemoteIPInternalProxy 127.0.0.1\n'
+      printf "AccelRedirectSet On\n"
+      printf "AccelRedirectSize 1k\n"
+      printf "RemoteIPHeader X-Client-IP\n"
+      printf "RemoteIPInternalProxy 127.0.0.1\n"
       if [ "${IPV6}" = "1" ]; then
-        printf 'RemoteIPInternalProxy ::1\n'
+        printf "RemoteIPInternalProxy ::1\n"
       fi
-      printf 'RemoteIPInternalProxyList /usr/local/directadmin/data/admin/ip.list\n'
+      printf "RemoteIPInternalProxyList %s/data/admin/ip.list\n" "${DA_PATH}"
     } > "${APACHE_NGINX_CONF}"
   fi
 
@@ -6719,9 +6782,9 @@ rewrite_confs() {
 
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     ## Copy the new configuration files
-    cp -rf "${PB_PATH}/configure/ap2/conf/" "${APACHE_PATH}/"
-    cp -f "${PB_PATH}/configure/ap2/conf/httpd.conf" "${APACHE_CONF}"
-    cp -f "${PB_PATH}/configure/ap2/conf/extra/httpd-mpm.conf" "${APACHE_EXTRAS}/httpd-mpm.conf"
+    cp -rf "${PB_CONFIG}/ap2/conf/" "${APACHE_PATH}/"
+    cp -f "${PB_CONFIG}/ap2/conf/httpd.conf" "${APACHE_CONF}"
+    cp -f "${PB_CONFIG}/ap2/conf/extra/httpd-mpm.conf" "${APACHE_EXTRAS}/httpd-mpm.conf"
 
     ${PERL} -pi -e 's/^DefaultType/#DefaultType/' "${APACHE_CONF}"
 
@@ -6729,22 +6792,21 @@ rewrite_confs() {
 
     apache_host_conf
 
-    ## Custom Apache configurations
+    ## Todo: Custom Apache configurations
     if [ "${APCUSTOMCONFDIR}" != "0" ]; then
       cp -rf "${APCUSTOMCONFDIR}" "${APACHE_PATH}"
     fi
 
-    ${CHMOD} 710 "${APACHE_EXTRAS}"
+    ${CHMOD} 710 "${APACHE_PATH}"
 
     ## Swap the |WEBAPPS_PHP_RELEASE| token
     if [ "${OPT_PHP1_MODE}" = "php-fpm" ] || [ "${OPT_PHP2_MODE}" = "php-fpm" ]; then
       PHPV=""
       if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
-        PHPV=$(${PERL} -e "print ${OPT_PHP1_VERSION}")
-      elif [ -n "${OPT_PHP2_VERSION}" ]; then
-        PHPV=$(${PERL} -e "print ${OPT_PHP2_VERSION}")
+        PHPV="${OPT_PHP1_VER}"
+      elif [ -n "${OPT_PHP2_VER}" ]; then
+        PHPV="${OPT_PHP2_VER}"
       fi
-
       if [ -n "${PHPV}" ]; then
         ${PERL} -pi -e "s/\|WEBAPPS_PHP_RELEASE\|/${PHPV}/" "${HDC}"
       fi
@@ -6779,8 +6841,8 @@ rewrite_confs() {
     tokenize_ports
 
     ## Add all the Include lines if they do not exist
-    if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRAS}/directadmin-vhosts.conf")" = "0" ] \
-      || [ ! -e "${APACHE_EXTRAS}/directadmin-vhosts.conf" ]; then
+    if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRAS}/directadmin-vhosts.conf")" = "0" ] ||
+      [ ! -e "${APACHE_EXTRAS}/directadmin-vhosts.conf" ]; then
       rewrite_vhosts
     fi
 
@@ -7537,15 +7599,22 @@ php_conf() {
 
   local IFS=' '
 
-  if [ "${HAVE_FPM_CGI}" = "YES" ]; then
-    for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
-      set_service "php-fpm${php_shortrelease}" OFF
-    done
+  if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    if [ "${HAVE_FPM_CGI}" = "YES" ]; then
+      for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
+        set_service "php-fpm${php_shortrelease}" OFF
+      done
+    else
+      for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
+        set_service "php-fpm${php_shortrelease}" delete
+      done
+    fi
   else
-    ## Delete FPM service
-    for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
-      set_service "php-fpm${php_shortrelease}" delete
-    done
+    if [ "${HAVE_FPM_CGI}" = "YES" ]; then
+      set_service php-fpm OFF
+    else
+      set_service "php-fpm" delete
+    fi
   fi
 
   # if [ "${HAVE_FPM_CGI}" = "YES" ]; then
@@ -7569,161 +7638,177 @@ php_conf() {
     if [ -e "${PB_CUSTOM}/ap2/conf/extra/httpd-php-handlers.conf" ]; then
       cp -f "${PB_CUSTOM}/ap2/conf/extra/httpd-php-handlers.conf" "${PHP_HANDLERS_CONF}"
     else
+      ## Generate httpd-php-handlers.conf
       printf "" > "${PHP_HANDLERS_CONF}"
       {
-        ## Writing data to httpd-php-handlers.conf
-        echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
-
+        printf "<FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)\$\">\n"
         if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
-          echo "AddHandler application/x-httpd-php .inc .php .php5 .php${OPT_PHP1_VER} .phtml"
+          printf "AddHandler application/x-httpd-php .inc .php .php5 .php%s .phtml\n" "${OPT_PHP1_VER}"
         fi
-
         if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${OPT_PHP2_VERSION}" != "NO" ]; then
-          echo "AddHandler application/x-httpd-php .php${OPT_PHP2_VERSION}"
+          printf "AddHandler application/x-httpd-php .php%s\n" "${OPT_PHP2_VERSION}"
         fi
-
         if [ "${OPT_PHP1_MODE}" = "mod_php" ] || [ "${OPT_PHP2_MODE}" = "mod_php" ]; then
-          echo "AddHandler application/x-httpd-php-source .phps"
+          printf "AddHandler application/x-httpd-php-source .phps\n"
         fi
-
-        echo "</FilesMatch>"
-        echo "AddType text/html .php"
+        printf "</FilesMatch>\n"
+        printf "AddType text/html .php\n"
       } > "${PHP_HANDLERS_CONF}"
     fi
   fi
 
-  for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
-    eval $(echo "HAVE_FPM${php_shortrelease}=NO")
-  done
-
-  ## PHP1:
-  if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
-    ## PB: Future: ${SERVICE} "php-fpm${OPT_PHP1_VER}" restart
-    php_fpm_restart
-    set_service "php-fpm${OPT_PHP1_VER}" ON
-    eval $(echo "HAVE_FPM${OPT_PHP1_VER}=YES")
+  if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
+      eval $(echo "HAVE_FPM${php_shortrelease}=NO")
+    done
+  else
+    HAVE_FPM=NO
   fi
 
-  ## PHP2:
-  if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
-    ## ${SERVICE} "php-fpm${OPT_PHP2_VERSION}" restart
-    php_fpm_restart
-    set_service "php-fpm${OPT_PHP2_VERSION}" ON
-    eval $(echo "HAVE_FPM${OPT_PHP2_VERSION}=YES")
-  fi
-
-  ## PHP1 FPM startup script:
-  for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
-    EVAL_FPM_VAR="HAVE_FPM${php_shortrelease}"
-    HAVE_SHORTRELEASE="$(eval_var "${EVAL_FPM_VAR}")"
-
-    if [ "${HAVE_SHORTRELEASE}" = "NO" ]; then
-      if [ -e "${RCD}/php-fpm${php_shortrelease}" ]; then
-        ${SERVICE} "php-fpm${php_shortrelease}" stop
-      else
-        ## Default non-prefixed installation
-        ${SERVICE} php-fpm stop
-      fi
-      set_service "php-fpm${php_shortrelease}" delete
-      # boot/init script: rm -f ${RCD}/php-fpm${php_shortrelease}
+  if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    ## PHP1:
+    if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
+      ## PB: Future: ${SERVICE} "php-fpm${OPT_PHP1_VER}" restart
+      php_fpm_restart
+      set_service "php-fpm${OPT_PHP1_VER}" ON
+      eval $(echo "HAVE_FPM${OPT_PHP1_VER}=YES")
     fi
-  done
 
-  ## Writing data to suphp.conf:
+    ## PHP2:
+    if [ "${OPT_PHP2_MODE}" = "php-fpm" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
+      ## ${SERVICE} "php-fpm${OPT_PHP2_VERSION}" restart
+      php_fpm_restart
+      set_service "php-fpm${OPT_PHP2_VERSION}" ON
+      eval $(echo "HAVE_FPM${OPT_PHP2_VERSION}=YES")
+    fi
+
+    ## PHP1 FPM startup script:
+    for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
+      EVAL_FPM_VAR="HAVE_FPM${php_shortrelease}"
+      HAVE_SHORTRELEASE="$(eval_var "${EVAL_FPM_VAR}")"
+
+      if [ "${HAVE_SHORTRELEASE}" = "NO" ]; then
+        if [ -e "${RCD}/php-fpm${php_shortrelease}" ]; then
+          ${SERVICE} "php-fpm${php_shortrelease}" stop
+        fi
+        set_service "php-fpm${php_shortrelease}" delete
+        ## Todo: boot/init script: rm -f ${RCD}/php-fpm${php_shortrelease}
+      fi
+    done
+  else
+    ## Single PHP Installation
+    if [ "${OPT_PHP1_MODE}" = "php-fpm" ]; then
+      php_fpm_restart
+      set_service "php-fpm" ON
+      HAVE_FPM=YES
+    fi
+    if [ "${HAVE_FPM}" = "NO" ]; then
+      if [ -e "${RCD}/php-fpm" ]; then
+        ${SERVICE} "php-fpm" stop
+      fi
+      set_service "php-fpm" delete
+      ## Verify: delete instead? (-x)
+      ${SYSRC} -q php_fpm_enable="NO"
+    fi
+  fi
+
+  ## Generate suphp.conf:
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
       {
-        echo "[global]"
-        echo ";Path to logfile"
-        echo "logfile=/var/log/suphp.log"
-        echo ""
-        echo ";Loglevel"
-        echo "loglevel=warn"
-        echo ""
-        echo ";User Apache is running as"
-        echo "webserver_user=${APACHE_USER}"
-        echo ""
-        echo ";Path all scripts have to be in"
-        echo "docroot=/"
-        echo ""
-        echo ";Security options"
-        echo "allow_file_group_writeable=false"
-        echo "allow_file_others_writeable=false"
-        echo "allow_directory_group_writeable=false"
-        echo "allow_directory_others_writeable=false"
-        echo ""
-        echo ";Check wheter script is within DOCUMENT_ROOT"
-        echo "check_vhost_docroot=false"
-        echo ""
-        echo ";Send minor error messages to browser"
-        echo "errors_to_browser=true"
-        echo ""
-        echo ";PATH environment variable"
-        echo "env_path=\"/bin:/usr/bin\""
-        echo ""
-        echo ";Umask to set, specify in octal notation"
-        echo "umask=0022"
-        echo ""
-        echo ";Minimum UID"
-        echo "min_uid=100"
-        echo ""
-        echo ";Minimum GID"
-        echo "min_gid=100"
-        echo ""
-        echo "[handlers]"
-        echo ";Handler for php-scripts"
+        printf "[global]\n"
+        printf ";Path to logfile\n"
+        printf "logfile=%s/suphp.log\n\n" "${LOGS}"
+        printf ";Loglevel\n"
+        printf "loglevel=warn\n\n"
+        printf ";User Apache is running as\n"
+        printf "webserver_user=%s\n\n" "${APACHE_USER}"
+        printf ";Path all scripts have to be in\n"
+        printf "docroot=/\n\n"
+        printf ";Security options\n"
+        printf "allow_file_group_writeable=false\n"
+        printf "allow_file_others_writeable=false\n"
+        printf "allow_directory_group_writeable=false\n"
+        printf "allow_directory_others_writeable=false\n\n"
+        printf ";Check wheter script is within DOCUMENT_ROOT\n"
+        printf "check_vhost_docroot=false\n\n"
+        printf ";Send minor error messages to browser\n"
+        printf "errors_to_browser=true\n\n"
+        printf ";PATH environment variable\n"
+        printf "env_path=\"/bin:/usr/bin\"\n\n"
+        printf ";Umask to set, specify in octal notation\n"
+        printf "umask=0022\n\n"
+        printf ";Minimum UID\n"
+        printf "min_uid=100\n\n"
+        printf ";Minimum GID\n"
+        printf "min_gid=100\n\n"
+        printf "[handlers]\n"
+        printf ";Handler for php-scripts\n"
 
-        ## PHP1:
-        if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
-          echo "x-httpd-php${OPT_PHP1_VER}=\"php:/usr/local/php${OPT_PHP1_VER}/bin/php-cgi${OPT_PHP1_VER}\""
+        if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+          ## PHP1:
+          if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
+            printf "x-httpd-php%s=\"php:/usr/local/php%s/bin/php-cgi%s\"\n" "${OPT_PHP1_VER}" "${OPT_PHP1_VER}" "${OPT_PHP1_VER}"
+          fi
+          ## PHP2:
+          if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
+            printf "x-httpd-php%s=\"php:/usr/local/php%s/bin/php-cgi%s\"\n" "${OPT_PHP2_VER}" "${OPT_PHP2_VER}" "${OPT_PHP2_VER}"
+          fi
+        else
+          ## Single PHP Installation
+          if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
+            printf "x-httpd-php%s=\"php:/usr/local/bin/php-cgi\"\n" "${OPT_PHP1_VER}"
+          fi
         fi
 
-        ## Todo: PHP2:
-        if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
-          echo "x-httpd-php${OPT_PHP2_VERSION}=\"php:/usr/local/php${OPT_PHP2_VERSION}/bin/php-cgi${OPT_PHP2_VERSION}\""
-        fi
-
-        echo ""
-        echo ";Handler for CGI-scripts"
-        echo "x-suphp-cgi=\"execute:!self\""
+        printf "\n;Handler for CGI-scripts\n"
+        printf "x-suphp-cgi=\"execute:!self\"\n"
       } > "${SUPHP_CONF_FILE}"
 
-      ## Writing data to ${APACHE_EXTRAS}/httpd-suphp.conf
+      ## Generate ${APACHE_EXTRAS}/httpd-suphp.conf
       printf "Writing data to %s\n" "${SUPHP_AP2_CONF}"
       {
-        echo "<IfModule mod_suphp.c>"
-        echo '<FilesMatch "\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)$">'
+        printf "<IfModule mod_suphp.c>\n"
+        printf "<FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)\$\">\n"
 
         if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
-          echo "AddHandler x-httpd-php${OPT_PHP1_VER} .inc .php .php3 .php4 .php5 .php${OPT_PHP1_VER} .phtml"
+          printf "AddHandler x-httpd-php%s .inc .php .php3 .php4 .php5 .php%s .phtml\n" "${OPT_PHP1_VER}" "${OPT_PHP1_VER}"
         fi
 
         ## PHP2:
         if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
-          echo "AddHandler x-httpd-php${OPT_PHP2_VERSION} .php${OPT_PHP2_VERSION}"
+          printf "AddHandler x-httpd-php%s .php%s\n" "${OPT_PHP2_VER}" "${OPT_PHP2_VER}"
         fi
 
-        echo "</FilesMatch>"
-        echo "<Location />"
-        echo "suPHP_Engine on"
+        printf "</FilesMatch>\n"
+        printf "<Location />\n"
+        printf "suPHP_Engine on\n"
 
-        if [ -d "/usr/local/php${OPT_PHP1_VER}/lib" ]; then
-          echo "suPHP_ConfigPath /usr/local/php${OPT_PHP1_VER}/lib/"
-        elif [ -d "/usr/local/php${OPT_PHP2_VER}/lib" ]; then
-          echo "suPHP_ConfigPath /usr/local/php${OPT_PHP2_VER}/lib/"
+        if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+          if [ -d "/usr/local/php${OPT_PHP1_VER}/lib" ]; then
+            printf "suPHP_ConfigPath /usr/local/php%s/lib/\n" "${OPT_PHP1_VER}"
+          elif [ -d "/usr/local/php${OPT_PHP2_VER}/lib" ]; then
+            printf "suPHP_ConfigPath /usr/local/php%s/lib/\n" "${OPT_PHP2_VER}"
+          fi
+        else
+          ## Single PHP Installation
+          ## Verify: need build or ext_date_dir?
+          if [ -d "/usr/local/lib/php" ]; then
+            printf "suPHP_ConfigPath /usr/local/lib/php\n"
+          fi
         fi
 
         if [ "${OPT_PHP1_MODE}" = "suphp" ]; then
-          echo "suPHP_AddHandler x-httpd-php${OPT_PHP1_VER}"
+          printf "suPHP_AddHandler x-httpd-php%s\n" "${OPT_PHP1_VER}"
         fi
 
         ## PHP2:
         if [ "${OPT_PHP2_MODE}" = "suphp" ] && [ "${OPT_PHP2_RELEASE}" != "NO" ]; then
-          echo "suPHP_AddHandler x-httpd-php${OPT_PHP2_VER}"
+          printf "suPHP_AddHandler x-httpd-php%s\n" "${OPT_PHP2_VER}"
         fi
 
-        echo "</Location>"
-        echo "</IfModule>"
+        printf "</Location>\n"
+        printf "</IfModule>\n"
       } > "${SUPHP_AP2_CONF}"
 
       printf "Done.\n"
@@ -7998,12 +8083,13 @@ validate_options() {
   OPT_PREFER_EXIM_SSL_CERTS="NO"
   OPT_PREFER_CUSTOM_SSL_CERTS="NO"
 
-  ## PHP Modes:
+  ## PHP Modes (single PHP installation):
   HAVE_FPM_CGI="NO"
   HAVE_SUPHP_CGI="NO"
   HAVE_CLI="NO"
   HAVE_FCGID="NO"
 
+  ## PB: Used for dual PHP mode:
   for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
     eval "$(echo "HAVE_FPM${php_shortrelease}_CGI=NO")"
     eval "$(echo "HAVE_FCGID${php_shortrelease}=NO")"
@@ -8019,7 +8105,7 @@ validate_options() {
   readonly PORT_8080=$(getDA_Opt port_8080 8080)
   readonly PORT_8081=$(getDA_Opt port_8081 8081)
 
-  ## Verify and update CB/options.conf
+  ## Verify and update CB/options.conf via setOpt()
   if checkyesno_opt AWSTATS; then
     readonly OPT_AWSTATS="$(uc ${AWSTATS})"
     setOpt awstats yes
@@ -8051,6 +8137,9 @@ validate_options() {
   if checkyesno_opt HTSCANNER; then
     readonly OPT_HTSCANNER="$(uc ${HTSCANNER})"
     setOpt htscanner yes
+  fi
+  if checkyesno_opt INSTALL_PORTMASTER; then
+    readonly OPT_INSTALL_PORTMASTER="$(uc ${INSTALL_PORTMASTER})"
   fi
   if checkyesno_opt INSTALL_CCACHE; then
     readonly OPT_INSTALL_CCACHE="$(uc ${INSTALL_CCACHE})"
@@ -8196,9 +8285,10 @@ validate_options() {
       esac
       ;;
     "no"|"NO"|"none")
-      readonly OPT_PHP1_VERSION="NO"
       readonly OPT_PHP1_MODE="NO"
       readonly OPT_PHP1_RELEASE="NO"
+      readonly OPT_PHP1_VER="NO"
+      readonly OPT_PHP1_VERSION="NO"
       readonly HAVE_FPM_CGI="NO"
       readonly HAVE_SUPHP_CGI="NO"
       readonly HAVE_CLI="NO"
@@ -8207,10 +8297,12 @@ validate_options() {
     *) printf "*** Error: Invalid PHP1_VERSION value set in options.conf\n"; exit ;;
   esac
 
-  ## Todo: PHP2:
+  ## Todo: PHP2: Remove readonly
+  readonly DUAL_PHP_MODE="NO"
   readonly OPT_PHP2_MODE="NO"
   readonly OPT_PHP2_VERSION="NO"
   readonly OPT_PHP2_RELEASE="NO"
+  readonly OPT_PHP2_VER=70
   # case ${PHP2_VERSION} in
   #   55|56|70) OPT_PHP1_VERSION=${PHP1_VERSION}
       #   OPT_PHP2_VER=$(${PHP2_VERSION} | tr -d '.')
@@ -8228,7 +8320,6 @@ validate_options() {
 
   ## additional checks for PHP, then:
   ## OPT_PHP_ENABLE="YES"
-  ## DUAL_PHP_MODE="YES"
 
   case $(lc ${WEBSERVER}) in
     "apache"|"apache24")
@@ -8527,8 +8618,8 @@ show_menu_setup() {
 show_config() {
 
   printf "\n"
-  printf "\tConfigured Option Values\n"
-  printf "\t=====================================\n"
+  printf "\tConfigured Option Values (options.conf)\n"
+  printf "\t=======================================\n"
   {
     printf "\tPHP1 Version: %s\n" "${OPT_PHP1_VERSION}"
     printf "\tPHP1 Mode: %s\n" "${OPT_PHP1_MODE}"
@@ -8559,6 +8650,7 @@ show_config() {
     printf "\tRoundCube: %s\n" "${OPT_ROUNDCUBE}"
     printf "\tPigeonHole: %s\n" "${OPT_PIGEONHOLE}"
     printf "\tPB Symlink: %s\n" "${OPT_PB_SYMLINK}"
+    printf "\tInstall Portmaster: %s\n" "${OPT_INSTALL_PORTMASTER}"
     printf "\tInstall CCache: %s\n" "${OPT_INSTALL_CCACHE}"
     printf "\tInstall Synth: %s\n" "${OPT_INSTALL_SYNTH}"
   } | column -t -s:
@@ -8880,7 +8972,7 @@ case "$1" in
   "audit") show_audit ;;                  ## run "pkg audit"
   "c"|"config") show_config ;;            ## show configured option values
   "d"|"debug") show_debug ;;              ## show debugging info
-  "i"|"install") install_app "$@" ;;      ## install an application
+  "i"|"install"|"build") install_app "$@" ;;      ## install an application
   "o"|"outdated") show_outdated ;;        ## show installed packages that are out of date
   "r"|"rewrite") rewrite_app "$@" ;;      ## rewrite a configuration file (e.g. apache vhosts)
   "s"|"setup") global_setup "$@" ;;       ## first time setup
