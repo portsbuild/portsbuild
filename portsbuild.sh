@@ -196,6 +196,7 @@ readonly APACHE_EXTRAS="${APACHE_PATH}/extra"
 readonly APACHE_CONF="${APACHE_PATH}/httpd.conf"
 readonly APACHE_HOSTNAME_CONF="${APACHE_EXTRAS}/httpd-hostname.conf"
 readonly APACHE_MIME_TYPES="${APACHE_PATH}/mime.types"
+readonly APACHE_HTPASSWD=/usr/local/bin/htpasswd
 readonly APACHE_HTTPD=/usr/local/sbin/httpd
 readonly APACHE_SSL_KEY="${APACHE_PATH}/ssl/server.key"
 readonly APACHE_SSL_CRT="${APACHE_PATH}/ssl/server.crt"
@@ -4238,7 +4239,7 @@ phpmyadmin_upgrade() {
 
 apache_install() {
 
-  local PHPMODULES ADMIN_HTTP HAVE_DACONF HDC WWW_APACHE24_PATCHDIR
+  local PHPMODULES ADMIN_HTTP HAVE_DACONF HDC WWW_APACHE24_PATCHDIR FIRST_TIME_INSTALL
 
   if [ "${OPT_WEBSERVER}" != "apache" ]; then
     printf "***\n Error: Can't install Apache %s because it hasn't been enabled in options.conf\n" "${OPT_APACHE_VER}"
@@ -4247,14 +4248,11 @@ apache_install() {
 
   printf "Starting Apache installation\n"
 
-  ## Todo:
-  # ## For ModSecurity
-  # if [ -d srclib/apr-util ]; then
-  #   echo "Patching srclib/apr-util/dbm/sdbm/sdbm_private.h..."
-  #   cd srclib/apr-util
-  #   patch -p0 < ${PB_PATH}/patches/sdbm_private.patch
-  #   cd ../../
-  # fi
+  if [ ! -x /usr/local/sbin/httpd ]; then
+    FIRST_TIME_INSTALL="YES"
+  else
+    FIRST_TIME_INSTALL="NO"
+  fi
 
   ### Main Installation
   if [ -z "${APACHE24_MAKE_SET}" ] && [ -z "${APACHE24_MAKE_UNSET}" ] &&
@@ -4276,13 +4274,20 @@ apache_install() {
       printf "Copying Apache 2.4 suexec patches to %s\n" "${WWW_APACHE24_PATCHDIR}"
       cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-modules_generators_mod__suexec.c" "${WWW_APACHE24_PATCHDIR}"
       cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-support_suexec.c" "${WWW_APACHE24_PATCHDIR}"
+      cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-configure.in2" "${WWW_APACHE24_PATCHDIR}"
 
       ## Todo:
       # printf "Patching Apache 2.4 to allow SuexecUserGroup in a Directory context.\n"
       # cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-mod_suexec_directory" "${WWW_APACHE24_PATCHDIR}"
 
-      # printf "Patching Apache 2.4 with suexec safedir patch.\n"
-      # cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-suexec-safe" "${WWW_APACHE24_PATCHDIR}"
+      ## Todo: For ModSecurity
+      ## PB: Is it actually found here? /usr/src/contrib/apr-util/dbm/sdbm/sdbm_private.h
+      # if [ -d "${PORTS_BASE}/${PORT_APACHE24}/work/*ver*/srclib/apr-util" ]; then
+      #   printf "Patching srclib/apr-util/dbm/sdbm/sdbm_private.h..."
+      #   #cd srclib/apr-util
+      #   #patch -p0 < ${PB_PATH}/patches/sdbm_private.patch
+      #   #cd ../../
+      # fi
     fi
 
     ## Research: patch for users override
@@ -4325,7 +4330,7 @@ apache_install() {
   setVal apachecert "${APACHE_SSL_CRT}" "${DA_CONF_TEMPLATE}"
   setVal apachekey "${APACHE_SSL_KEY}" "${DA_CONF_TEMPLATE}"
   setVal apacheca "${APACHE_SSL_CA}" "${DA_CONF_TEMPLATE}"
-  setVal htpasswd /usr/local/bin/htpasswd "${DA_CONF_TEMPLATE}"
+  setVal htpasswd "${APACHE_HTPASSWD}" "${DA_CONF_TEMPLATE}"
   setVal cloud_cache 0 "${DA_CONF_TEMPLATE}"
   setVal nginx 0 "${DA_CONF_TEMPLATE}"
 
@@ -4338,7 +4343,7 @@ apache_install() {
     setVal apachecert "${APACHE_SSL_CRT}" "${DA_CONF}"
     setVal apachekey "${APACHE_SSL_KEY}" "${DA_CONF}"
     setVal apacheca "${APACHE_SSL_CA}" "${DA_CONF}"
-    setVal htpasswd /usr/local/bin/htpasswd "${DA_CONF}"
+    setVal htpasswd "${APACHE_HTPASSWD}" "${DA_CONF}"
     setVal cloud_cache 0 "${DA_CONF}"
     setVal nginx 0 "${DA_CONF}"
   fi
@@ -4417,8 +4422,11 @@ apache_install() {
   # htcacheclean_interval="${htcacheclean_interval:-"60"}"
   # htcacheclean_args="${htcacheclean_args:-"-t -n -i"}"
 
-  ## Start Apache
-  ${SERVICE} apache24 start
+  ## PB: Verify:
+  if [ "${FIRST_TIME_INSTALL}" = "NO" ]; then
+    ## Start Apache
+    ${SERVICE} apache24 start
+  fi
 
   HAVE_DACONF=0
   if [ -s "${DA_CONF}" ]; then
@@ -4439,7 +4447,7 @@ apache_install() {
   #     directadmin_restart
   #   fi
   #
-  #   ## Verify: Backup Apache directory
+  #   ## Backup Apache directory
   #   mv -f ${APACHE_PATH} ${APACHE_PATH}.${OPT_APACHE_VER}.backup
   #
   #   ## Copy portsbuild/configure/ap2/conf files to etc/apache24
@@ -4520,18 +4528,19 @@ apache_install() {
 
   do_rewrite_httpd_alias
 
-  ## CB2: rewrite ips.conf if needed
+  ## CB2: Rewrite ips.conf if needed
   echo "action=rewrite&value=ips" >> "${DA_TASK_QUEUE}"
   echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
 
   run_dataskq
 
-  ## CB2: tokenize the IP and ports if needed
+  ## CB2: Tokenize the IP and ports if needed
   tokenize_IP
   tokenize_ports
 
-  ## CB2: add all the Include lines if they do not exist (or if directadmin-vhosts.conf doesn't exist)
-  if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRAS}/directadmin-vhosts.conf")" = "0" ] || [ ! -e "${APACHE_EXTRAS}/directadmin-vhosts.conf" ]; then
+  ## CB2: Add all the Include lines if they do not exist (or if directadmin-vhosts.conf doesn't exist)
+  if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRAS}/directadmin-vhosts.conf")" = "0" ] ||
+    [ ! -e "${APACHE_EXTRAS}/directadmin-vhosts.conf" ]; then
     rewrite_vhosts
   fi
 
@@ -7067,19 +7076,19 @@ rewrite_vhosts() {
   printf '' > "${APACHE_EXTRAS}/directadmin-vhosts.conf"
 
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
-    for i in $(ls /usr/local/directadmin/data/users/*/nginx.conf); do
+    for i in $(ls "${DA_PATH}/data/users/*/nginx.conf"); do
       echo "include $i;" >> "${APACHE_EXTRAS}/directadmin-vhosts.conf"
     done
   elif [ "${OPT_WEBSERVER}" = "apache" ]; then
-    for i in $(ls /usr/local/directadmin/data/users/*/httpd.conf); do
+    for i in $(ls "${DA_PATH}/data/users/*/httpd.conf"); do
       echo "Include $i" >> "${APACHE_EXTRAS}/directadmin-vhosts.conf"
     done
   elif [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     printf '' > "${NGINX_PATH}/directadmin-vhosts.conf"
-    for i in $(ls /usr/local/directadmin/data/users/*/nginx.conf); do
+    for i in $(ls "${DA_PATH}/data/users/*/nginx.conf"); do
       echo "include $i;" >> "${NGINX_PATH}/directadmin-vhosts.conf"
     done
-    for i in $(ls /usr/local/directadmin/data/users/*/httpd.conf); do
+    for i in $(ls "${DA_PATH}/data/users/*/httpd.conf"); do
       echo "Include $i" >> "${APACHE_EXTRAS}/directadmin-vhosts.conf"
     done
   fi
@@ -7109,10 +7118,9 @@ verify_server_ca() {
     return
   fi
 
-  # if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    ## PB: mkdir -p ${NGINX_PATH}/ssl.crt
-    ## PB: mkdir -p ${NGINX_PATH}/ssl.key
-  # fi
+  if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    mkdir -p ${NGINX_PATH}/ssl
+  fi
 
   printf "Making sure %s exists.\n" "${SSL_CA}"
 
@@ -7252,11 +7260,13 @@ suhosin_install() {
 
   ## Add support for scanning uploads using ClamAV
   if [ "${OPT_SUHOSIN_UPLOADSCAN}" = "YES" ] && [ ! -e "${CLAMDSCAN}" ]; then
+    printf "*** Error: Cannot install Suhosin with PHP upload scan using ClamAV,\n\
+      because %s does not exist on the system" "${CLAMDSCAN}"
     if [ "${OPT_CLAMAV}" = "NO" ]; then
-      printf "*** Error: Cannot install Suhosin with PHP upload scan using ClamAV,\n\
-      because %s does not exist on the system and CLAMAV=NO is set in the options.conf file." "${CLAMDSCAN}"
+      printf " and CLAMAV=NO is set in the options.conf file.\n"
       return #exit
     fi
+    printf ".\n"
 
     clamav_install
   fi
