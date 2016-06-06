@@ -202,6 +202,7 @@ readonly APACHE_SSL_KEY="${APACHE_PATH}/ssl/server.key"
 readonly APACHE_SSL_CRT="${APACHE_PATH}/ssl/server.crt"
 readonly APACHE_SSL_CA="${APACHE_PATH}/ssl/server.ca"
 readonly APACHE_SUEXEC=/usr/local/sbin/suexec
+readonly APXS=/usr/local/sbin/apxs
 readonly PHP_HANDLERS_CONF="${APACHE_EXTRAS}/httpd-php-handlers.conf"
 # readonly APACHE_PID=/var/run/httpd.pid
 
@@ -289,7 +290,7 @@ readonly CLAMD_CONF=/usr/local/etc/clamd.conf
 readonly FRESHCLAM_CONF=/usr/local/etc/freshclam.conf
 
 ## ModSecurity
-# readonly MODSECURITY_PATH=/usr/local/etc/modsecurity.d
+readonly MODSECURITY_PATH=/usr/local/etc/modsecurity
 
 ## ProFTPD
 readonly PROFTPD_CONF=/usr/local/etc/proftpd.conf
@@ -986,9 +987,7 @@ ports_update() {
 }
 
 ################################################################################
-##
 ## pkg shortcuts
-##
 ################################################################################
 
 pkgi() { ${PKG} install -y "$@"; }
@@ -1000,9 +999,7 @@ pkg_update() { ${PKG} update; }
 pkg_update_force() { ${PKG} update -f; }
 
 ################################################################################
-##
-## Synth shortcuts
-##
+## synth shortcuts
 ################################################################################
 
 synth_prepare() { ${SYNTH} prepare-system; }
@@ -1010,9 +1007,7 @@ synth_upgrade() { ${SYNTH} upgrade-system; }
 synth_status() { ${SYNTH} status; }
 
 ################################################################################
-##
 ## portmaster shortcuts
-##
 ################################################################################
 
 ## Clean stale ports (deprecate soon)
@@ -1022,10 +1017,18 @@ clean_stale_ports() {
 }
 
 ## Reinstall all ports "in place" (deprecate soon)
+## Consider -R flag
 ## Todo: migrate this process to synth
 reinstall_all_ports() {
-  ${PORTMASTER} -a -f -d      ## Consider -R
+  ${PORTMASTER} -a -f -d
 }
+
+################################################################################
+## apache shortcuts
+################################################################################
+
+apxs_enable() { ${APXS} -e -a -n "$1" "$2"; }
+apxs_disable() { ${APXS} -e -A -n "$1" "$2"; }
 
 ################################################################################
 ##
@@ -1055,6 +1058,8 @@ make_install_clean() {
   OPTIONS_UNSET="${_MAKE_UNSET}" \
   reinstall clean
   # fi
+
+  return
 }
 
 ################################################################################
@@ -3578,7 +3583,6 @@ fpmCheck() {
     ${CHOWN} "${CHOWN_USER}:${CHOWN_USER}" "${PHP_SOCKETS_PATH}"
   fi
 
-
   if [ "${DUAL_PHP_MODE}" = "YES" ]; then
     ${CHMOD} ${FPM_SOCK_CHMOD} "/usr/local/php${ARG}/sockets"
   else
@@ -4666,6 +4670,7 @@ apache_install() {
       ## CB2: Use event MPM for php-fpm and prefork for mod_php
       if [ "${OPT_APACHE_MPM}" = "auto" ]; then
         if [ "${HAVE_CLI}" = "NO" ]; then
+
           echo "LoadModule mpm_event_module ${APACHE_LIBS}/mod_mpm_event.so" >> "${PHPMODULES}"
         else
           echo "LoadModule mpm_prefork_module ${APACHE_LIBS}/mod_mpm_prefork.so" >> "${PHPMODULES}"
@@ -4834,8 +4839,8 @@ install_mod_htscanner() {
 
   pkgi "${PORT_HTSCANNER}"
 
-  # APXS=/usr/local/sbin/apxs
-  # $APXS -a -i -c mod_htscanner2.c
+  ## PB: Verify:
+  # ${APXS} -a -i -c mod_htscanner2.c
 
   PHPMODULES="${APACHE_EXTRAS}/httpd-phpmodules.conf"
 
@@ -6005,6 +6010,7 @@ modsecurity_install() {
 
   local PHPMODULES
 
+  ## ap24-mod_security
   pkgi "${PORT_MOD_SECURITY}"
 
   ## CB2: For nginx we need to rebuild it, because ModSecurity is added as a static module
@@ -6103,11 +6109,11 @@ update_modsecurity_rules() {
   printf "*** Error: update_modsecurity_rules(): Incomplete\n"
   exit
 
-  if [ ! -d /usr/local/etc/modsecurity.d ]; then
-    mkdir -p /usr/local/etc/modsecurity.d
+  if [ ! -d "${MODSECURITY_PATH}" ]; then
+    mkdir -p ${MODSECURITY_PATH}
   fi
 
-  rm -f /usr/local/etc/modsecurity.d/*
+  rm -f "${MODSECURITY_PATH}/*"
 
   if [ "${OPT_MODSECURITY_RULESET}" = "comodo" ]; then
     printf "Installing the Comodo Ruleset for ModSecurity\n"
@@ -6138,7 +6144,7 @@ update_modsecurity_rules() {
       /usr/local/cwaf/scripts/update-client.pl
     fi
 
-    echo "IncludeOptional /usr/local/etc/cwaf/cwaf.conf" > /usr/local/etc/modsecurity.d/comodo_rules.conf.main
+    echo "IncludeOptional /usr/local/etc/cwaf/cwaf.conf" > "${MODSECURITY_PATH}/comodo_rules.conf.main"
 
     if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
       ${PERL} -pi -e 's/cwaf_platform="Apache"/cwaf_platform="Nginx"/' /usr/local/etc/cwaf/main.conf
@@ -6157,22 +6163,22 @@ update_modsecurity_rules() {
 
   if [ "${OPT_MODSECURITY_RULESET}" = "owasp" ]; then
     printf "Installing the OWASP Core Ruleset for ModSecurity\n"
-    # getFile SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz owasp_rules
-    ${TAR} xzf "SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz" -C /usr/local/etc/modsecurity.d/ */modsecurity_crs_10_setup.conf.example --strip-components=1 --no-same-owner
-    ${TAR} xzf "SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz" -C /usr/local/etc/modsecurity.d/ */base_rules --strip-components=2 --no-same-owner
+    ## Todo: getFile SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz owasp_rules
+    ${TAR} xzf "SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz" -C "${MODSECURITY_PATH}/" */modsecurity_crs_10_setup.conf.example --strip-components=1 --no-same-owner
+    ${TAR} xzf "SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz" -C "${MODSECURITY_PATH}/" */base_rules --strip-components=2 --no-same-owner
 
-    echo "${OWASP_RULES_VER}" > /usr/local/etc/modsecurity.d/owasp_rules_version
+    echo "${OWASP_RULES_VER}" > "${MODSECURITY_PATH}/owasp_rules_version"
 
-    if [ -e /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.example ]; then
-      mv -f /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.example /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.main
+    if [ -e "${MODSECURITY_PATH}/modsecurity_crs_10_setup.conf.example" ]; then
+      mv -f "${MODSECURITY_PATH}/modsecurity_crs_10_setup.conf.example" "${MODSECURITY_PATH}/modsecurity_crs_10_setup.conf.main"
     fi
-    ${PERL} -pi -e 's|^SecDefaultAction|#SecDefaultAction|' /usr/local/etc/modsecurity.d/modsecurity_crs_10_setup.conf.main
+    ${PERL} -pi -e 's|^SecDefaultAction|#SecDefaultAction|' "${MODSECURITY_PATH}/modsecurity_crs_10_setup.conf.main"
   fi
 
   if [ "${OPT_WEBSERVER}" = "apache" ]; then
     MODSECURITY_CONF_FILE="${APACHE_EXTRAS}/httpd-modsecurity.conf"
   else
-    MODSECURITY_CONF_FILE=/usr/local/etc/nginx/nginx-modsecurity.conf
+    MODSECURITY_CONF_FILE="${NGINX_PATH}/nginx-modsecurity.conf"
   fi
 
   if [ "${OPT_MODSECURITY_UPLOADSCAN}" = "yes" ] && [ "${OPT_CLAMAV}" = "yes" ]; then
@@ -6188,17 +6194,17 @@ update_modsecurity_rules() {
 
     cp -pf "${RUNAV_PL}" /usr/local/bin/runav.pl
     ${CHMOD} 755 /usr/local/bin/runav.pl
-    cp -pf "${RUNAV_CONF}" /usr/local/etc/modsecurity.d/runav.conf
+    cp -pf "${RUNAV_CONF}" "${MODSECURITY_PATH}/runav.conf"
     ${PERL} -pi -e 's#SecRequestBodyAccess Off#SecRequestBodyAccess On#' "${MODSECURITY_CONF_FILE}"
   else
     rm -f /usr/local/bin/runav.pl
-    rm -f /usr/local/etc/modsecurity.d/runav.conf
+    rm -f "${MODSECURITY_PATH}/runav.conf"
     ${PERL} -pi -e 's#SecRequestBodyAccess On#SecRequestBodyAccess Off#' "${MODSECURITY_CONF_FILE}"
   fi
 
   if [ -d "${MODSECURITY_CUSTOM_RULES}" ]; then
-    printf "Copying custom ModSecurity rules to /usr/local/etc/modsecurity.d/\n"
-    cp -Rpf "${MODSECURITY_CUSTOM_RULES}/*" /usr/local/etc/modsecurity.d/
+    printf "Copying custom ModSecurity rules to %s/\n" "${MODSECURITY_PATH}"
+    cp -Rpf "${MODSECURITY_CUSTOM_RULES}/*" "${MODSECURITY_PATH}/"
   fi
 
   printf "Installation of the ModSecurity Ruleset has finished.\n"
@@ -6918,18 +6924,18 @@ rewrite_confs() {
     ## PHP1: mod_php
     if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
       if [ "${OPT_PHP1_VER}" = "70" ]; then
-        echo "LoadModule  php7_module   ${APACHE_LIBS}/libphp7.so" >> "${PHPMODULES}"
+        echo "LoadModule php7_module ${APACHE_LIBS}/libphp7.so" >> "${PHPMODULES}"
       else
-        echo "LoadModule  php5_module   ${APACHE_LIBS}/libphp5.so" >> "${PHPMODULES}"
+        echo "LoadModule php5_module ${APACHE_LIBS}/libphp5.so" >> "${PHPMODULES}"
       fi
     fi
 
     ## PHP2: mod_php
     if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${OPT_PHP2_VERSION}" != "NO" ]; then
       if [ "${OPT_PHP2_VERSION}" = "7.0" ]; then
-        echo "LoadModule    php7_module             ${APACHE_LIBS}/libphp7.so" >> "${PHPMODULES}"
+        echo "LoadModule php7_module ${APACHE_LIBS}/libphp7.so" >> "${PHPMODULES}"
       else
-        echo "LoadModule    php5_module             ${APACHE_LIBS}/libphp5.so" >> "${PHPMODULES}"
+        echo "LoadModule php5_module ${APACHE_LIBS}/libphp5.so" >> "${PHPMODULES}"
       fi
     fi
 
