@@ -3759,6 +3759,10 @@ php_install() {
     fi
   fi
 
+  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    doApacheCheck
+  fi
+
   ## CB2 code:
   PHPMODULES="${APACHE_EXTRAS}/httpd-phpmodules.conf"
   if [ "${HAVE_CLI}" = "YES" ] && [ -e "${PHPMODULES}" ]; then
@@ -3859,46 +3863,59 @@ php_install() {
 
   if [ -z "${PHP_MAKE_SET}" ] && [ -z "${PHP_MAKE_UNSET}" ]; then
     ## Base PHP Installation (includes FPM, CGI, CLI modes)
-    pkgi "${PORT_PHP}" "${PHP_EXT_LIST}"
-
     case ${OPT_PHP1_MODE} in
-      # "fpm") # moved out of case ;;
-      "mod_php") pkgi "${PORT_MOD_PHP}" ;;
-      # fastcgi) echo "not done"; pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
-      # fcgid) echo "not done"; pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
-      "suphp") pkgi "${PORT_SUPHP}" ;;
+      "fpm")
+          pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
+      "mod_php")
+          pkgi "${PORT_MOD_PHP}" "${PHP_EXT_LIST}" ;;
+      "suphp")
+          pkgi "${PORT_SUPHP}" "${PHP_EXT_LIST}" ;;
+      # fastcgi) pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
+      # fcgid) pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
     esac
   else
-    ## Base PHP Installation (includes FPM, CGI, CLI modes)
-    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" rmconfig
-    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" \
-    OPTIONS_SET="${PHP_MAKE_SET} ${GLOBAL_MAKE_SET}" \
-    OPTIONS_UNSET="${PHP_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
-    reinstall clean
-
-    ## PHP Extensions:
-    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" rmconfig
-    ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" \
-    OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" \
-    OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
-    reinstall clean
-
     case ${OPT_PHP1_MODE} in
-      # "fpm") # moved out of case ;;
+      "fpm")
+          ## Base PHP Installation (includes FPM, CGI, CLI modes)
+          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" rmconfig
+          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" \
+          OPTIONS_SET="${PHP_MAKE_SET} ${GLOBAL_MAKE_SET}" \
+          OPTIONS_UNSET="${PHP_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
+          reinstall
+
+          ## PHP Extensions:
+          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" rmconfig
+          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" \
+          OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" \
+          OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
+          reinstall
+
+          ## Cleanup
+          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" clean
+          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" clean
+          ;;
       "mod_php")
           ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" rmconfig
           ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" \
           OPTIONS_SET="${PHP_MOD_MAKE_SET} ${GLOBAL_MAKE_SET}" \
           OPTIONS_UNSET="${PHP_MOD_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
-          reinstall clean
-          # ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" \
-          # OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" \
-          # OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
-          # reinstall clean
+          reinstall
+
+          ## PHP Extensions:
+          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" \
+          OPTIONS_SET="${PHP_EXT_MAKE_SET} ${GLOBAL_MAKE_SET}" \
+          OPTIONS_UNSET="${PHP_EXT_MAKE_UNSET} ${GLOBAL_MAKE_UNSET}" \
+          reinstall
+
+          ## Cleanup
+          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_MOD_PHP}" clean
+          ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" clean
+          ;;
+      "suphp")
+          pkgi "${PORT_SUPHP}" "${PORT_PHP_EXT}"
           ;;
       # fastcgi) echo "not done" ;;
       # fcgid) echo "not done" ;;
-      "suphp") pkgi ${PORT_SUPHP} ;;
       *) printf "*** Error: Wrong PHP mode selected. (Script error?)\n"; exit ;;
     esac
   fi
@@ -4300,7 +4317,8 @@ phpmyadmin_upgrade() {
 
 apache_install() {
 
-  local PHPMODULES ADMIN_HTTP HAVE_DACONF HDC WWW_APACHE24_PATCHDIR
+  local PHPMODULES ADMIN_HTTP HAVE_DACONF HDC
+  local WWW_APACHE24_PATCHDIR WWW_APACHE24_WRKSRC
   local FIRST_TIME_INSTALL
 
   if [ "${OPT_WEBSERVER}" != "apache" ]; then
@@ -4323,11 +4341,12 @@ apache_install() {
     pkgi "${PORT_APACHE24}"
   else
     readonly WWW_APACHE24_PATCHDIR=$(${MAKE} -C ${PORTS_BASE}/${PORT_APACHE24} make -V PATCHDIR)
+    readonly WWW_APACHE24_WRKSRC=$(${MAKE} -C ${PORTS_BASE}/${PORT_APACHE24} make -V WRKSRC)
 
+    ## Start with a clean working directory
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" distclean clean
 
     if [ "${OPT_APACHE_VER}" = "2.4" ]; then
-      ## Harden Symlinks Patch for Apache 2.4
       if [ "${OPT_HARDEN_SYMLINKS_PATCH}" = "YES" ]; then
           printf "Copying Apache 2.4 Harden Symlink patches to %s\n" "${WWW_APACHE24_PATCHDIR}"
           cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-include_http__core.h" "${WWW_APACHE24_PATCHDIR}"
@@ -4339,13 +4358,13 @@ apache_install() {
       cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-support_suexec.c" "${WWW_APACHE24_PATCHDIR}"
       cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-configure.in2" "${WWW_APACHE24_PATCHDIR}"
 
-      ## Todo:
+      ## Todo: Missing configure.in parameters?
       # printf "Patching Apache 2.4 to allow SuexecUserGroup in a Directory context.\n"
       # cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-mod_suexec_directory" "${WWW_APACHE24_PATCHDIR}"
 
       ## Todo: For ModSecurity
       ## PB: Is it actually found here? /usr/src/contrib/apr-util/dbm/sdbm/sdbm_private.h
-      # if [ -d "${PORTS_BASE}/${PORT_APACHE24}/work/*ver*/srclib/apr-util" ]; then
+      # if [ -d "${WWW_APACHE24_WRKSRC}/srclib/apr-util" ]; then
       #   printf "Patching srclib/apr-util/dbm/sdbm/sdbm_private.h..."
       #   #cd srclib/apr-util
       #   #patch -p0 < ${PB_PATH}/patches/sdbm_private.patch
@@ -4364,6 +4383,26 @@ apache_install() {
     OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" \
     reinstall clean
   fi
+
+  ## Update /boot/loader.conf
+  ${SYSRC} -f /boot/loader.conf accf_http_load="YES"
+  ${SYSRC} -f /boot/loader.conf accf_data_load="YES"
+
+  ## Load the modules now to avoid restarting
+  /sbin/kldload -q accf_http
+  /sbin/kldload -q accf_data
+
+  ## Update /etc/rc.conf
+  ${SYSRC} apache24_enable="YES"
+  ${SYSRC} apache24_http_accept_enable="YES"
+
+  ## Todo: Implement HTCacheClean
+  # ${SYSRC} htcacheclean_enable="YES"
+  # htcacheclean_enable="${htcacheclean_enable:-"NO"}"
+  # htcacheclean_cache="${htcacheclean_cache:-"/usr/local/www/proxy"}"
+  # htcacheclean_cachelimit="${htcacheclean_cachelimit:-"512M"}"
+  # htcacheclean_interval="${htcacheclean_interval:-"60"}"
+  # htcacheclean_args="${htcacheclean_args:-"-t -n -i"}"
 
   ## PB: Verify:
   ## Copy over base configuration files to etc/apache24/:
@@ -4454,10 +4493,8 @@ apache_install() {
     ${SYSRC} -q -x nginx_enable
   fi
 
-  ## Verify:
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then ## || [ ! -e "${APACHE_HTTPD}" ]
     set_service httpd ON
-    ## CB2: rm -f /usr/sbin/apxs
   fi
 
   ${CHOWN} "${WEBAPPS_USER}:${APACHE_GROUP}" "${WWW_DIR}"
@@ -4465,73 +4502,22 @@ apache_install() {
 
   restore_http
 
-  ## Update /boot/loader.conf
-  ${SYSRC} -f /boot/loader.conf accf_http_load="YES"
-  ${SYSRC} -f /boot/loader.conf accf_data_load="YES"
-
-  ## Load the modules now to avoid restarting
-  /sbin/kldload -q accf_http
-  /sbin/kldload -q accf_data
-
-  ## Update /etc/rc.conf
-  ${SYSRC} apache24_enable="YES"
-  ${SYSRC} apache24_http_accept_enable="YES"
-
-  ## Todo: Implement HTCacheClean
-  # ${SYSRC} htcacheclean_enable="YES"
-  # htcacheclean_enable="${htcacheclean_enable:-"NO"}"
-  # htcacheclean_cache="${htcacheclean_cache:-"/usr/local/www/proxy"}"
-  # htcacheclean_cachelimit="${htcacheclean_cachelimit:-"512M"}"
-  # htcacheclean_interval="${htcacheclean_interval:-"60"}"
-  # htcacheclean_args="${htcacheclean_args:-"-t -n -i"}"
-
   ## PB: Verify: Needed?
-  if [ "${FIRST_TIME_INSTALL}" = "NO" ]; then
-    ## Start Apache
-    ${SERVICE} apache24 start
-  fi
+  # if [ "${FIRST_TIME_INSTALL}" = "NO" ]; then
+  #   ## Start Apache
+  #   ${SERVICE} apache24 start
+  # fi
 
   HAVE_DACONF=0
   if [ -s "${DA_CONF}" ]; then
     HAVE_DACONF=1
   fi
 
-  ## PB: not needed since installing from scratch
-  ## Use directadmin-vhosts.conf instead of httpd.conf
-  ## CB2: Check directadmin.conf (template) file
-  # if [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF_TEMPLATE})" = "1" ]; then
-  #   ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/usr/local/etc/apache24/extra/directadmin-vhosts.conf#' ${DA_CONF_TEMPLATE}
-  # fi
-
-  ## PB: Existing DA install with directadmin.conf present (and referencing httpd.conf)
-  # if [ "${HAVE_DACONF}" = "1" ] && [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF})" = "1" ]; then
-  #   if [ "$(grep -m1 -c 'apacheconf=/etc/httpd/conf/httpd.conf' ${DA_CONF})" = "1" ]; then
-  #     ${PERL} -pi -e 's#apacheconf=/etc/httpd/conf/httpd.conf#apacheconf=/usr/local/etc/apache24/extra/directadmin-vhosts.conf#' ${DA_CONF}
-  #     directadmin_restart
-  #   fi
-  #
-  #   ## Backup Apache directory
-  #   mv -f ${APACHE_PATH} ${APACHE_PATH}.${OPT_APACHE_VER}.backup
-  #
-  #   ## Copy portsbuild/configure/ap2/conf files to etc/apache24
-  #   # CB2: cp -rf ${APCONFDIR} ${APACHE_PATH}
-  #   cp -rf "${PB_PATH}/configure/ap2/conf" ${APACHE_PATH}
-  #
-  #   ## Custom configuration files (portsbuild/custom/ap2/conf)
-  #   if [ "${APCUSTOMCONFDIR}" != "0" ]; then
-  #     cp -rf ${APCUSTOMCONFDIR} ${APACHE_PATH}
-  #   fi
-  #   cp -rf ${APACHE_PATH}.${OPT_APACHE_VER}.backup/ssl.key ${APACHE_PATH}
-  #   cp -rf ${APACHE_PATH}.${OPT_APACHE_VER}.backup/ssl.crt ${APACHE_PATH}
-  #   directadmin_restart
-  # fi
-
   ## PB: Verify: Still need to reference httpd-directories-old.conf?
   ## CB2: Copy the new configs if needed
-  if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRAS}/directadmin-vhosts.conf")" = "0" ] ||
-    [ ! -e "${APACHE_EXTRAS}/directadmin-vhosts.conf" ]; then
+  if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRAS}/directadmin-vhosts.conf")" = "0" ] || [ ! -e "${APACHE_EXTRAS}/directadmin-vhosts.conf" ]; then
 
-    cp -rf "${PB_PATH}/configure/ap2/conf" "${APACHE_PATH}"
+    cp -rf "${PB_CONFIG}/ap2/conf/" "${APACHE_PATH}/"
 
     HDC="${APACHE_EXTRAS}/httpd-directories-old.conf"
 
@@ -4548,9 +4534,9 @@ apache_install() {
   create_httpd_nginx
 
   ## Hide frontpage (from CB2: hideFrontpage())
-  if [ -e "${DA_CONF_TEMPLATE}" ] && [ "$(grep -m1 -c frontpage_on "${DA_CONF_TEMPLATE}")" = "0" ]; then
-    setVal frontpage_on 0 "${DA_CONF_TEMPLATE}"
-  fi
+  # if [ -e "${DA_CONF_TEMPLATE}" ] && [ "$(grep -m1 -c frontpage_on "${DA_CONF_TEMPLATE}")" = "0" ]; then
+  setVal frontpage_on 0 "${DA_CONF_TEMPLATE}"
+  # fi
 
   ## Existing DirectAdmin installation
   if [ -e "${DA_CONF}" ] && [ "$(grep -m1 -c frontpage_on "${DA_CONF}")" = "0" ]; then
@@ -4561,6 +4547,7 @@ apache_install() {
   fi
 
   ## CB2: Make sure the correct apache_ver is set in directadmin.conf
+  ## PB: Needed? Default is 2.0 for new installs
   if [ "$(grep -m1 -c apache_ver=2.0 "${DA_CONF_TEMPLATE}")" -eq "0" ]; then
     setVal apache_ver 2.0 "${DA_CONF_TEMPLATE}"
     echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
@@ -4570,6 +4557,7 @@ apache_install() {
   fi
 
   ## Existing DirectAdmin installation
+  ## PB: Needed? Default is 2.0 for new installs
   if [ "${HAVE_DACONF}" = "1" ]; then
     if [ "$(grep -m1 -c apache_ver=2.0 "${DA_CONF}")" -eq "0" ]; then
       setVal apache_ver 2.0 "${DA_CONF}"
@@ -6792,8 +6780,9 @@ rewrite_confs() {
   local IFS=' '
   local HDC PHPV PHPMODULES WEBMAIL_LINK
 
-  HDC="${APACHE_EXTRAS}/httpd-directories-old.conf"
-
+  ## **************************************************
+  ## Apache / Nginx+Apache
+  ## **************************************************
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     ## Copy the new configuration files
     cp -rf "${PB_CONFIG}/ap2/conf/" "${APACHE_PATH}/"
@@ -6801,6 +6790,8 @@ rewrite_confs() {
     cp -f "${PB_CONFIG}/ap2/conf/extra/httpd-mpm.conf" "${APACHE_EXTRAS}/httpd-mpm.conf"
 
     ${PERL} -pi -e 's/^DefaultType/#DefaultType/' "${APACHE_CONF}"
+
+    HDC="${APACHE_EXTRAS}/httpd-directories-old.conf"
 
     ln -sf "${HDC}" "${APACHE_EXTRAS}/httpd-directories.conf"
 
@@ -6855,8 +6846,7 @@ rewrite_confs() {
     tokenize_ports
 
     ## Add all the Include lines if they do not exist
-    if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRAS}/directadmin-vhosts.conf")" = "0" ] ||
-      [ ! -e "${APACHE_EXTRAS}/directadmin-vhosts.conf" ]; then
+    if [ "$(grep -m1 -c 'Include' "${APACHE_EXTRAS}/directadmin-vhosts.conf")" = "0" ] || [ ! -e "${APACHE_EXTRAS}/directadmin-vhosts.conf" ]; then
       rewrite_vhosts
     fi
 
@@ -6907,11 +6897,10 @@ rewrite_confs() {
     if ! grep -m1 -q "${APACHE_LIBS}/mod_mpm_" "${PHPMODULES}"; then
       ## Use event MPM for php-fpm and prefork for mod_php
       if [ "${OPT_APACHE_MPM}" = "auto" ]; then
-        if [ "${HAVE_CLI}" = "NO" ]; then
           ## Add to httpd-phpmodules.conf
+        if [ "${HAVE_CLI}" = "NO" ]; then
           echo "LoadModule mpm_event_module ${APACHE_LIBS}/mod_mpm_event.so" >> "${PHPMODULES}"
         else
-          ## Add to httpd-phpmodules.conf
           echo "LoadModule mpm_prefork_module ${APACHE_LIBS}/mod_mpm_prefork.so" >> "${PHPMODULES}"
         fi
       elif [ "${OPT_APACHE_MPM}" = "event" ]; then
@@ -6929,7 +6918,7 @@ rewrite_confs() {
 
     ## Add correct PHP module to httpd-phpmodules.conf
 
-    ## PHP1: mod_php
+    ## PHP1: mod_php:
     if [ "${OPT_PHP1_MODE}" = "mod_php" ]; then
       if [ "${OPT_PHP1_VER}" = "70" ]; then
         echo "LoadModule php7_module ${APACHE_LIBS}/libphp7.so" >> "${PHPMODULES}"
@@ -6938,7 +6927,7 @@ rewrite_confs() {
       fi
     fi
 
-    ## PHP2: mod_php
+    ## PHP2: mod_php:
     if [ "${OPT_PHP2_MODE}" = "mod_php" ] && [ "${OPT_PHP2_VERSION}" != "NO" ]; then
       if [ "${OPT_PHP2_VERSION}" = "7.0" ]; then
         echo "LoadModule php7_module ${APACHE_LIBS}/libphp7.so" >> "${PHPMODULES}"
@@ -6965,27 +6954,39 @@ rewrite_confs() {
         ${CHOWN} "${APACHE_USER}:${APACHE_GROUP}" /usr/local/safe-bin
       fi
 
-      for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
-        EVAL_CHECK_VAR="HAVE_FCGID${php_shortrelease}"
+      if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+        for php_shortrelease in $(echo "${PHP1_SHORTRELEASE_SET}"); do
+          EVAL_CHECK_VAR="HAVE_FCGID${php_shortrelease}"
 
-        if [ "$(eval_var ${EVAL_CHECK_VAR})" = "YES" ]; then
-          cp -f "${PB_PATH}/configure/fastcgi/fcgid${php_shortrelease}.sh" "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
+          if [ "$(eval_var ${EVAL_CHECK_VAR})" = "YES" ]; then
+            cp -f "${PB_PATH}/configure/fastcgi/fcgid${php_shortrelease}.sh" "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
 
-          ## Custom configuration
-          if [ -e "${PB_CUSTOM}/fastcgi/fcgid${php_shortrelease}.sh" ]; then
-            cp -f "${PB_CUSTOM}/fastcgi/fcgid${php_shortrelease}.sh" "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
+            ## Custom configuration
+            if [ -e "${PB_CUSTOM}/fastcgi/fcgid${php_shortrelease}.sh" ]; then
+              cp -f "${PB_CUSTOM}/fastcgi/fcgid${php_shortrelease}.sh" "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
+            fi
+            ${CHOWN} "${APACHE_USER}:${APACHE_GROUP}" "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
+            ${CHMOD} 555 "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
           fi
-          ${CHOWN} "${APACHE_USER}:${APACHE_GROUP}" "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
-          ${CHMOD} 555 "/usr/local/safe-bin/fcgid${php_shortrelease}.sh"
+        done
+      else
+        cp -f "${PB_PATH}/configure/fastcgi/fcgid${OPT_PHP1_VER}.sh" "/usr/local/safe-bin/fcgid${OPT_PHP1_VER}.sh"
+
+        ## Custom configuration
+        if [ -e "${PB_CUSTOM}/fastcgi/fcgid${OPT_PHP1_VER}.sh" ]; then
+          cp -f "${PB_CUSTOM}/fastcgi/fcgid${OPT_PHP1_VER}.sh" "/usr/local/safe-bin/fcgid${OPT_PHP1_VER}.sh"
         fi
-      done
+        ${CHOWN} "${APACHE_USER}:${APACHE_GROUP}" "/usr/local/safe-bin/fcgid${OPT_PHP1_VER}.sh"
+        ${CHMOD} 555 "/usr/local/safe-bin/fcgid${OPT_PHP1_VER}.sh"
+      fi
+
     fi
 
     ## SuPHP
     if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
       if [ -e "${PHPMODULES}" ]; then
         if ! grep -m1 -q 'suphp_module' "${PHPMODULES}"; then
-          echo "LoadModule  suphp_module    ${APACHE_LIBS}/mod_suphp.so" >> "${PHPMODULES}"
+          echo "LoadModule suphp_module ${APACHE_LIBS}/mod_suphp.so" >> "${PHPMODULES}"
         fi
       fi
     fi
@@ -7017,14 +7018,21 @@ rewrite_confs() {
     fi
   fi
 
+  ## **************************************************
   ## Nginx:
+  ## **************************************************
   if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     # Copy the new configs
     cp -rf "${NGINXCONFDIR}/*" "${NGINX_PATH}"
 
-    for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
-      ${PERL} -pi -e "s|/usr/local/php${php_shortrelease}/sockets/webapps.sock|/usr/local/php${OPT_PHP1_VER}/sockets/webapps.sock|" "${NGINX_PATH}/nginx.conf"
-    done
+    if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+      for php_shortrelease in $(echo ${PHP1_SHORTRELEASE_SET}); do
+        ${PERL} -pi -e "s|/usr/local/php${php_shortrelease}/sockets/webapps.sock|/usr/local/php${OPT_PHP1_VER}/sockets/webapps.sock|" "${NGINX_PATH}/nginx.conf"
+      done
+      ## PB: Verify: Needed?
+    # else
+    #   ${PERL} -pi -e "s|/usr/local/php${php_shortrelease}/sockets/webapps.sock|/var/run/php/sockets/webapps.sock|" "${NGINX_PATH}/nginx.conf"
+    fi
 
     do_rewrite_nginx_webapps
     verify_server_ca
@@ -7631,18 +7639,6 @@ php_conf() {
     fi
   fi
 
-  # if [ "${HAVE_FPM_CGI}" = "YES" ]; then
-  #   set_service "php-fpm" OFF
-  #   set_service "php-fpm55" OFF
-  #   set_service "php-fpm56" OFF
-  #   set_service "php-fpm70" OFF
-  # else
-  #   set_service "php-fpm" delete
-  #   set_service "php-fpm55" delete
-  #   set_service "php-fpm56" delete
-  #   set_service "php-fpm70" delete
-  # fi
-
   fpmChecks
 
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
@@ -7853,8 +7849,9 @@ bfm_setup() {
   fi
 
   ## Todo:
-  if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    ${WGET} "${WGET_CONNECT_OPTIONS}" -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+  if [ -e "${PB_DIR}/patches/${PORT_PHPMYADMIN}/pma_auth_logging.patch" ]; then
+    ## ${WGET} "${WGET_CONNECT_OPTIONS}" -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+    # cp -f "${PB_DIR}/patches/${PORT_PHPMYADMIN}/pma_auth_logging.patch"
   fi
 
   return
