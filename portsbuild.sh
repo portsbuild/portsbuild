@@ -291,6 +291,7 @@ readonly FRESHCLAM_CONF=/usr/local/etc/freshclam.conf
 
 ## ModSecurity
 readonly MODSECURITY_PATH=/usr/local/etc/modsecurity
+readonly MODSECURITY_CONF="${MODSECURITY_PATH}/modsecurity.conf"
 
 ## ProFTPD
 readonly PROFTPD_CONF=/usr/local/etc/proftpd.conf
@@ -6055,7 +6056,7 @@ modsecurity_install() {
       if ! grep -m1 -q 'httpd-modsecurity' "${PHPMODULES}"; then
         echo "Include ${APACHE_EXTRAS}/httpd-modsecurity.conf" >> "${PHPMODULES}"
       fi
-      cp -pf "${MODSECURITY_APACHE_INCLUDE}" ${APACHE_EXTRAS}/httpd-modsecurity.conf
+      cp -pf "${MODSECURITY_APACHE_INCLUDE}" "${APACHE_EXTRAS}/httpd-modsecurity.conf"
     fi
   fi
 
@@ -6109,12 +6110,15 @@ update_modsecurity_rules() {
   printf "*** Error: update_modsecurity_rules(): Incomplete\n"
   exit
 
+  local MODSECURITY_CONF_FILE CWAF_PLATFORM
+
   if [ ! -d "${MODSECURITY_PATH}" ]; then
     mkdir -p ${MODSECURITY_PATH}
   fi
 
   rm -f "${MODSECURITY_PATH}/*"
 
+  ## Verify: Comodo Rules
   if [ "${OPT_MODSECURITY_RULESET}" = "comodo" ]; then
     printf "Installing the Comodo Ruleset for ModSecurity\n"
 
@@ -6127,7 +6131,7 @@ update_modsecurity_rules() {
     fi
 
     if [ ! -e /usr/local/cwaf/scripts/updater.pl ]; then
-      ${WGET} -O cwaf_client_install.sh https://waf.comodo.com/cpanel/cwaf_client_install.sh
+      ${WGET} -O ${PB_PATH}/cwaf_client_install.sh https://waf.comodo.com/cpanel/cwaf_client_install.sh
       ${CHMOD} 700 cwaf_client_install.sh
       HOME=/root TERM=xterm ./cwaf_client_install.sh -- --batch --login=nologin --password=nopassword --platform=${CWAF_PLATFORM}
 
@@ -6161,6 +6165,7 @@ update_modsecurity_rules() {
     fi
   fi
 
+  ## OWASP Rules
   if [ "${OPT_MODSECURITY_RULESET}" = "owasp" ]; then
     printf "Installing the OWASP Core Ruleset for ModSecurity\n"
     ## Todo: getFile SpiderLabs-owasp-modsecurity-crs-${OWASP_RULES_VER}.tar.gz owasp_rules
@@ -6175,13 +6180,15 @@ update_modsecurity_rules() {
     ${PERL} -pi -e 's|^SecDefaultAction|#SecDefaultAction|' "${MODSECURITY_PATH}/modsecurity_crs_10_setup.conf.main"
   fi
 
+  ## Web Server Configuration
   if [ "${OPT_WEBSERVER}" = "apache" ]; then
     MODSECURITY_CONF_FILE="${APACHE_EXTRAS}/httpd-modsecurity.conf"
   else
     MODSECURITY_CONF_FILE="${NGINX_PATH}/nginx-modsecurity.conf"
   fi
 
-  if [ "${OPT_MODSECURITY_UPLOADSCAN}" = "yes" ] && [ "${OPT_CLAMAV}" = "yes" ]; then
+  ## UploadScan via ClamAV
+  if [ "${OPT_MODSECURITY_UPLOADSCAN}" = "YES" ] && [ "${OPT_CLAMAV}" = "YES" ]; then
     if [ ! -e "${CLAMDSCAN}" ]; then
       #removeLockfile
       clamav_install
@@ -6202,6 +6209,7 @@ update_modsecurity_rules() {
     ${PERL} -pi -e 's#SecRequestBodyAccess On#SecRequestBodyAccess Off#' "${MODSECURITY_CONF_FILE}"
   fi
 
+  ## Custom Rules
   if [ -d "${MODSECURITY_CUSTOM_RULES}" ]; then
     printf "Copying custom ModSecurity rules to %s/\n" "${MODSECURITY_PATH}"
     cp -Rpf "${MODSECURITY_CUSTOM_RULES}/*" "${MODSECURITY_PATH}/"
@@ -6209,11 +6217,11 @@ update_modsecurity_rules() {
 
   printf "Installation of the ModSecurity Ruleset has finished.\n"
 
+  ## Restart Web Server
   if [ "$1" != "norestart" ]; then
     if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
       ${SERVICE} apache24 restart
     fi
-
     if [ "${OPT_WEBSERVER}" = "nginx_apache" ] || [ "${OPT_WEBSERVER}" = "nginx" ]; then
       ${SERVICE} nginx restart
     fi
