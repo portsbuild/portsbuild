@@ -3,10 +3,13 @@
 The following table shows if the differently configured software stacks have been tested or not.
 
 
-No. | Webserver     | PHP #1   | SQL
---- | -----------   | ---      | ---
-1   | Apache 2.4    | FPM      | MariaDB 10.1
-2   | Apache 2.4    | FCGI     | MariaDB 10.1
+No. | Webserver     | PHP #1   | SQL            | Status
+--- | -----------   | ---      | ---            | ------ 
+1   | Apache 2.4    | FPM      | MariaDB 10.1   | OK
+2   | Apache 2.4    | FCGI     | MariaDB 10.1   | Todo
+3   | Apache 2.4    | SUPHP    | MariaDB 10.1   | Todo
+4   | Apache 2.4    | MODPHP   | MariaDB 10.1   | Todo
+
 
 
 Service         | Versions      | Status

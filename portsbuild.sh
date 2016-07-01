@@ -50,7 +50,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20160603
+PB_BUILD_DATE=20160624
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -402,20 +402,20 @@ readonly PORTS_BASE=/usr/ports
 # readonly PKG_VAR_DB=/var/db/pkgs
 
 ## Ports: Dependencies
-readonly PORT_PORTMASTER=ports-mgmt/portmaster
-readonly PORT_SYNTH=ports-mgmt/synth
-readonly PORT_PERL=lang/perl5.20
-readonly PORT_AUTOCONF=devel/autoconf
-readonly PORT_AUTOMAKE=devel/automake
-readonly PORT_BISON=devel/bison
-readonly PORT_CA_ROOT_NSS=security/ca_root_nss
+readonly PORT_PORTMASTER='ports-mgmt/portmaster'
+readonly PORT_SYNTH='ports-mgmt/synth'
+readonly PORT_PERL='lang/perl5.20'
+readonly PORT_AUTOCONF='devel/autoconf'
+readonly PORT_AUTOMAKE='devel/automake'
+readonly PORT_BISON='devel/bison'
+readonly PORT_CA_ROOT_NSS='security/ca_root_nss'
 readonly PORT_CURL='ftp/curl'
-readonly PORT_LIBTOOL=devel/libtool
-readonly PORT_LIBXML2=textproc/libxml2
-readonly PORT_LIBXSLT=textproc/libxslt
-readonly PORT_LIBARCHIVE=archivers/libarchive
-readonly PORT_FREETYPE2=print/freetype2
-readonly PORT_CYRUSSASL2=security/cyrus-sasl2
+readonly PORT_LIBTOOL='devel/libtool'
+readonly PORT_LIBXML2='textproc/libxml2'
+readonly PORT_LIBXSLT='textproc/libxslt'
+readonly PORT_LIBARCHIVE='archivers/libarchive'
+readonly PORT_FREETYPE2='print/freetype2'
+readonly PORT_CYRUSSASL2='security/cyrus-sasl2'
 readonly PORT_PYTHON='lang/python'
 readonly PORT_CCACHE='devel/ccache'
 readonly PORT_CMAKE='devel/cmake'
@@ -522,9 +522,9 @@ NGINX_MAKE_SET=""
 NGINX_MAKE_UNSET=""
 
 ## Prefixes for multi-PHP installations:
-readonly PHP55_PREFIX=/usr/local/php55
-readonly PHP56_PREFIX=/usr/local/php56
-readonly PHP70_PREFIX=/usr/local/php70
+readonly PHP55_PREFIX='/usr/local/php55'
+readonly PHP56_PREFIX='/usr/local/php56'
+readonly PHP70_PREFIX='/usr/local/php70'
 
 PHP55_MAKE_SET="" # MAILHEAD
 PHP55_MAKE_UNSET=""
@@ -1012,17 +1012,12 @@ synth_status() { ${SYNTH} status; }
 ################################################################################
 
 ## Clean stale ports (deprecate soon)
-clean_stale_ports() {
-  printf "Cleaning stale ports\n"
-  ${PORTMASTER} -s
-}
+clean_stale_ports() { printf "Cleaning stale ports\n"; ${PORTMASTER} -s ; }
 
 ## Reinstall all ports "in place" (deprecate soon)
 ## Consider -R flag
 ## Todo: migrate this process to synth
-reinstall_all_ports() {
-  ${PORTMASTER} -a -f -d
-}
+reinstall_all_ports() { ${PORTMASTER} -a -f -d ; }
 
 ################################################################################
 ## apache shortcuts
@@ -1379,7 +1374,7 @@ global_setup() {
     ${CHOWN} -f diradmin:diradmin "${CB_CONF}"
     ${CHMOD} 755 "${CB_CONF}"
 
-    ## Copy DA startup file to .usr/local/etc/rc.d/
+    ## Copy DA startup file to /usr/local/etc/rc.d/
     cp -f "${PB_PATH}/etc/rc.d/directadmin" "${RCD}/directadmin"
     ${CHMOD} 755 "${RCD}/directadmin"
 
@@ -1994,6 +1989,7 @@ directadmin_install() {
   ## PB: Verify: Create backup.conf (wasn't created?)
   # ${CHOWN} -f diradmin:diradmin ${DA_PATH}/data/users/admin/backup.conf
 
+  ## 2016-06-24: Necessary? Don't we need PermitRootLogin yes added?
   SSHROOT=$(grep -c 'AllowUsers root' ${SSHD_CONFIG})
   if [ "${SSHROOT}" = 0 ]; then
     printf "*** Notice: Adding the 'root' user to the sshd configuration's AllowUsers list.\n"
@@ -2754,34 +2750,38 @@ blockcracking_install() {
 
   if [ -x "${EXIM_BIN}" ]; then
 
-    printf "Downloading BlockCracking\n"
+    printf "Setting up BlockCracking for Exim\n"
 
-    ${WGET} -O "${PB_PATH}/files/exim.blockcracking.tar.gz" "${PB_MIRROR}/files/exim.blockcracking.tar.gz"
+    cp -fp "${PB_CONFIG}/exim/bc/*" "${EXIM_BC_PATH}/"
 
     ## used to include: -${BLOCKCRACKING_VER}
 
-    if [ -e "${PB_PATH}/files/exim.blockcracking.tar.gz" ]; then
-      mkdir -p ${EXIM_BC_PATH}
+    ### Downloaded version:
+    ## used to include: -${BLOCKCRACKING_VER}
+    # ${WGET} -O "${PB_PATH}/files/exim.blockcracking.tar.gz" "${PB_MIRROR}/files/exim.blockcracking.tar.gz"
 
-      printf "Extracting exim.blockcracking.tar.gz\n"
-      ${TAR} xvf "${PB_PATH}/files/exim.blockcracking.tar.gz" -C ${EXIM_BC_PATH}
+    # if [ -e "${PB_PATH}/files/exim.blockcracking.tar.gz" ]; then
+    #   mkdir -p ${EXIM_BC_PATH}
 
-      BC_DP_SRC=${EXIM_BC_PATH}/script.denied_paths.default.txt
+    #   printf "Extracting exim.blockcracking.tar.gz\n"
+    #   ${TAR} xvf "${PB_PATH}/files/exim.blockcracking.tar.gz" -C ${EXIM_BC_PATH}
 
-      if [ -e "${EXIM_BC_PATH}/script.denied_paths.custom.txt" ]; then
-        printf "Using custom BlockCracking script.denied_paths.custom.txt\n"
-        BC_DP_SRC="${EXIM_BC_PATH}/script.denied_paths.custom.txt"
-      fi
+    #   BC_DP_SRC=${EXIM_BC_PATH}/script.denied_paths.default.txt
 
-      cp -fp ${BC_DP_SRC} ${EXIM_BC_PATH}/script.denied_paths.txt
+    #   if [ -e "${EXIM_BC_PATH}/script.denied_paths.custom.txt" ]; then
+    #     printf "Using custom BlockCracking script.denied_paths.custom.txt\n"
+    #     BC_DP_SRC="${EXIM_BC_PATH}/script.denied_paths.custom.txt"
+    #   fi
 
-      exim_restart
+    #   cp -fp ${BC_DP_SRC} ${EXIM_BC_PATH}/script.denied_paths.txt
 
-      printf "BlockCracking is now enabled.\n"
-    else
-      printf "*** Error: Unable to find exim.blockcracking.tar.gz for extraction. Aborting.\n"
-      exit 1
-    fi
+    #   exim_restart
+
+    #   printf "BlockCracking is now enabled.\n"
+    # else
+    #   printf "*** Error: Unable to find exim.blockcracking.tar.gz for extraction. Aborting.\n"
+    #   exit 1
+    # fi
   else
     printf "*** Error: Exim is not installed. Cannot continue as the binary was not found.\n"
   fi
@@ -4074,12 +4074,12 @@ php_install() {
   fi
 
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    echo "Restarting Apache"
+    printf "Restarting Apache\n"
     ${SERVICE} apache24 restart
   fi
 
   if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    echo "Restarting Nginx"
+    printf "Restarting Nginx\n"
     ## Verify: /usr/sbin/nginx -s stop >/dev/null 2>&1
     ${SERVICE} nginx restart
   fi
@@ -4311,7 +4311,7 @@ phpmyadmin_upgrade() {
 
 ################################################################################
 ##
-## Apache 2.4 Installation (refereces doApache2 from CB2)
+## Apache 2.4 Installation (references doApache2 from CB2)
 ##
 ################################################################################
 
@@ -4650,7 +4650,7 @@ apache_install() {
     COUNT="$(grep -m1 -c 'httpd-modsecurity' ${PHPMODULES})"
     if [ "${OPT_MODSECURITY}" = "YES" ] && [ "${OPT_WEBSERVER}" = "apache" ] && [ "${COUNT}" -eq 0 ]; then
       ${PERL} -pi -e 's|^LoadModule security2_module|#LoadModule security2_module|' "${APACHE_CONF}"
-      echo "Include ${APACHE_EXTRAS}/httpd-modsecurity.conf" >> "${PHPMODULES}"
+      printf "Include %s/httpd-modsecurity.conf\n" "${APACHE_EXTRAS}" >> "${PHPMODULES}"
       cp -pf "${MODSECURITY_APACHE_INCLUDE}" "${APACHE_EXTRAS}/httpd-modsecurity.conf"
     fi
 
@@ -4659,17 +4659,16 @@ apache_install() {
       ## CB2: Use event MPM for php-fpm and prefork for mod_php
       if [ "${OPT_APACHE_MPM}" = "auto" ]; then
         if [ "${HAVE_CLI}" = "NO" ]; then
-
-          echo "LoadModule mpm_event_module ${APACHE_LIBS}/mod_mpm_event.so" >> "${PHPMODULES}"
+          printf "LoadModule mpm_event_module %s/mod_mpm_event.so\n" "${APACHE_LIBS}" >> "${PHPMODULES}"
         else
-          echo "LoadModule mpm_prefork_module ${APACHE_LIBS}/mod_mpm_prefork.so" >> "${PHPMODULES}"
+          printf "LoadModule mpm_prefork_module %s/mod_mpm_prefork.so\n" "${APACHE_LIBS}" >> "${PHPMODULES}"
         fi
       elif [ "${OPT_APACHE_MPM}" = "event" ]; then
-        echo "LoadModule mpm_event_module ${APACHE_LIBS}/mod_mpm_event.so" >> "${PHPMODULES}"
+        printf "LoadModule mpm_event_module %s/mod_mpm_event.so\n" "${APACHE_LIBS}" >> "${PHPMODULES}"
       elif [ "${OPT_APACHE_MPM}" = "worker" ]; then
-        echo "LoadModule mpm_worker_module ${APACHE_LIBS}/mod_mpm_worker.so" >> ${PHPMODULES}
+        printf "LoadModule mpm_worker_module %s/mod_mpm_worker.so\n" "${APACHE_LIBS}" >> "${PHPMODULES}"
       else
-        echo "LoadModule mpm_prefork_module ${APACHE_LIBS}/mod_mpm_prefork.so" >> ${PHPMODULES}
+        printf "LoadModule mpm_prefork_module %s/mod_mpm_prefork.so\n" "${APACHE_LIBS}" >> "${PHPMODULES}"
       fi
     fi
 
@@ -4679,10 +4678,10 @@ apache_install() {
         if [ "${HAVE_FCGID}" = "YES" ] || [ "${HAVE_FPM_CGI}" = "YES" ] || [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
           if ! grep -m1 -c 'htscanner_module' ${PHPMODULES}; then
             ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
-            echo "LoadModule htscanner_module ${APACHE_LIBS}/mod_htscanner2.so" >> ${PHPMODULES}
+            printf "LoadModule htscanner_module %s/mod_htscanner2.so\n" "${APACHE_LIBS}" >> "${PHPMODULES}"
           else
-            ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' ${APACHE_CONF}
-            ${PERL} -pi -e 's|^LoadModule  htscanner_module|^#LoadModule htscanner_module' ${PHPMODULES}
+            ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' "${APACHE_CONF}"
+            ${PERL} -pi -e 's|^LoadModule  htscanner_module|^#LoadModule htscanner_module' "${PHPMODULES}"
           fi
           install_mod_htscanner
         fi
@@ -4693,7 +4692,7 @@ apache_install() {
     if [ "${HAVE_SUPHP_CGI}" = "YES" ]; then
       if ! grep -m1 -q 'suphp_module' "${PHPMODULES}"; then
         ${PERL} -pi -e 's|^LoadModule suphp_module|#LoadModule suphp_module|' "${APACHE_CONF}"
-        echo "LoadModule  suphp_module    ${APACHE_LIBS}/mod_suphp.so" >> "${PHPMODULES}"
+        printf "LoadModule suphp_module %s/mod_suphp.so\n" "${APACHE_LIBS}" >> "${PHPMODULES}"
       fi
     fi
 
@@ -4704,10 +4703,10 @@ apache_install() {
       fi
       if ! grep -m1 -q 'fcgid_module' "${PHPMODULES}"; then
         ${PERL} -pi -e 's|^LoadModule  mod_fcgid|#LoadModule mod_fcgid|' "${APACHE_CONF}"
-        echo "LoadModule  fcgid_module    ${APACHE_LIBS}/mod_fcgid.so" >> "${PHPMODULES}"
+        printf "LoadModule fcgid_module %s/mod_fcgid.so\n " "${APACHE_LIBS}" >> "${PHPMODULES}"
       fi
       if ! grep -m1 -q 'httpd-fcgid.conf' "${PHPMODULES}"; then
-        echo "Include ${APACHE_EXTRAS}/httpd-fcgid.conf" >> "${PHPMODULES}"
+        printf "Include %s/httpd-fcgid.conf\n" "${APACHE_EXTRAS}" >> "${PHPMODULES}"
       fi
     fi
 
@@ -4810,7 +4809,6 @@ apache_uninstall() {
   return
 }
 
-
 ################################################################################
 ##
 ## Install mod_htscanner (from CB2: doModHtscanner())
@@ -4836,7 +4834,7 @@ install_mod_htscanner() {
   if [ -e "${PHPMODULES}" ]; then
     ${PERL} -pi -e 's|^LoadModule htscanner_module|#LoadModule htscanner_module|' "${APACHE_CONF}"
     if ! grep -m1 -q 'htscanner_module' ${PHPMODULES}; then
-      echo "LoadModule  htscanner_module    ${APACHE_LIBS}/mod_htscanner2.so" >> "${PHPMODULES}"
+      printf "LoadModule htscanner_module %s/mod_htscanner2.so\n" "${APACHE_LIBS}" >> "${PHPMODULES}"
     fi
   fi
 
@@ -4916,17 +4914,17 @@ install_mod_fcgid() {
   if [ -e "${PHPMODULES}" ]; then
     if ! grep -m1 -q 'fcgid_module' "${PHPMODULES}"; then
       ${PERL} -pi -e 's|^LoadModule  fcgid_module|#LoadModule  fcgid_module|' "${APACHE_CONF}"
-      echo "LoadModule fcgid_module ${APACHE_LIBS}/mod_fcgid.so" >> "${PHPMODULES}"
+      printf "LoadModule fcgid_module %s/mod_fcgid.so" "${APACHE_LIBS}" >> "${PHPMODULES}"
     fi
 
     if ! grep -m1 -q 'httpd-fcgid.conf' "${PHPMODULES}"; then
-      echo "Include ${APACHE_EXTRAS}/httpd-fcgid.conf" >> "${PHPMODULES}"
+      printf "Include %s/httpd-fcgid.conf" "${APACHE_EXTRAS}" >> "${PHPMODULES}"
     fi
   fi
 
   ## Copy configuration
-  if [ ! -e "${APACHE_EXTRAS}/httpd-fcgid.conf" ] && [ -e "${PB_PATH}/configure/ap2/conf/extra/httpd-fcgid.conf" ]; then
-    cp "${PB_PATH}/configure/ap2/conf/extra/httpd-fcgid.conf" "${APACHE_PATH}/extra/httpd-fcgid.conf"
+  if [ ! -e "${APACHE_EXTRAS}/httpd-fcgid.conf" ] && [ -e "${PB_CONFIG}/ap2/conf/extra/httpd-fcgid.conf" ]; then
+    cp "${PB_CONFIG}/ap2/conf/extra/httpd-fcgid.conf" "${APACHE_PATH}/extra/httpd-fcgid.conf"
   fi
 
   echo "action=rewrite&value=httpd" >> "${DA_TASK_QUEUE}"
@@ -5149,7 +5147,7 @@ pureftpd_install() {
 
     printf "Enabling Pure-FTPD upload scanning script\n"
     cp -f "${PB_CONFIG}/pureftpd/pureftpd_uploadscan.sh" "${PUREFTPD_UPLOADSCAN_BIN}"
-    chmod 711 "${PUREFTPD_UPLOADSCAN_BIN}"
+    ${CHMOD} 711 "${PUREFTPD_UPLOADSCAN_BIN}"
 
     ${SYSRC} pureftpd_upload_enable="YES"
     ${SYSRC} pureftpd_uploadscript="${PUREFTPD_UPLOADSCAN_BIN}"
@@ -8437,13 +8435,192 @@ validate_options() {
     DA_INSECURE=$(cat /root/.insecure_download)
   fi
 
-
   return
 }
 
 ################################################################################
 ##
-## Todo: Update directadmin.conf (and the template)
+## Todo: Get Versions (from CB2: doVersions())
+##
+################################################################################
+
+get_versions() {
+
+  local VERSIONS ## 0 = auto-update, 1 == show info only
+  local DIRECTADMIN_VER APACHE_VER DOVECOT_CONF_VER
+  local EXIT_CODE
+
+  ## DirectAdmin
+  if [ -e "${DA_BIN}" ] && [ "${DIRECTADMIN_VER}" != "0" ]; then
+    DIRECTADMINV="$(${DA_BIN} v | grep -m1 '^Version:' | grep -oE '[^ ]+$' | cut -d. -f2,3,4)"
+    if [ "${VERSIONS}" = "1" ]; then
+      echo "Latest version of DirectAdmin: ${DIRECTADMIN_VER}"
+      echo "Installed version of DirectAdmin: ${DIRECTADMINV}"
+      echo ""
+    fi
+    if [ "${DIRECTADMIN_VER}" != "${DIRECTADMINV}" ]; then
+      if [ "${VERSIONS}" = "0" ] || [ "${VERSIONS}" = "3" ]; then
+        directadmin_update
+      elif [ "${VERSIONS}" = "1" ]; then
+        echo "${boldon}DirectAdmin ${DIRECTADMINV} to ${DIRECTADMIN_VER} update is available.${boldoff}"
+        echo ""
+      fi
+      EXIT_CODE=$((EXIT_CODE+1))
+    fi
+  else
+    printf "DirectAdmin is not installed.\n"
+  fi
+
+  ## Apache
+  if [ "${APACHE2_VER}" != "0" ]; then
+    if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+      if [ -e "${APACHE_HTTPD}" ]; then
+        APACHEV="$(${APACHE_HTTPD} -v | grep -m1 'Server version:' | awk '{ print $3 }' | cut -d/ -f2)"
+        if [ "${VERSIONS}" = "1" ]; then
+          echo "Latest version of Apache: ${APACHE2_VER}"
+          echo "Installed version of Apache: ${APACHEV}"
+          echo ""
+        fi
+        if [ "${APACHE2_VER}" != "${APACHEV}" ]; then
+          if [ "${VERSIONS}" = "0" ]; then
+            echo "${boldon}Updating Apache${boldoff}"
+            apache_install
+          elif [ "${VERSIONS}" = "1" ]; then
+            echo "${boldon}Apache ${APACHEV} to ${APACHE2_VER} update is available.${boldoff}"
+            echo ""
+          fi
+          EXIT_CODE=$((EXIT_CODE+1))
+        fi
+      fi
+    fi
+  fi
+
+  ## dovecot.conf
+  if [ "${OPT_DOVECOT_CONF}" = "YES" ]; then
+    COUNT=0
+    if [ -e "${DOVECOT_CONF}" ]; then
+      COUNT=$(head -n1 "${DOVECOT_CONF}" | grep -c '^#')
+    fi
+    if [ "${COUNT}" -gt 0 ]; then
+      DOVECOT_CONFV="$(head -n1 "${DOVECOT_CONF}" | cut -d'#' -f2)"
+    else
+      DOVECOT_CONFV=0
+    fi
+
+    if [ "${DOVECOT_CONFV}" = "" ]; then
+      DOVECOT_CONFV=0
+    fi
+
+    COUNT=0
+    if [ -e ${DOVECTCONFFILE} ]; then
+      COUNT=$(head -n1 ${DOVECTCONFFILE} | grep -c '^#')
+    fi
+    if [ "${COUNT}" -gt 0 ]; then
+      DOVECOT_CONF_VER="$(head -n1 ${DOVECTCONFFILE} | cut -d'#' -f2)"
+    else
+      DOVECOT_CONF_VER=0
+    fi
+
+    if [ "${DOVECOT_CONF_VER}" != "0" ]; then
+      if [ "${VERSIONS}" = "1" ]; then
+        echo "Latest version of dovecot.conf: ${DOVECOT_CONF_VER}"
+        echo "Installed version of dovecot.conf: ${DOVECOT_CONFV}"
+        echo ""
+      fi
+      if [ "${DOVECOT_CONF_VER}" != "${DOVECOT_CONFV}" ]; then
+        if [ "${VERSIONS}" = "0" ]; then
+          echo "${boldon}Updating dovecot.conf${boldoff}"
+          doDovecotConf
+        elif [ "${VERSIONS}" = "1" ]; then
+          echo "${boldon}dovecot.conf ${DOVECOT_CONFV} to ${DOVECOT_CONF_VER} update is available.${boldoff}"
+          echo ""
+        fi
+        EXIT_CODE=$((EXIT_CODE+1))
+      fi
+    fi
+  fi
+
+  ## Exim.conf
+  if [ "${OPT_EXIMCONF}" = "YES" ] && [ "${EXIM_CONF_VER}" != "0" ]; then
+    EXIMCONFV=$(exim_conf_version)
+    if [ "${VERSIONS}" = "1" ]; then
+      echo "Latest version of exim.conf: ${EXIM_CONF_VER}"
+      echo "Installed version of exim.conf: ${EXIMCONFV}"
+      echo ""
+    fi
+    if [ "${EXIM_CONF_VER}" != "${EXIMCONFV}" ]; then
+      if [ "${VERSIONS}" = "0" ]; then
+        echo "${boldon}Updating exim.conf${boldoff}"
+        doEximConf
+      elif [ "${VERSIONS}" = "1" ]; then
+        echo "${boldon}exim.conf ${EXIMCONFV} to ${EXIM_CONF_VER} update is available.${boldoff}"
+        echo ""
+      fi
+      EXIT_CODE=$((EXIT_CODE+1))
+    fi
+  fi
+
+  ## BlockCracking
+  if [ "${OPT_BLOCKCRACKING}" = "YES" ] && [ "${BLOCKCRACKING_VER}" != "0" ]; then
+    COUNT=0
+    if [ -e "${EXIM_BC_PATH}/README.txt" ]; then
+      COUNT=$(head -n1 "${EXIM_BC_PATH}/README.txt" | grep -c '^#')
+    fi
+    if [ "${COUNT}" -gt 0 ]; then
+      BLOCKCRACKINGV="$(head -n1 "${EXIM_BC_PATH}/README.txt" | cut -d'#' -f2)"
+    else
+      BLOCKCRACKINGV=0
+    fi
+    if [ "${VERSIONS}" = "1" ]; then
+      echo "Latest version of BlockCracking: ${BLOCKCRACKING_VER}"
+      echo "Installed version of BlockCracking: ${BLOCKCRACKINGV}"
+      echo ""
+    fi
+    if [ "${BLOCKCRACKING_VER}" != "${BLOCKCRACKINGV}" ]; then
+      if [ "${VERSIONS}" = "0" ]; then
+        echo "${boldon}Updating BlockCracking${boldoff}"
+        blockcracking_install
+      elif [ "${VERSIONS}" = "1" ]; then
+        echo "${boldon}BlockCracking ${BLOCKCRACKINGV} to ${BLOCKCRACKING_VER} update is available.${boldoff}"
+        echo ""
+      fi
+      EXIT_CODE=$((EXIT_CODE+1))
+    fi
+  fi
+
+  ## Easy Spam Fighter
+  if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ] && [ "${EASY_SPAM_FIGHTER_VER}" != "0" ]; then
+    COUNT=0
+    if [ -e "${EXIM_ESF_PATH}/README.txt" ]; then
+      COUNT=$(head -n1 "${EXIM_ESF_PATH}/README.txt" | grep -c '^#')
+    fi
+    if [ "${COUNT}" -gt 0 ]; then
+      EASY_SPAM_FIGHTERV="`head -n1 /etc/exim.easy_spam_fighter/README.txt | cut -d'#' -f2`"
+    else
+      EASY_SPAM_FIGHTERV=0
+    fi
+    if [ "${VERSIONS}" = "1" ]; then
+      echo "Latest version of Easy Spam Fighter: ${EASY_SPAM_FIGHTER_VER}"
+      echo "Installed version of Easy Spam Fighter: ${EASY_SPAM_FIGHTERV}"
+      echo ""
+    fi
+    if [ "${EASY_SPAM_FIGHTER_VER}" != "${EASY_SPAM_FIGHTERV}" ]; then
+      if [ "${VERSIONS}" = "0" ]; then
+        echo "${boldon}Updating Easy Spam Fighter${boldoff}"
+        easyspamfighter_install
+      elif [ "${VERSIONS}" = "1" ]; then
+        echo "${boldon}Easy Spam Fighter ${EASY_SPAM_FIGHTERV} to ${EASY_SPAM_FIGHTER_VER} update is available.${boldoff}"
+        echo ""
+      fi
+      EXIT_CODE=$((EXIT_CODE+1))
+    fi
+  fi
+
+}
+
+################################################################################
+##
+## Todo: Update directadmin.conf (and the template) with corrected paths
 ##
 ################################################################################
 
@@ -8453,7 +8630,6 @@ update_da_conf() {
   setVal openssl ${OPENSSL} ${DA_CONF}
 
   return
-
 }
 
 ################################################################################
