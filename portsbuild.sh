@@ -50,7 +50,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20160624
+PB_BUILD_DATE=20160705
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -1241,9 +1241,9 @@ global_setup() {
     ## Install Dependencies
     printf "Installing initial required dependencies and compatibility libraries (misc/compats)\n"
     if [ "${OS_MAJ}" -eq 10 ]; then
-      pkgi "${PORT_DEPS_100}" misc/compat4x misc/compat5x misc/compat6x misc/compat8x misc/compat9x
+      pkgi "${PORT_DEPS_100}" misc/compat4x misc/compat5x misc/compat6x misc/compat7x misc/compat8x misc/compat9x
     elif [ "${OS_MAJ}" -eq 9 ]; then
-      pkgi "${PORT_DEPS}" misc/compat4x misc/compat5x misc/compat6x misc/compat8x
+      pkgi "${PORT_DEPS}" misc/compat4x misc/compat5x misc/compat6x misc/compat7x misc/compat8x
     fi
 
     ## Check for /etc/rc.conf
