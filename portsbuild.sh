@@ -3429,9 +3429,7 @@ sql_prepare() {
 }
 
 ################################################################################
-##
 ## MariaDB or MySQL Database Installation
-##
 ################################################################################
 
 sql_install() {
@@ -3548,10 +3546,8 @@ sql_install() {
 }
 
 ################################################################################
-##
 ## Verify: FPM Check (from CB2: fpmCheck())
 ## Checks to see if any changes were done (e.g. converting between web server softwares)
-##
 ################################################################################
 
 fpmCheck() {
@@ -3638,9 +3634,7 @@ fpmCheck() {
 }
 
 ################################################################################
-##
 ## Todo: Verify: FPM Checks (from CB2: fpmChecks())
-##
 ################################################################################
 
 fpmChecks() {
@@ -3655,6 +3649,7 @@ fpmChecks() {
       EVAL_CHECK_VAR="HAVE_FPM${php_shortrelease}_CGI"
       EVAL_COPY_VAR="PHP${php_shortrelease}_FPM_CONF"
       if [ "$(eval_var "${EVAL_CHECK_VAR}")" = "YES" ] && [ -d "/usr/local/php${php_shortrelease}/sockets" ]; then
+        printf "*** Debug: Copying file in fpmChecks()\n"
         cp -f "$(eval_var "${EVAL_COPY_VAR}")" "/usr/local/php${php_shortrelease}/etc/php-fpm.conf"
         fpmCheck "${php_shortrelease}"
       fi
@@ -3703,10 +3698,8 @@ fpmChecks() {
 }
 
 ################################################################################
-##
 ## Dovecot Checks (from CB2: dovecotChecks())
 ## Used when switching between webservers: Apache/Nginx/Nginx_Apache
-##
 ################################################################################
 
 dovecot_checks() {
@@ -3734,9 +3727,7 @@ dovecot_checks() {
 }
 
 ################################################################################
-##
 ## PHP Installation Tasks
-##
 ################################################################################
 
 php_install() {
@@ -3747,14 +3738,14 @@ php_install() {
 
   ## Apache / Nginx+Apache:
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    if [ ! -d ${APACHE_PATH} ]; then
+    if [ ! -d "${APACHE_PATH}" ]; then
       apache_install
     fi
   fi
 
   ## Nginx / Nginx+Apache:
   if [ "${OPT_WEBSERVER}" = "nginx" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    if [ ! -d ${NGINX_PATH} ]; then
+    if [ ! -d "${NGINX_PATH}" ]; then
       nginx_install
     fi
   fi
@@ -3782,7 +3773,8 @@ php_install() {
 
   ## PHP1 Version Selector
   case ${OPT_PHP1_VER} in
-    "55") PORT_PHP="${PORT_PHP55}"
+    "55")
+        PORT_PHP="${PORT_PHP55}"
         PORT_PHP_EXT="${PORT_PHP55_EXT}"
         PORT_MOD_PHP="${PORT_MOD_PHP55}"
         PHP_MAKE_SET="${PHP55_MAKE_SET}"
@@ -3807,7 +3799,8 @@ php_install() {
         net/php55-xmlrpc textproc/php55-xmlwriter textproc/php55-xsl \
         archivers/php55-zip archivers/php55-zlib"
         ;;
-    "56") PORT_PHP="${PORT_PHP56}"
+    "56")
+        PORT_PHP="${PORT_PHP56}"
         PORT_PHP_EXT="${PORT_PHP56_EXT}"
         PORT_MOD_PHP="${PORT_MOD_PHP56}"
         PHP_MAKE_SET="${PHP56_MAKE_SET}"
@@ -3832,7 +3825,8 @@ php_install() {
         net/php56-xmlrpc textproc/php56-xmlwriter textproc/php56-xsl \
         archivers/php56-zip archivers/php56-zlib"
         ;;
-    "70") PORT_PHP="${PORT_PHP70}"
+    "70")
+        PORT_PHP="${PORT_PHP70}"
         PORT_PHP_EXT="${PORT_PHP70_EXT}"
         PORT_MOD_PHP="${PORT_MOD_PHP70}"
         PHP_MAKE_SET="${PHP70_MAKE_SET}"
@@ -3856,10 +3850,10 @@ php_install() {
         textproc/php70-xmlreader net/php70-xmlrpc textproc/php70-xmlwriter \
         textproc/php70-xsl archivers/php70-zip archivers/php70-zlib"
         ;;
-    *) printf "*** Error: Wrong PHP version selected. (Script error?)\n"; exit ;;
+    *) printf "*** Error: php_install(): Wrong PHP version selected. (Script error)\n"; exit ;;
   esac
 
-  printf "Starting PHP installation\n"
+  printf "*** Notice: Starting PHP installation\n"
 
   if [ -z "${PHP_MAKE_SET}" ] && [ -z "${PHP_MAKE_UNSET}" ]; then
     ## Base PHP Installation (includes FPM, CGI, CLI modes)
@@ -3916,13 +3910,14 @@ php_install() {
           ;;
       # fastcgi) echo "not done" ;;
       # fcgid) echo "not done" ;;
-      *) printf "*** Error: Wrong PHP mode selected. (Script error?)\n"; exit ;;
+      *) printf "*** Error: php_install(): Wrong PHP mode selected. (Script error)\n"; exit ;;
     esac
   fi
 
   # ${MAKE} -DNO_DIALOG -C "${PORT_PHP_EXT}" reinstall clean
 
   if [ "${OPT_PHP_IONCUBE}" = "YES" ]; then
+    printf "*** Notice: Installing IonCube loaders.\n"
     pkgi ${PORT_IONCUBE}
   fi
 
@@ -4088,10 +4083,8 @@ php_install() {
 }
 
 ################################################################################
-##
 ## Todo: Move to control_service()
 ## PHP-FPM Restart and configuration file verification
-##
 ################################################################################
 
 php_fpm_restart() {
@@ -4129,9 +4122,7 @@ php_fpm_restart() {
 }
 
 ################################################################################
-##
 ## Upgrade PHP and related components
-##
 ################################################################################
 
 php_upgrade() {
@@ -4144,10 +4135,8 @@ php_upgrade() {
 }
 
 ################################################################################
-##
 ## Have PHP System (from CB2)
 ## Needed?
-##
 ################################################################################
 
 have_php_system() {
@@ -4177,9 +4166,7 @@ have_php_system() {
 }
 
 ################################################################################
-##
 ## phpMyAdmin Installation
-##
 ################################################################################
 
 phpmyadmin_install() {
@@ -4295,9 +4282,7 @@ phpmyadmin_install() {
 }
 
 ################################################################################
-##
 ## Upgrade phpMyAdmin
-##
 ################################################################################
 
 phpmyadmin_upgrade() {
@@ -4310,9 +4295,7 @@ phpmyadmin_upgrade() {
 }
 
 ################################################################################
-##
 ## Apache 2.4 Installation (references doApache2 from CB2)
-##
 ################################################################################
 
 apache_install() {
@@ -4602,6 +4585,8 @@ apache_install() {
   if [ ! -s "${APACHE_SSL_KEY}" ] || [ ! -s "${APACHE_SSL_CRT}" ]; then
     mkdir -p "${APACHE_PATH}/ssl"
 
+    printf "*** Notice: Generating Apache self-signed SSL certificate and key.\n"
+
     ${OPENSSL} req -x509 -newkey rsa:2048 -keyout "${APACHE_SSL_KEY}" \
     -out "${APACHE_SSL_CRT}" -days 9999 -nodes -config "${SSL_REQ_CONF}"
 
@@ -4628,6 +4613,7 @@ apache_install() {
 
   ## Safe-bin directory
   if [ ! -d /usr/local/safe-bin ]; then
+    printf "*** Notice: Creating directory: /usr/local/safe-bin\n"
     mkdir -p /usr/local/safe-bin
     ${CHMOD} 511 /usr/local/safe-bin
     ${CHOWN} "${APACHE_USER}:${APACHE_GROUP}" /usr/local/safe-bin
@@ -4786,13 +4772,13 @@ apache_install() {
     ${SERVICE} apache24 restart
   fi
 
+  printf "Apache %s installation has been completed.\n" "${OPT_APACHE_VER}"
+
   return
 }
 
 ################################################################################
-##
 ## Apache Uninstall
-##
 ################################################################################
 
 apache_uninstall() {
@@ -4810,9 +4796,7 @@ apache_uninstall() {
 }
 
 ################################################################################
-##
 ## Install mod_htscanner (from CB2: doModHtscanner())
-##
 ################################################################################
 
 install_mod_htscanner() {
@@ -4848,9 +4832,7 @@ install_mod_htscanner() {
 }
 
 ################################################################################
-##
 ## Verify: Install Let's Encrypt
-##
 ################################################################################
 
 letsencrypt_install() {
@@ -4874,9 +4856,7 @@ letsencrypt_install() {
 }
 
 ################################################################################
-##
 ## Uninstall Let's Encrypt
-##
 ################################################################################
 
 letsencrypt_uninstall() {
@@ -4892,9 +4872,7 @@ letsencrypt_uninstall() {
 }
 
 ################################################################################
-##
 ## Verify: Install mod_fcgid (from CB2: doModFCGID())
-##
 ################################################################################
 
 install_mod_fcgid() {
@@ -4936,9 +4914,7 @@ install_mod_fcgid() {
 }
 
 ################################################################################
-##
 ## Todo: NGINX Installation
-##
 ################################################################################
 
 nginx_install() {
@@ -5011,9 +4987,7 @@ nginx_install() {
 }
 
 ################################################################################
-##
 ## Uninstall nginx
-##
 ################################################################################
 
 nginx_uninstall() {
@@ -5030,9 +5004,7 @@ nginx_uninstall() {
 }
 
 ################################################################################
-##
 ## Majordomo Install
-##
 ################################################################################
 
 majordomo_install() {
@@ -5054,9 +5026,7 @@ majordomo_install() {
 }
 
 ################################################################################
-##
 ## Majordomo Uninstall
-##
 ################################################################################
 
 majordomo_uninstall() {
@@ -5067,9 +5037,7 @@ majordomo_uninstall() {
 }
 
 ################################################################################
-##
 ## PureFTPD Installation
-##
 ################################################################################
 
 pureftpd_install() {
@@ -5187,9 +5155,7 @@ pureftpd_install() {
 }
 
 ################################################################################
-##
 ## PureFTPD Uninstall
-##
 ################################################################################
 
 pureftpd_uninstall() {
@@ -5211,9 +5177,7 @@ pureftpd_uninstall() {
 }
 
 ################################################################################
-##
 ## ProFTPD Installation
-##
 ################################################################################
 
 proftpd_install() {
@@ -7143,9 +7107,10 @@ run_dataskq() {
 
 rewrite_vhosts() {
 
-  local PATHNAME
+  local IFS=' '
+  local PATHNAME="${APACHE_EXTRAS}"
 
-  PATHNAME="${APACHE_EXTRAS}"
+  printf "*** Notice: Starting: Rewriting Virtual Hosts via rewrite_vhosts()\n"
 
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
     PATHNAME="${NGINX_PATH}"
@@ -7158,22 +7123,26 @@ rewrite_vhosts() {
   printf '' > "${APACHE_EXTRAS}/directadmin-vhosts.conf"
 
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
-    for i in $(ls "${DA_PATH}/data/users/*/nginx.conf"); do
+    for i in $(ls ${DA_PATH}/data/users/*/nginx.conf); do
       echo "include $i;" >> "${APACHE_EXTRAS}/directadmin-vhosts.conf"
     done
   elif [ "${OPT_WEBSERVER}" = "apache" ]; then
-    for i in $(ls "${DA_PATH}/data/users/*/httpd.conf"); do
+    for i in $(ls ${DA_PATH}/data/users/*/httpd.conf); do
       echo "Include $i" >> "${APACHE_EXTRAS}/directadmin-vhosts.conf"
     done
   elif [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     printf '' > "${NGINX_PATH}/directadmin-vhosts.conf"
-    for i in $(ls "${DA_PATH}/data/users/*/nginx.conf"); do
+    for i in $(ls ${DA_PATH}/data/users/*/nginx.conf); do
       echo "include $i;" >> "${NGINX_PATH}/directadmin-vhosts.conf"
     done
-    for i in $(ls "${DA_PATH}/data/users/*/httpd.conf"); do
+    for i in $(ls ${DA_PATH}/data/users/*/httpd.conf); do
       echo "Include $i" >> "${APACHE_EXTRAS}/directadmin-vhosts.conf"
     done
+  else
+    printf "*** Error: rewrite_hosts(): No suitable webserver selected.\n"
   fi
+
+  printf "*** Notice: Completed: Rewriting Virtual Hosts via rewrite_vhosts()\n"
 }
 
 ################################################################################
@@ -7209,10 +7178,12 @@ verify_server_ca() {
   ## Copy root CA cert from PORT_CA_ROOT_NSS package (or install it)
   if [ ! -s "${SSL_CA}" ]; then
     if [ -s /usr/local/share/certs/ca-root-nss.crt ]; then
+      printf "Copying ca-root-nss.crt to %s\n" "${SSL_CA}"
       cp -f /usr/local/share/certs/ca-root-nss.crt "${SSL_CA}"
     else
       pkgi "${PORT_CA_ROOT_NSS}"
       if [ "$?" = 0 ]; then
+        printf "Copying ca-root-nss.crt to %s\n" "${SSL_CA}"
         cp -f /usr/local/share/certs/ca-root-nss.crt "${SSL_CA}"
       fi
     fi
@@ -8439,9 +8410,7 @@ validate_options() {
 }
 
 ################################################################################
-##
 ## Todo: Get Versions (from CB2: doVersions())
-##
 ################################################################################
 
 get_versions() {
@@ -8619,15 +8588,126 @@ get_versions() {
 }
 
 ################################################################################
-##
 ## Todo: Update directadmin.conf (and the template) with corrected paths
-##
 ################################################################################
 
 update_da_conf() {
 
+  printf "*** Notice: Updating directadmin.conf (and template) with recommended values.\n"
+
+  # if [ -e "${DA_CONF}" ]; then
+  # fi
+
   setVal openssl ${OPENSSL} ${DA_CONF_TEMPLATE}
   setVal openssl ${OPENSSL} ${DA_CONF}
+
+  # setVal pureftp 0 "${DA_CONF_TEMPLATE}"
+  # setVal pureftp 0 "${DA_CONF}"
+
+  setVal ftpconfig "${PROFTPD_CONF}" "${DA_CONF_TEMPLATE}"
+  setVal ftpconfig "${PROFTPD_CONF}" "${DA_CONF}"
+
+  setVal ftppasswd "${PROFTPD_PASSWD}" "${DA_CONF_TEMPLATE}"
+  setVal ftppasswd "${PROFTPD_PASSWD}" "${DA_CONF}"
+
+  setVal ftppasswd_db /usr/local/etc/pureftpd.pdb "${DA_CONF_TEMPLATE}"
+  setVal ftppasswd_db /usr/local/etc/pureftpd.pdb "${DA_CONF}"
+
+  setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf "${DA_CONF_TEMPLATE}"
+  setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf "${DA_CONF}"
+
+  setVal mq_exim_bin "${EXIM_BIN}" "${DA_CONF_TEMPLATE}"
+  setVal mq_exim_bin "${EXIM_BIN}" "${DA_CONF}"
+
+  setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" "${DA_CONF_TEMPLATE}"
+  setVal brute_force_pma_log "${WWW_DIR}/phpMyAdmin/log/auth.log" "${DA_CONF}"
+
+  setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" "${DA_CONF_TEMPLATE}"
+  setVal brute_force_roundcube_log "${WWW_DIR}/roundcube/logs/errors" "${DA_CONF}"
+
+  setVal brute_force_squirrelmail_log "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" "${DA_CONF_TEMPLATE}"
+  setVal brute_force_squirrelmail_log "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" "${DA_CONF}"
+
+  if [ "${OS_MAJ}" -eq 10 ]; then
+    ## FreeBSD 10.x: /usr/local/etc/namedb/
+    NAMED_BIN=/usr/local/sbin/named
+    NAMEDB_PATH=/usr/local/etc/namedb
+    RNDC_BIN=/usr/local/sbin/rndc-confgen
+    NAMED_CONF="${NAMEDB_PATH}/named.conf"
+    RNDC_KEY="${NAMEDB_PATH}/rndc.key"
+  elif [ "${OS_MAJ}" -eq 9 ]; then
+    ## FreeBSD 9.3: /etc/namedb/
+    NAMED_BIN=/usr/sbin/named
+    NAMEDB_PATH=/etc/namedb
+    RNDC_BIN=/sbin/rndc-confgen
+    NAMED_CONF="${NAMEDB_PATH}/named.conf"
+    RNDC_KEY="${NAMEDB_PATH}/rndc.key"
+  else
+    printf "*** Warning: update_da_conf(): Unable to detect operating system version. (script error)\n"
+  fi
+
+  setVal namedconfig "${NAMED_CONF}" "${DA_CONF_TEMPLATE}"
+  setVal nameddir "${NAMEDB_PATH}" "${DA_CONF_TEMPLATE}"
+
+  setVal namedconfig "${NAMED_CONF}" "${DA_CONF}"
+  setVal nameddir "${NAMEDB_PATH}" "${DA_CONF}"
+
+  setVal frontpage_on 0 "${DA_CONF_TEMPLATE}"
+  setVal frontpage_on 0 "${DA_CONF}"
+
+  if [ "${OPT_WEBSERVER}" = "apache" ]; then
+    setVal apache_ver 2.0 "${DA_CONF_TEMPLATE}"
+    setVal apache_ver 2.0 "${DA_CONF}"
+    setVal apacheca "${APACHE_SSL_CA}" "${DA_CONF_TEMPLATE}"
+    setVal apacheca "${APACHE_SSL_CA}" "${DA_CONF}"
+    setVal apachecert "${APACHE_SSL_CRT}" "${DA_CONF_TEMPLATE}"
+    setVal apachecert "${APACHE_SSL_CRT}" "${DA_CONF}"
+    setVal apacheconf "${APACHE_EXTRAS}/directadmin-vhosts.conf" "${DA_CONF_TEMPLATE}"
+    setVal apacheconf "${APACHE_EXTRAS}/directadmin-vhosts.conf" "${DA_CONF}"
+    setVal apacheips "${APACHE_PATH}/ips.conf" "${DA_CONF_TEMPLATE}"
+    setVal apacheips "${APACHE_PATH}/ips.conf" "${DA_CONF}"
+    setVal apachekey "${APACHE_SSL_KEY}" "${DA_CONF_TEMPLATE}"
+    setVal apachekey "${APACHE_SSL_KEY}" "${DA_CONF}"
+    setVal apachemimetypes "${APACHE_MIME_TYPES}" "${DA_CONF_TEMPLATE}"
+    setVal apachemimetypes "${APACHE_MIME_TYPES}" "${DA_CONF}"
+    setVal cloud_cache 0 "${DA_CONF_TEMPLATE}"
+    setVal cloud_cache 0 "${DA_CONF}"
+    setVal htpasswd "${APACHE_HTPASSWD}" "${DA_CONF_TEMPLATE}"
+    setVal htpasswd "${APACHE_HTPASSWD}" "${DA_CONF}"
+    setVal nginx 0 "${DA_CONF_TEMPLATE}"
+    setVal nginx 0 "${DA_CONF}"
+  fi
+
+  if [ "${OPT_WEBSERVER}" = "nginx" ]; then
+    setVal nginx_ca "${NGINX_SSL_CA}" "${DA_CONF_TEMPLATE}"
+    setVal nginx_ca "${NGINX_SSL_CA}" "${DA_CONF}"
+    setVal nginx_cert "${NGINX_SSL_CRT}" "${DA_CONF_TEMPLATE}"
+    setVal nginx_cert "${NGINX_SSL_CRT}" "${DA_CONF}"
+    setVal nginx_key "${NGINX_SSL_KEY}" "${DA_CONF_TEMPLATE}"
+    setVal nginx_key "${NGINX_SSL_KEY}" "${DA_CONF}"
+    setVal nginx_pid /var/run/nginx.pid "${DA_CONF_TEMPLATE}"
+    setVal nginx_pid /var/run/nginx.pid "${DA_CONF}"
+    setVal nginxconf "${NGINX_PATH}/directadmin-vhosts.conf" "${DA_CONF_TEMPLATE}"
+    setVal nginxconf "${NGINX_PATH}/directadmin-vhosts.conf" "${DA_CONF}"
+    setVal nginxips "${NGINX_PATH}/directadmin-ips.conf" "${DA_CONF_TEMPLATE}"
+    setVal nginxips "${NGINX_PATH}/directadmin-ips.conf" "${DA_CONF}"
+    setVal nginxlogdir "${LOGS}/nginx/domains" "${DA_CONF_TEMPLATE}"
+    setVal nginxlogdir "${LOGS}/nginx/domains" "${DA_CONF}"
+  fi
+
+  if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
+    setVal nginx_proxy 1 "${DA_CONF_TEMPLATE}"
+    setVal nginx_proxy 1 "${DA_CONF}"
+    setVal litespeed 0 "${DA_CONF_TEMPLATE}"
+    setVal litespeed 0 "${DA_CONF}"
+  elif [ "${OPT_WEBSERVER}" = "apache" ]; then
+    setVal nginx_proxy 0 "${DA_CONF_TEMPLATE}"
+    setVal nginx_proxy 0 "${DA_CONF}"
+    setVal litespeed 0 "${DA_CONF_TEMPLATE}"
+    setVal litespeed 0 "${DA_CONF}"
+  fi
+
+  printf "*** Notice: Completed directadmin.conf updates.\n"
 
   return
 }
@@ -8797,12 +8877,10 @@ show_menu_setup() {
 }
 
 ################################################################################
-##
 ## Show Configuration Values
-##
 ################################################################################
 
-show_config() {
+show_config_values() {
 
   printf "\n"
   printf "\tConfigured Option Values (options.conf)\n"
@@ -8848,9 +8926,34 @@ show_config() {
 }
 
 ################################################################################
-##
+## Show Configuration Menu
+################################################################################
+
+# show_config_menu() {
+
+#   case $2 in
+#     "daconf"|"da_conf") update_da_conf ;;
+#     "") ;;
+#   esac
+
+# }
+
+################################################################################
+## Show Configuration
+################################################################################
+
+show_config() {
+
+  case $2 in
+    "daconf"|"da_conf") update_da_conf ;;
+    "") show_config_values ;;
+  esac
+
+  return
+}
+
+################################################################################
 ## Show Debugging Information
-##
 ################################################################################
 
 show_debug() {
@@ -8884,15 +8987,16 @@ show_debug() {
 
 rewrite_app() {
 
-  local APP="$1"
+  local APP="$2"
 
   case "${APP}" in
     "apache"|"apache24") apache_host_conf ;;
     "exim") exim_rewrite_confs ;;
     "dovecot") dovecot_rewrite_confs ;;
     "named"|"bind"|"dns") named_rewrite_confs ;;
-    "nginx") rewrite_nginx_confs ;;
-    "php") php_conf ;;
+    "nginx") nginx_rewrite_confs ;;
+    "php") php_rewrite_confs ;;
+    "vhosts") rewrite_vhosts ;;
     "virtual") rewrite_virtual_confs ;;
     "") show_rewrite_menu ;;
   esac
@@ -8920,6 +9024,7 @@ show_rewrite_menu() {
     printf "\tnamed: Rewrite Named (Bind) DNS files\n"
     printf "\tnginx: Rewrite Nginx configuration files and virtual hosts\n"
     printf "\tphp: Rewrite PHP configuration files\n"
+    printf "\tvhosts: Rewrite Virtual Hosts\n"
     printf "\tvirtual: Rewrite Mail (/etc/virtual) directory\n"
   } | column -t -s:
 
@@ -9157,7 +9262,7 @@ validate_options
 case "$1" in
   "about") show_about ;;                  ## show about
   "audit") show_audit ;;                  ## run "pkg audit"
-  "c"|"config") show_config ;;            ## show configured option values
+  "c"|"config") show_config "$@" ;;            ## show configured option values
   "d"|"debug") show_debug ;;              ## show debugging info
   "i"|"install"|"build") install_app "$@" ;;      ## install an application
   "o"|"outdated") show_outdated ;;        ## show installed packages that are out of date
