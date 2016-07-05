@@ -53,6 +53,9 @@ PortsBuild will NOT support:
 * PHP-FPM does not restart after adding a user due to startup script being called "php-fpm" instead of "php-fpmXX" (XX= 55, 56, 70, etc.) (DirectAdmin limitation)
 * Only one instance of PHP can be installed through ports/packages (afaik). Multiple PHP versions may be possible, but requires testing.
 
+### Changes from DA/CB defaults
+* PHP Sockets are now found under /var/run/php/sockets (used to be: /usr/local/php%VER%/sockets)
+* The WWW directory is now /usr/local/www (used to be: /var/www/html)
 
 ### Additional documentation to add
 * Virtualization (FreeBSD+DA as a Guest VM)
