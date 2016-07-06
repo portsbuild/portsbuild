@@ -2459,7 +2459,11 @@ exim_install() {
   fi
 
   ${CHMOD} 755 ${VIRTUAL_PATH}/*
-  ${MKDIR} ${VIRTUAL_PATH}/usage
+
+  if [ ! -d "${VIRTUAL_PATH}/usage" ]; then
+    ${MKDIR} "${VIRTUAL_PATH}/usage"
+  fi
+
   ${CHMOD} 750 ${VIRTUAL_PATH}/usage
 
   virtual_files="\
@@ -2538,8 +2542,8 @@ exim_install() {
     fi
   fi
 
-  ## Symlink configuration file
-  ln -s ${EXIM_CONF} "${EXIM_PATH}/configure"
+  ## Symlink configuration file (exim.conf -> configure)
+  ln -s ${EXIM_CONF} "${EXIM_PATH}/exim.conf"
 
   ## Verify Exim config:
   ${EXIM_BIN} -C "${EXIM_CONF}" -bV
