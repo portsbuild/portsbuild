@@ -2961,7 +2961,7 @@ dovecot_install() {
 
   local DOVECOT_CHECK QUOTA_COUNT COUNT_TEMPLATE
 
-  if [ ${OPT_DOVECOT} != "YES" ]; then
+  if [ "${OPT_DOVECOT}" != "YES" ]; then
     printf "*** Notice: DOVECOT is not enabled in options.conf\n"
     return
   fi
@@ -2978,7 +2978,7 @@ dovecot_install() {
     setVal dovecot 1 ${DA_CONF_TEMPLATE}
   fi
 
-  if [ "${DOVECOT_COUNT}" -eq 0 ] || [ ! -e "${DA_CONF}" ]; then
+  if [ "${DOVECOT_CHECK}" -eq 0 ] || [ ! -e "${DA_CONF}" ]; then
      printf "Converting to Dovecot\n"
 
     #   ## PB: Verify: moved contents of function below
@@ -8989,6 +8989,7 @@ install_app() {
     "blockcracking"|"bc") blockcracking_install ;;
     "directadmin"|"da") directadmin_install ;;
     "dkim") pkgi ${PORT_LIBDKIM} ;;
+    "dovecot") dovecot_install ;;
     "easy_spam_fighter"|"easyspamfighter"|"esf") easyspamfighter_install ;;
     "exim") exim_install ;;
     "ioncube"|"ic") pkgi "${PORT_IONCUBE}" ;;
