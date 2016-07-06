@@ -2416,13 +2416,12 @@ verify_webapps_logrotate() {
 }
 
 ################################################################################
-##
 ## Exim Installation
-##
 ################################################################################
 
 exim_install() {
 
+  local IFS=' '
   local virtual_files
 
   if [ "${OPT_EXIM}" != "YES" ]; then
@@ -2447,20 +2446,20 @@ exim_install() {
   # EXIM_USER="${EXIM_USER}" EXIM_GROUP="${EXIM_GROUP}"
 
   ## From: DA's scripts/install.sh
-  mkdir -p "${VIRTUAL_PATH}"
+  ${MKDIR} -p "${VIRTUAL_PATH}"
   ${CHOWN} -f "${EXIM_USER}:${EXIM_GROUP}" "${VIRTUAL_PATH}"
   ${CHMOD} 755 "${VIRTUAL_PATH}"
 
   if [ ! -s "${VIRTUAL_PATH}/limit" ]; then
-    echo "${LIMIT_DEFAULT}" > "${VIRTUAL_PATH}/limit"
+    printf "%s\n" "${LIMIT_DEFAULT}" > "${VIRTUAL_PATH}/limit"
   fi
 
   if [ ! -s "${VIRTUAL_PATH}/limit_unknown" ]; then
-    echo "${LIMIT_UNKNOWN}" > "${VIRTUAL_PATH}/limit_unknown"
+    printf "%s\n" "${LIMIT_UNKNOWN}" > "${VIRTUAL_PATH}/limit_unknown"
   fi
 
   ${CHMOD} 755 ${VIRTUAL_PATH}/*
-  mkdir ${VIRTUAL_PATH}/usage
+  ${MKDIR} ${VIRTUAL_PATH}/usage
   ${CHMOD} 750 ${VIRTUAL_PATH}/usage
 
   virtual_files="\
@@ -2482,42 +2481,65 @@ exim_install() {
 
   for file in ${virtual_files}; do
     if [ ! -e "${VIRTUAL_PATH}/${file}" ]; then
-      touch "${VIRTUAL_PATH}/${file}"
+      ${TOUCH} "${VIRTUAL_PATH}/${file}"
     fi
+    ${CHOWN} "${EXIM_USER}:${EXIM_GROUP}" "${VIRTUAL_PATH}/${file}"
     ${CHMOD} 600 "${VIRTUAL_PATH}/${file}"
   done
 
   ## Todo: add check first before adding 'hostname'
-  ## Verify: replace $(hostname)
+  ## Verify: replace with: $(hostname)
   hostname >> "${VIRTUAL_PATH}/domains"
 
   ${CHOWN} -f ${EXIM_USER}:${EXIM_GROUP} ${VIRTUAL_PATH}/*
-
-  ## Set permissions
   ${CHOWN} -R ${EXIM_USER}:${EXIM_GROUP} /var/spool/exim
 
-  ## Generate Self-Signed SSL Certificates
-  ## See: http://help.directadmin.com/item.php?id=245
-  ${OPENSSL} req -x509 -newkey rsa:2048 -keyout ${EXIM_SSL_KEY} -out ${EXIM_SSL_CRT} -days 9000 -nodes -config "${SSL_REQ_CONF}" # "${OPENSSL_EXTRA}"
-
-  ## Symlink Exim SSL key and cert for DA compat:
-  if [ -e "${EXIM_SSL_KEY}" ]; then
-    ln -s ${EXIM_SSL_KEY} /etc/exim.key
-    ${CHOWN} "${EXIM_USER}:${EXIM_GROUP}" ${EXIM_SSL_KEY}
-    ${CHMOD} 644 ${EXIM_SSL_KEY}
+  if [ ! -d "${EXIM_PATH}/ssl" ]; then
+    ${MKDIR} -p "${EXIM_PATH}/ssl"
+    ${CHOWN} "${EXIM_USER}:${EXIM_GROUP}" "${EXIM_PATH}/ssl"
+    ${CHMOD} 755 "${EXIM_PATH}/ssl"
   fi
+
+  if [ ! -e "${EXIM_SSL_KEY}" ]; then
+    ## Generate Self-Signed SSL Certificates
+    ## See: http://help.directadmin.com/item.php?id=245
+    ${OPENSSL} req -x509 -newkey rsa:2048 -keyout ${EXIM_SSL_KEY} \
+    -out ${EXIM_SSL_CRT} -days 9000 -nodes -config "${SSL_REQ_CONF}" # "${OPENSSL_EXTRA}"
+  fi
+
+  ${CHOWN} "${EXIM_USER}:${EXIM_GROUP}" ${EXIM_SSL_KEY}
+  ${CHMOD} 600 ${EXIM_SSL_KEY}
+
+  ${CHOWN} "${EXIM_USER}:${EXIM_GROUP}" ${EXIM_SSL_CRT}
+  ${CHMOD} 644 ${EXIM_SSL_CRT}
 
   ## Symlink for DA compat:
   if [ "${COMPAT_EXIM_SYMLINKS}" = "YES" ]; then
-    if [ ! -e /etc/exim.conf ]; then
-      ln -s ${EXIM_CONF} /etc/exim.conf
+    if [ -e ${EXIM_CONF} ]; then
+      if [ ! -e /etc/exim.conf ]; then
+        ln -s ${EXIM_CONF} /etc/exim.conf
+      fi
+      ${CHOWN} -h "${EXIM_USER}:${EXIM_GROUP}" /etc/exim.conf
+      ${CHMOD} -h 644 /etc/exim.conf
     fi
-
     if [ -e "${EXIM_SSL_CRT}" ]; then
-      ln -s ${EXIM_SSL_CRT} /etc/exim.cert
-      ${CHMOD} 644 ${EXIM_SSL_CRT}
+      if [ ! -e /etc/exim.cert ]; then
+        ln -s ${EXIM_SSL_CRT} /etc/exim.cert
+      fi
+      ${CHOWN} -h "${EXIM_USER}:${EXIM_GROUP}" /etc/exim.cert
+      ${CHMOD} -h 644 /etc/exim.cert
+    fi
+    if [ -e "${EXIM_SSL_KEY}" ]; then
+      if [ ! -e /etc/exim.key ]; then
+        ln -s ${EXIM_SSL_KEY} /etc/exim.key
+      fi
+      ${CHOWN} -h "${EXIM_USER}:${EXIM_GROUP}" /etc/exim.key
+      ${CHMOD} -h 600 /etc/exim.key
     fi
   fi
+
+  ## Symlink configuration file
+  ln -s ${EXIM_CONF} "${EXIM_PATH}/configure"
 
   ## Verify Exim config:
   ${EXIM_BIN} -C "${EXIM_CONF}" -bV
@@ -2529,17 +2551,16 @@ exim_install() {
 
   if [ ! -e /etc/periodic.conf ]; then
     printf "Creating /etc/periodic.conf\n"
-    touch /etc/periodic.conf
+    ${TOUCH} /etc/periodic.conf
   fi
 
   printf "Updating /etc/periodic.conf\n"
   ${SYSRC} -f /etc/periodic.conf daily_status_include_submit_mailq="NO"
   ${SYSRC} -f /etc/periodic.conf daily_clean_hoststat_enable="NO"
 
-  printf "Starting Exim\n"
   ${SERVICE} exim start
 
-  printf "Updating mq_exim_bin paths in DirectAdmin template + configuration files\n"
+  # printf "Updating mq_exim_bin paths in DirectAdmin template + configuration files\n"
   setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_TEMPLATE}
 
   if [ -e "${DA_CONF}" ]; then
@@ -2551,7 +2572,7 @@ exim_install() {
   ## Verify: Modify /usr/local/etc/mailer.conf instead?
   if [ ! -e /etc/mail/mailer.conf ]; then
     printf "Creating /etc/mail/mailer.conf\n"
-    touch /etc/mail/mailer.conf
+    ${TOUCH} /etc/mail/mailer.conf
 
     # cp "${PB_PATH}/configure/etc/mail/mailer.93.conf" /etc/mail/mailer.conf
     # cp "${PB_PATH}/configure/etc/mail/mailer.100.conf" /etc/mail/mailer.conf
@@ -2936,6 +2957,11 @@ dovecot_install() {
 
   local DOVECOT_CHECK QUOTA_COUNT COUNT_TEMPLATE
 
+  if [ ${OPT_DOVECOT} != "YES" ]; then
+    printf "*** Notice: DOVECOT is not enabled in options.conf\n"
+    return
+  fi
+
   ## Todo:
   ## 2016-03-26: Check to see if we need to convert instead of a fresh install
 
@@ -2948,61 +2974,61 @@ dovecot_install() {
     setVal dovecot 1 ${DA_CONF_TEMPLATE}
   fi
 
-  # if [ "${DOVECOT_COUNT}" -eq 0 ] || [ ! -e "${DA_CONF}" ]; then
-  #   echo "Converting to Dovecot"
-  #
-  #   ## PB: Verify: moved contents of function below
-  #   # convertToDovecot
-  #
-  #   ## CB2: Patch exim.conf
-  #   if [ -e "${EXIM_CONF}" ] && [ "$(grep -m1 -c maildir_format ${EXIM_CONF})" -eq 0 ]; then
-  #     echo "To Dovecot: Patching /etc/exim.conf to maildir"
-  #     ## Verify: patch -d/ -p0 < ${PB_PATH}/patches/exim.conf.dovecot.patch
-  #   fi
-  #
-  #   ## Existing installs
-  #   if [ -e "${DA_CONF}" ]; then
-  #     if ! grep -m1 -q -e '^dovecot=1' ${DA_CONF}; then
-  #       echo "Adding dovecot=1 to ${DA_CONF}"
-  #       setVal dovecot 1 ${DA_CONF}
-  #       set_service dovecot ON
-  #       directadmin_restart
-  #     fi
-  #   fi
-  #
-  #   ## Existing + New installs
-  #   if [ -e "${DA_CONF_TEMPLATE}" ]; then
-  #     if ! grep -m1 -q -e '^dovecot=1' ${DA_CONF_TEMPLATE}; then
-  #       echo "Adding dovecot=1 to template ${DA_CONF_TEMPLATE}"
-  #       setVal dovecot 1 ${DA_CONF_TEMPLATE}
-  #       set_service dovecot ON
-  #     fi
-  #   fi
-  #
-  #   ## Verify:
-  #   # ${SERVICE} directadmin restart
-  #   # ${SERVICE} exim restart
-  #   # ${PERL} -pi -e 's/^imap/#imap/' /etc/inetd.conf
-  #   # killall -HUP inetd
-  #   # /usr/local/etc/rc.d/vm-pop3d stop
-  #   # grep -v vm-pop3d /usr/local/etc/rc.d/boot.sh > /usr/local/etc/rc.d/boot.sh.new
-  #   # mv -f /usr/local/etc/rc.d/boot.sh /usr/local/etc/rc.d/boot.sh.old
-  #   # mv -f /usr/local/etc/rc.d/boot.sh.new /usr/local/etc/rc.d/boot.sh
-  #   # chmod 755 /usr/local/etc/rc.d/boot.sh
-  #
-  #   echo "Adding conversion command to the Task Queue"
-  #   echo "action=convert&value=todovecot" >> ${DA_TASK_QUEUE}
-  #   echo "Executing the Task Queue contents now, please wait..."
-  #   run_dataskq d
-  #
-  #   printf "Restarting Dovecot\n"
-  #   ${SERVICE} dovecot restart
-  #
-  #   printf "Restarting Exim\n"
-  #   ${SERVICE} exim restart
-  #
-  #   echo "Completed Dovecot conversion."
-  # fi
+  if [ "${DOVECOT_COUNT}" -eq 0 ] || [ ! -e "${DA_CONF}" ]; then
+     printf "Converting to Dovecot\n"
+
+    #   ## PB: Verify: moved contents of function below
+    #   # convertToDovecot
+    #
+    #   ## CB2: Patch exim.conf
+    #   if [ -e "${EXIM_CONF}" ] && [ "$(grep -m1 -c maildir_format ${EXIM_CONF})" -eq 0 ]; then
+    #     echo "To Dovecot: Patching /etc/exim.conf to maildir"
+    #     ## Verify: patch -d/ -p0 < ${PB_PATH}/patches/exim.conf.dovecot.patch
+    #   fi
+
+    ## Existing installs
+    if [ -e "${DA_CONF}" ]; then
+      if ! grep -m1 -q -e '^dovecot=1' ${DA_CONF}; then
+        # printf "Adding dovecot=1 to %s" "${DA_CONF}"
+        setVal dovecot 1 ${DA_CONF}
+        set_service dovecot ON
+        directadmin_restart
+      fi
+    fi
+
+    ## Existing + New installs
+    if [ -e "${DA_CONF_TEMPLATE}" ]; then
+      if ! grep -m1 -q -e '^dovecot=1' ${DA_CONF_TEMPLATE}; then
+        # printf "Adding dovecot=1 to template %s" "${DA_CONF_TEMPLATE}"
+        setVal dovecot 1 ${DA_CONF_TEMPLATE}
+        set_service dovecot ON
+      fi
+    fi
+
+    # ${SERVICE} directadmin restart
+    # ${SERVICE} exim restart
+    # ${PERL} -pi -e 's/^imap/#imap/' /etc/inetd.conf
+    # killall -HUP inetd
+    # /usr/local/etc/rc.d/vm-pop3d stop
+
+    # grep -v vm-pop3d /usr/local/etc/rc.d/boot.sh > /usr/local/etc/rc.d/boot.sh.new
+    # mv -f /usr/local/etc/rc.d/boot.sh /usr/local/etc/rc.d/boot.sh.old
+    # mv -f /usr/local/etc/rc.d/boot.sh.new /usr/local/etc/rc.d/boot.sh
+    # chmod 755 /usr/local/etc/rc.d/boot.sh
+
+    # printf "Adding conversion command to the Task Queue\n"
+    # echo "action=convert&value=todovecot" >> ${DA_TASK_QUEUE}
+    # printf "Executing the Task Queue contents now, please wait...\n"
+    # run_dataskq d
+
+    # printf "Restarting Dovecot\n"
+    # dovecot_restart
+
+    # printf "Restarting Exim\n"
+    # exim_restart
+
+    # printf "Dovecot conversion completed.\n"
+  fi
 
   printf "Starting Dovecot installation\n"
 
@@ -3066,7 +3092,7 @@ dovecot_install() {
   if [ "${COMPAT_DOVECOT_SYMLINKS}" = "YES" ]; then
     ## Symlink for compat:
     mkdir -p /etc/dovecot
-    ln -s ${DOVECOT_CONF} "${DOVECOT_PATH}/dovecot.conf"
+    ln -s ${DOVECOT_CONF} "/etc/dovecot/dovecot.conf"
     ## Skipped: ln -s /etc/dovecot/dovecot.conf /etc/dovecot.conf
   fi
 
@@ -3080,26 +3106,26 @@ dovecot_install() {
     ${PERL} -pi -e 's#transport = virtual_localdelivery#transport = dovecot_lmtp_udp#' ${EXIM_CONF}
 
     cp -f "${PB_CONFIG}/dovecot/conf.d/90-sieve.conf" "${DOVECOT_PATH}/conf.d/90-sieve.conf"
-    echo "protocols = imap pop3 lmtp sieve" > ${DOVECOT_PATH}/conf/protocols.conf
-    echo "mail_plugins = \$mail_plugins quota sieve" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
+    printf "protocols = imap pop3 lmtp sieve\n" > ${DOVECOT_PATH}/conf/protocols.conf
+    printf "mail_plugins = \$mail_plugins quota sieve\n" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
   else
     rm -f "${DOVECOT_PATH}/conf.d/90-sieve.conf"
-    echo "mail_plugins = \$mail_plugins quota" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
+    printf "mail_plugins = \$mail_plugins quota\n" > ${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf
   fi
 
   if [ -e "${DOVECOT_PATH}/conf/lmtp.conf" ]; then
     ${PERL} -pi -e "s|HOSTNAME|$(hostname)|" ${DOVECOT_PATH}/conf/lmtp.conf
   fi
 
-  touch /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
+  ${TOUCH} /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
   ${CHOWN} root:wheel /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
   ${CHMOD} 600 /var/log/dovecot-lmtp.log /var/log/dovecot-lmtp-errors.log
 
   ${PERL} -pi -e 's/driver = shadow/driver = passwd/' ${DOVECOT_CONF}
   ${PERL} -pi -e 's/passdb shadow/passdb passwd/' ${DOVECOT_CONF}
 
-  echo "mail_plugins = \$mail_plugins quota"            > ${DOVECOT_PATH}/conf/mail_plugins.conf
-  echo "mail_plugins = \$mail_plugins quota imap_quota" > ${DOVECOT_PATH}/conf/imap_mail_plugins.conf
+  printf "mail_plugins = \$mail_plugins quota\n"            > ${DOVECOT_PATH}/conf/mail_plugins.conf
+  printf "mail_plugins = \$mail_plugins quota imap_quota\n" > ${DOVECOT_PATH}/conf/imap_mail_plugins.conf
 
   ## Check for IPV6 compatibility:
   if [ "${IPV6}" = "1" ]; then
@@ -3135,8 +3161,8 @@ dovecot_install() {
     echo "ssl_key = <${DOVECOT_SSL_KEY}" >> "${DOVECOT_PATH}/conf/ssl.conf"
   fi
 
-  echo "ssl_protocols = !SSLv2 !SSLv3" >> "${DOVECOT_PATH}/conf/ssl.conf"
-  echo "ssl_cipher_list = ALL:!ADH:RC4+RSA:+HIGH:+MEDIUM:-LOW:-SSLv2:-EXP" >> "${DOVECOT_PATH}/conf/ssl.conf"
+  printf "ssl_protocols = !SSLv2 !SSLv3\n" >> "${DOVECOT_PATH}/conf/ssl.conf"
+  printf "ssl_cipher_list = ALL:!ADH:RC4+RSA:+HIGH:+MEDIUM:-LOW:-SSLv2:-EXP\n" >> "${DOVECOT_PATH}/conf/ssl.conf"
 
   freebsd_set_newsyslog "${LOGS}/dovecot-lmtp-errors.log" root:wheel
   freebsd_set_newsyslog "${LOGS}/dovecot-lmtp.log" root:wheel
@@ -3144,8 +3170,8 @@ dovecot_install() {
   ## PB: vm-pop3d is no longer needed (part of CB2's convertToDovecot())
   set_service vm-pop3d delete
 
-  ## PB: Verify:
-  # set_service da-popb4smtp OFF
+  ## Disable da-popb4smtp
+  set_service da-popb4smtp OFF
 
   printf "Enabling Dovecot startup (upating /etc/rc.conf)\n"
   ${SYSRC} dovecot_enable="YES"
@@ -3156,9 +3182,120 @@ dovecot_install() {
 }
 
 ################################################################################
-##
+## Dovecot Configuration (from CB: doDovecotConf())
+################################################################################
+
+dovecot_config() {
+
+  local COUNT COUNT_TEMPLATE
+
+  if [ "${OPT_DOVECOT_CONF}" != "yes" ]; then
+    printf "*** NOtice: You cannot update Dovecot configuration files, because you do not have it set in options.conf.\n"
+  fi
+
+  printf "Updating Dovecot configuration files...\n"
+
+  ## CB2: Enable dovecot quota by default
+  COUNT=0
+  if [ -e "${DA_CONF}" ]; then
+    COUNT="$(grep -m1 -c -e '^add_userdb_quota=1' ${DA_CONF})"
+  fi
+
+  if [ "${COUNT}" = "0" ] && [ -e ${DA_CONF} ]; then
+    #echo "Adding add_userdb_quota=1 to the ${DA_CONF} file to enable dovecot quota..."
+    printf "add_userdb_quota=1\n" >> ${DA_CONF}
+    directadmin_restart
+    echo "action=rewrite&value=email_passwd" >> ${DA_TASK_QUEUE}
+    run_dataskq d
+  fi
+
+  COUNT_TEMPLATE="$(grep -m1 -c -e '^add_userdb_quota=1' ${DA_CONF_TEMPLATE})"
+  if [ "${COUNT_TEMPLATE}" = "0" ] && [ -e "${DA_CONF_TEMPLATE}" ]; then
+    #echo "Adding add_userdb_quota=1 to the ${DACONF_TEMPLATE_FILE} (template) file ..."
+    printf "add_userdb_quota=1\n" >> "${DA_CONF_TEMPLATE}"
+  fi
+
+  if [ ! -d "${DOVECOT_PATH}/conf" ]; then
+    mkdir -p "${DOVECOT_PATH}/conf"
+  fi
+
+  if [ ! -d "${DOVECOT_PATH}/conf.d" ]; then
+    mkdir -p "${DOVECOT_PATH}/conf.d"
+  fi
+
+  cp -rf ${DOVECOTCONFDIR} ${DOVECOT_PATH}
+
+  if [ "${IPV6}" = "1" ]; then
+    printf "listen = *, ::\n" > "${DOVECOT_PATH}/conf/ip.conf"
+  fi
+
+  ## Verify:
+  if [ "${DOVECOTCUSTOMCONFDIR}" != "0" ]; then
+    cp -rf ${DOVECOTCUSTOMCONFDIR} ${DOVECOT_PATH}/
+  fi
+
+  cp -f ${DOVECTCONFFILE} ${DOVECOT_CONF}
+  cp -f ${DOVECTCONFQUOTA} "${DOVECOT_PATH}/conf.d/90-quota.conf"
+
+  if [ "${OPT_PIGEONHOLE}" = "YES" ]; then
+    cp -f ${DOVECTCONFSIEVE} "${DOVECOT_PATH}/conf.d/90-sieve.conf"
+    printf "protocols = imap pop3 lmtp sieve\n" > "${DOVECOT_PATH}/conf/protocols.conf"
+    printf "mail_plugins = \$mail_plugins quota sieve\n" > "${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf"
+  else
+    rm -f "${DOVECOT_PATH}/conf.d/90-sieve.conf"
+    printf "mail_plugins = \$mail_plugins quota\n" > "${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf"
+  fi
+  if [ -e "${DOVECOT_PATH}/conf/lmtp.conf" ]; then
+    ${PERL} -pi -e "s|HOSTNAME|`hostname`|" "${DOVECOT_PATH}/conf/lmtp.conf"
+  fi
+
+  # if [ ! -L /usr/local/etc/dovecot.conf ]; then
+  #   mv -f /usr/local/etc/dovecot.conf /usr/local/etc/dovecot.conf.old
+  #   ln -s /etc/dovecot/dovecot.conf /usr/local/etc/dovecot.conf
+  # fi
+
+  # DC="${DOVECOT_PATH}/dovecot.conf"
+  # if [ -L ${DOVECOT_PATH}/dovecot.conf ]; then
+  #   DC=${DOVECOT_PATH}/dovecot.conf
+  # fi
+
+  ${PERL} -pi -e 's/driver = shadow/driver = passwd/' ${DOVECOT_CONF}
+  ${PERL} -pi -e 's/passdb shadow/passdb passwd/' ${DOVECOT_CONF}
+
+  printf "mail_plugins = \$mail_plugins quota\n" > "${DOVECOT_PATH}/conf/mail_plugins.conf"
+  printf "mail_plugins = \$mail_plugins quota imap_quota\n" > "${DOVECOT_PATH}/conf/imap_mail_plugins.conf"
+
+  #If customized configs - overwrite existing ones, which we modified above
+  if [ "${DOVECOTCUSTOMCONFDIR}" != "0" ]; then
+    if [ -e ${DOVECOTCUSTOMCONFDIR}/protocols.conf ]; then
+      cp -f ${DOVECOTCUSTOMCONFDIR}/protocols.conf "${DOVECOT_PATH}/conf/protocols.conf"
+    fi
+    if [ -e ${DOVECOTCUSTOMCONFDIR}/lmtp_mail_plugins.conf ]; then
+      cp -f ${DOVECOTCUSTOMCONFDIR}/lmtp_mail_plugins.conf "${DOVECOT_PATH}/conf/lmtp_mail_plugins.conf"
+    fi
+    if [ -e ${DOVECOTCUSTOMCONFDIR}/mail_plugins.conf ]; then
+      cp -f ${DOVECOTCUSTOMCONFDIR}/mail_plugins.conf "${DOVECOT_PATH}/conf/mail_plugins.conf"
+    fi
+    if [ -e ${DOVECOTCUSTOMCONFDIR}/imap_mail_plugins.conf ]; then
+      cp -f ${DOVECOTCUSTOMCONFDIR}/imap_mail_plugins.conf "${DOVECOT_PATH}/conf/imap_mail_plugins.conf"
+    fi
+    if [ -e ${DOVECOTCUSTOMCONFDIR}/lmtp.conf ]; then
+      cp -f ${DOVECOTCUSTOMCONFDIR}/lmtp.conf "${DOVECOT_PATH}/conf/lmtp.conf"
+    fi
+  fi
+
+  if [ "$1" != "norestart" ]; then
+    # echo "Restarting dovecot."
+    control_service dovecot restart
+  fi
+
+  printf "Dovecot configuration files have been updated successfully.\n"
+
+  return
+}
+
+################################################################################
 ## Dovecot Restart with configuration file verification
-##
 ################################################################################
 
 dovecot_restart() {
@@ -8602,7 +8739,7 @@ get_versions() {
       if [ "${DOVECOT_CONF_VER}" != "${DOVECOT_CONFV}" ]; then
         if [ "${VERSIONS}" = "0" ]; then
           echo "${boldon}Updating dovecot.conf${boldoff}"
-          doDovecotConf
+          dovecot_config
         elif [ "${VERSIONS}" = "1" ]; then
           echo "${boldon}dovecot.conf ${DOVECOT_CONFV} to ${DOVECOT_CONF_VER} update is available.${boldoff}"
           echo ""
