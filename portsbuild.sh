@@ -237,7 +237,7 @@ readonly PHP_INI_WEBAPPS="${PHP_ETC}/50-webapps.ini"
 readonly PHP_INI_EXTENSIONS="${PHP_ETC}/extensions.ini"
 readonly PHP_INI_OPCACHE="${PHP_ETC}/opcache.ini"
 readonly PHP_INI_DIRECTADMIN="${PHP_ETC}/10-directadmin.ini"
-readonly PHP_FPM_CONF="${PHP_ETC}/php-fpm.conf"
+readonly PHP_FPM_CONF="/usr/local/etc/php-fpm.conf"
 readonly PHP_SOCKETS_PATH=/var/run/php/sockets
 readonly PHP1_RELEASE_SET="5.5 5.6 7.0"
 readonly PHP1_SHORTRELEASE_SET="$(echo "${PHP1_RELEASE_SET}" | tr -d '.')"
@@ -453,6 +453,57 @@ readonly PORT_MOD_PHP55='www/mod_php55'
 readonly PORT_MOD_PHP56='www/mod_php56'
 readonly PORT_MOD_PHP70='www/mod_php70'
 readonly PORT_SUPHP='www/suphp'
+
+## PHP 5.6 Extensions
+readonly PORT_ARCHIVERS_PHP56_BZ2='archivers/php56-bz2'
+readonly PORT_ARCHIVERS_PHP56_PHAR='archivers/php56-phar'
+readonly PORT_ARCHIVERS_PHP56_ZIP='archivers/php56-zip'
+readonly PORT_ARCHIVERS_PHP56_ZLIB='archivers/php56-zlib'
+readonly PORT_CONVERTERS_PHP56_ICONV='converters/php56-iconv'
+readonly PORT_CONVERTERS_PHP56_MBSTRING='converters/php56-mbstring'
+readonly PORT_CONVERTERS_PHP56_RECODE='converters/php56-recode'
+readonly PORT_DATABASES_PHP56_MYSQL='databases/php56-mysql'
+readonly PORT_DATABASES_PHP56_MYSQLI='databases/php56-mysqli'
+readonly PORT_DATABASES_PHP56_ODBC='databases/php56-odbc'
+readonly PORT_DATABASES_PHP56_PDO='databases/php56-pdo'
+readonly PORT_DATABASES_PHP56_PDO_MYSQL='databases/php56-pdo_mysql'
+readonly PORT_DATABASES_PHP56_PDO_SQLITE='databases/php56-pdo_sqlite'
+readonly PORT_DATABASES_PHP56_SQLITE3='databases/php56-sqlite3'
+readonly PORT_DEVEL_PHP56_GETTEXT='devel/php56-gettext'
+readonly PORT_DEVEL_PHP56_JSON='devel/php56-json'
+readonly PORT_DEVEL_PHP56_READLINE='devel/php56-readline'
+readonly PORT_DEVEL_PHP56_TOKENIZER='devel/php56-tokenizer'
+readonly PORT_FTP_PHP56_CURL='ftp/php56-curl'
+readonly PORT_FTP_PHP56_FTP='ftp/php56-ftp'
+readonly PORT_GRAPHICS_PHP56_EXIF='graphics/php56-exif'
+readonly PORT_GRAPHICS_PHP56_GD='graphics/php56-gd'
+readonly PORT_MAIL_PHP56_IMAP='mail/php56-imap'
+readonly PORT_MATH_PHP56_BCMATH='math/php56-bcmath'
+readonly PORT_MISC_PHP56_CALENDAR='misc/php56-calendar'
+readonly PORT_NET_MGMT_PHP56_SNMP='net-mgmt/php56-snmp'
+readonly PORT_NET_PHP56_SOAP='net/php56-soap'
+readonly PORT_NET_PHP56_SOCKETS='net/php56-sockets'
+readonly PORT_NET_PHP56_XMLRPC='net/php56-xmlrpc'
+readonly PORT_SECURITY_PHP56_FILTER='security/php56-filter'
+readonly PORT_SECURITY_PHP56_HASH='security/php56-hash'
+readonly PORT_SECURITY_PHP56_MCRYPT='security/php56-mcrypt'
+readonly PORT_SECURITY_PHP56_OPENSSL='security/php56-openssl'
+readonly PORT_SYSUTILS_PHP56_FILEINFO='sysutils/php56-fileinfo'
+readonly PORT_SYSUTILS_PHP56_POSIX='sysutils/php56-posix'
+readonly PORT_TEXTPROC_PHP56_CTYPE='textproc/php56-ctype'
+readonly PORT_TEXTPROC_PHP56_DOM='textproc/php56-dom'
+readonly PORT_TEXTPROC_PHP56_PSPELL='textproc/php56-pspell'
+readonly PORT_TEXTPROC_PHP56_SIMPLEXML='textproc/php56-simplexml'
+readonly PORT_TEXTPROC_PHP56_WDDX='textproc/php56-wddx'
+readonly PORT_TEXTPROC_PHP56_XML='textproc/php56-xml'
+readonly PORT_TEXTPROC_PHP56_XMLREADER='textproc/php56-xmlreader'
+readonly PORT_TEXTPROC_PHP56_XMLWRITER='textproc/php56-xmlwriter'
+readonly PORT_TEXTPROC_PHP56_XSL='textproc/php56-xsl'
+readonly PORT_WWW_PHP56_OPCACHE='www/php56-opcache'
+readonly PORT_WWW_PHP56_SESSION='www/php56-session'
+readonly PORT_WWW_PHP56_TIDY='www/php56-tidy'
+
+readonly PHP56_EXT_LIST="${PORT_ARCHIVERS_PHP56_BZ2} ${PORT_ARCHIVERS_PHP56_PHAR} ${PORT_ARCHIVERS_PHP56_ZIP} ${PORT_ARCHIVERS_PHP56_ZLIB} ${PORT_CONVERTERS_PHP56_ICONV} ${PORT_CONVERTERS_PHP56_MBSTRING} ${PORT_CONVERTERS_PHP56_RECODE} ${PORT_DATABASES_PHP56_MYSQL} ${PORT_DATABASES_PHP56_MYSQLI} ${PORT_DATABASES_PHP56_ODBC} ${PORT_DATABASES_PHP56_PDO} ${PORT_DATABASES_PHP56_PDO_MYSQL} ${PORT_DATABASES_PHP56_PDO_SQLITE} ${PORT_DATABASES_PHP56_SQLITE3} ${PORT_DEVEL_PHP56_GETTEXT} ${PORT_DEVEL_PHP56_JSON} ${PORT_DEVEL_PHP56_READLINE} ${PORT_DEVEL_PHP56_TOKENIZER} ${PORT_FTP_PHP56_CURL} ${PORT_FTP_PHP56_FTP} ${PORT_GRAPHICS_PHP56_EXIF} ${PORT_GRAPHICS_PHP56_GD} ${PORT_MAIL_PHP56_IMAP} ${PORT_MATH_PHP56_BCMATH} ${PORT_MISC_PHP56_CALENDAR} ${PORT_NET_MGMT_PHP56_SNMP} ${PORT_NET_PHP56_SOAP} ${PORT_NET_PHP56_SOCKETS} ${PORT_NET_PHP56_XMLRPC} ${PORT_SECURITY_PHP56_FILTER} ${PORT_SECURITY_PHP56_HASH} ${PORT_SECURITY_PHP56_MCRYPT} ${PORT_SECURITY_PHP56_OPENSSL} ${PORT_SYSUTILS_PHP56_FILEINFO} ${PORT_SYSUTILS_PHP56_POSIX} ${PORT_TEXTPROC_PHP56_CTYPE} ${PORT_TEXTPROC_PHP56_DOM} ${PORT_TEXTPROC_PHP56_PSPELL} ${PORT_TEXTPROC_PHP56_SIMPLEXML} ${PORT_TEXTPROC_PHP56_WDDX} ${PORT_TEXTPROC_PHP56_XML} ${PORT_TEXTPROC_PHP56_XMLREADER} ${PORT_TEXTPROC_PHP56_XMLWRITER} ${PORT_TEXTPROC_PHP56_XSL} ${PORT_WWW_PHP56_OPCACHE} ${PORT_WWW_PHP56_SESSION} ${PORT_WWW_PHP56_TIDY}"
 
 readonly PORT_PHPMYADMIN='databases/phpmyadmin'
 readonly PORT_IONCUBE='devel/ioncube'
@@ -792,12 +843,21 @@ setVal() {
   local OPTION_NAME="$1"
   local OPTION_VALUE="$2"
   local OPTION_FILE="$3"
+  local FILE_DESC
 
   if [ "${OPTION_FILE}" = "${DA_CONF}" ] && [ ! -e "${DA_CONF}" ]; then
     return
   fi
 
-  printf "Setting %s to %s in %s\n" "${OPTION_NAME}" "${OPTION_VALUE}" "${OPTION_FILE}"
+  if [ "${OPTION_FILE}" = "${DA_CONF}" ]; then
+    FILE_DESC='directadmin.conf'
+  elif [ "${OPTION_FILE}" = "${DA_CONF_TEMPLATE}" ]; then
+    FILE_DESC='directadmin.conf (template)'
+  else
+    FILE_DESC="${OPTIONS_FILE}"
+  fi
+
+  printf "Setting %s to %s in %s\n" "${OPTION_NAME}" "${OPTION_VALUE}" "${FILE_DESC}"
 
   ## Check if file exists.
   if [ ! -e "${OPTION_FILE}" ]; then
@@ -1606,7 +1666,7 @@ control_service() {
 
   ## Test certain service config files before restarting to prevent downtime
   case ${SERVICE_NAME} in
-    "php-fpm"|"fpm"|"php") CONFIG_STATUS=$(${SERVICE} php-fpm configtest) ;;
+    "php-fpm"|"fpm"|"php"|"php_fpm") CONFIG_STATUS=$(${SERVICE} php-fpm configtest) ;;
     "apache"|"apache24"|"httpd") CONFIG_STATUS=$(${SERVICE} apache24 configtest) ;;
     "nginx") CONFIG_STATUS=$(${SERVICE} nginx configtest) ;;
     "exim") CONFIG_STATUS=$(${EXIM_BIN} -C "${EXIM_CONF}" -bV) ;;
@@ -2046,6 +2106,12 @@ directadmin_install() {
   mkdir -p "${DA_PATH}/data/users/admin/packages"
   ${CHOWN} diradmin:diradmin "${DA_PATH}/data/users/admin/packages"
   ${CHMOD} 700 "${DA_PATH}/data/users/admin/packages"
+
+  if [ ! -d "${DA_PATH}/data/templates/custom" ]; then
+    printf "*** Notice: Copying custom PB DirectAdmin templates.\n"
+    cp -Rf "${PB_PATH}/directadmin/data/templates/custom/" "${DA_PATH}/data/templates/custom/"
+    ${CHOWN} -R diradmin:diradmin "${DA_PATH}/data/templates/custom/"
+  fi
 
   return
 }
@@ -3078,6 +3144,9 @@ dovecot_install() {
   ## PB: vm-pop3d is no longer needed (part of CB2's convertToDovecot())
   set_service vm-pop3d delete
 
+  ## PB: Verify:
+  # set_service da-popb4smtp OFF
+
   printf "Enabling Dovecot startup (upating /etc/rc.conf)\n"
   ${SYSRC} dovecot_enable="YES"
 
@@ -3555,7 +3624,7 @@ fpmCheck() {
   local ARG="$1" ## PHP version (dual PHP mode)
   local WEB_SERVER_CHANGED COUNT FPM_SOCK_CHMOD
 
-  readonly FPM_SOCK_CHMOD=700
+  FPM_SOCK_CHMOD=700
 
   WEB_SERVER_CHANGED=0
 
@@ -3574,18 +3643,21 @@ fpmCheck() {
     CHOWN_USER="${OPT_WEBSERVER}"
   fi
 
+  ## Socket directory permissions
   if [ "${DUAL_PHP_MODE}" = "YES" ]; then
     ${CHOWN} "${CHOWN_USER}:${CHOWN_USER}" "/usr/local/php${ARG}/sockets"
   else
     ${CHOWN} "${CHOWN_USER}:${CHOWN_USER}" "${PHP_SOCKETS_PATH}"
   fi
 
+  ## Socket directory permissions
   if [ "${DUAL_PHP_MODE}" = "YES" ]; then
-    ${CHMOD} ${FPM_SOCK_CHMOD} "/usr/local/php${ARG}/sockets"
+    ${CHMOD} "${FPM_SOCK_CHMOD}" "/usr/local/php${ARG}/sockets"
   else
-    ${CHMOD} ${FPM_SOCK_CHMOD} "${PHP_SOCKETS_PATH}"
+    ${CHMOD} "${FPM_SOCK_CHMOD}" "${PHP_SOCKETS_PATH}"
   fi
 
+  ## Nginx
   if [ "${OPT_WEBSERVER}" = "nginx" ] && [ "${COUNT}" -eq 0 ]; then
     if [ "${DUAL_PHP_MODE}" = "YES" ]; then
       ${PERL} -pi -e 's/apache/nginx/' "/usr/local/php${ARG}/etc/php-fpm.conf"
@@ -3604,6 +3676,7 @@ fpmCheck() {
     fi
   fi
 
+  ## Socket directory permissions
   if [ "${DUAL_PHP_MODE}" = "YES" ]; then
     if [ -d "/usr/local/php${ARG}/sockets" ]; then
       if [ "${OPT_WEBSERVER}" = "nginx" ]; then
@@ -3622,11 +3695,12 @@ fpmCheck() {
     fi
   fi
 
+  ## Restart PHP-FPM if webserver changed
   if [ ${WEB_SERVER_CHANGED} -eq 1 ]; then
     if [ "${DUAL_PHP_MODE}" = "YES" ]; then
       ${SERVICE} "php-fpm${ARG}" restart
     else
-      ${SERVICE} php-fpm restart
+      php_fpm_restart
     fi
   fi
 
@@ -3649,15 +3723,16 @@ fpmChecks() {
       EVAL_CHECK_VAR="HAVE_FPM${php_shortrelease}_CGI"
       EVAL_COPY_VAR="PHP${php_shortrelease}_FPM_CONF"
       if [ "$(eval_var "${EVAL_CHECK_VAR}")" = "YES" ] && [ -d "/usr/local/php${php_shortrelease}/sockets" ]; then
-        printf "*** Debug: Copying file in fpmChecks()\n"
         cp -f "$(eval_var "${EVAL_COPY_VAR}")" "/usr/local/php${php_shortrelease}/etc/php-fpm.conf"
         fpmCheck "${php_shortrelease}"
       fi
     done
   else
-    EVAL_CHECK_VAR="HAVE_FPM${OPT_PHP1_VERSION}_CGI"
-    if [ "$(eval_var "${EVAL_CHECK_VAR}")" = "YES" ] && [ -d "/var/run/php/sockets" ]; then
-      ## Todo: cp -f ${}
+    ## EVAL_CHECK_VAR="HAVE_FPM${OPT_PHP1_VERSION}_CGI"
+    # EVAL_CHECK_VAR="HAVE_FPM_CGI"
+    # $(eval_var "${EVAL_CHECK_VAR}") = "YES"
+    if [ "${OPT_PHP1_MODE}" = "php-fpm" ] && [ -d "${PHP_SOCKETS_PATH}" ]; then
+      cp -f "${PB_CONFIG}/fpm/php-fpm.conf.${OPT_PHP1_VER}" "${PHP_FPM_CONF}"
       fpmCheck "${OPT_PHP1_VER}"
     fi
   fi
@@ -3732,13 +3807,17 @@ dovecot_checks() {
 
 php_install() {
 
+  local IFS=' '
   local PHPMODULES COUNT_SUPHP COUNT_MODSEC COUNT_HTSCANNER
+  local PHP_EXT_LIST PORT_PHP PORT_PHP_EXT PORT_MOD_PHP
+  local PHP_MAKE_SET PHP_MAKE_UNSET PHP_EXT_MAKE_SET PHP_EXT_MAKE_UNSET
+  local PHP_MOD_MAKE_SET PHP_MOD_MAKE_UNSET
 
   ## Install Web Server(s) first
 
   ## Apache / Nginx+Apache:
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    if [ ! -d "${APACHE_PATH}" ]; then
+    if [ ! -x "${APACHE_HTTPD}" ]; then
       apache_install
     fi
   fi
@@ -3809,21 +3888,22 @@ php_install() {
         PHP_EXT_MAKE_UNSET="${PHP56_EXT_MAKE_UNSET}"
         PHP_MOD_MAKE_SET="${MOD_PHP56_MAKE_SET}"
         PHP_MOD_MAKE_UNSET="${MOD_PHP56_MAKE_UNSET}"
-        PHP_EXT_LIST="math/php56-bcmath archivers/php56-bz2 misc/php56-calendar \
-        textproc/php56-ctype ftp/php56-curl textproc/php56-dom graphics/php56-exif \
-        sysutils/php56-fileinfo security/php56-filter ftp/php56-ftp graphics/php56-gd \
-        devel/php56-gettext security/php56-hash converters/php56-iconv mail/php56-imap \
-        devel/php56-json converters/php56-mbstring security/php56-mcrypt \
-        databases/php56-mysql databases/php56-mysqli databases/php56-odbc \
-        www/php56-opcache security/php56-openssl databases/php56-pdo \
-        databases/php56-pdo_mysql databases/php56-pdo_sqlite archivers/php56-phar \
-        sysutils/php56-posix textproc/php56-pspell devel/php56-readline \
-        converters/php56-recode www/php56-session textproc/php56-simplexml \
-        net-mgmt/php56-snmp net/php56-soap net/php56-sockets \
-        databases/php56-sqlite3 www/php56-tidy devel/php56-tokenizer \
-        textproc/php56-wddx textproc/php56-xml textproc/php56-xmlreader \
-        net/php56-xmlrpc textproc/php56-xmlwriter textproc/php56-xsl \
-        archivers/php56-zip archivers/php56-zlib"
+        PHP_EXT_LIST="${PHP56_EXT_LIST}"
+        # PHP_EXT_LIST=math/php56-bcmath archivers/php56-bz2 misc/php56-calendar \
+        # textproc/php56-ctype ftp/php56-curl textproc/php56-dom graphics/php56-exif \
+        # sysutils/php56-fileinfo security/php56-filter ftp/php56-ftp graphics/php56-gd \
+        # devel/php56-gettext security/php56-hash converters/php56-iconv mail/php56-imap \
+        # devel/php56-json converters/php56-mbstring security/php56-mcrypt \
+        # databases/php56-mysql databases/php56-mysqli databases/php56-odbc \
+        # www/php56-opcache security/php56-openssl databases/php56-pdo \
+        # databases/php56-pdo_mysql databases/php56-pdo_sqlite archivers/php56-phar \
+        # sysutils/php56-posix textproc/php56-pspell devel/php56-readline \
+        # converters/php56-recode www/php56-session textproc/php56-simplexml \
+        # net-mgmt/php56-snmp net/php56-soap net/php56-sockets \
+        # databases/php56-sqlite3 www/php56-tidy devel/php56-tokenizer \
+        # textproc/php56-wddx textproc/php56-xml textproc/php56-xmlreader \
+        # net/php56-xmlrpc textproc/php56-xmlwriter textproc/php56-xsl \
+        # archivers/php56-zip archivers/php56-zlib
         ;;
     "70")
         PORT_PHP="${PORT_PHP70}"
@@ -3836,19 +3916,19 @@ php_install() {
         PHP_MOD_MAKE_SET="${MOD_PHP70_MAKE_SET}"
         PHP_MOD_MAKE_UNSET="${MOD_PHP70_MAKE_UNSET}"
         PHP_EXT_LIST="math/php70-bcmath archivers/php70-bz2 misc/php70-calendar \
-        textproc/php70-ctype ftp/php70-curl textproc/php70-dom graphics/php70-exif \
-        sysutils/php70-fileinfo security/php70-filter ftp/php70-ftp graphics/php70-gd \
-        devel/php70-gettext security/php70-hash converters/php70-iconv mail/php70-imap \
-        devel/php70-json converters/php70-mbstring security/php70-mcrypt \
-        databases/php70-mysqli databases/php70-odbc www/php70-opcache \
-        security/php70-openssl databases/php70-pdo databases/php70-pdo_mysql \
-        databases/php70-pdo_sqlite archivers/php70-phar sysutils/php70-posix \
-        textproc/php70-pspell devel/php70-readline converters/php70-recode \
-        www/php70-session textproc/php70-simplexml net-mgmt/php70-snmp \
-        net/php70-soap net/php70-sockets databases/php70-sqlite3 www/php70-tidy \
-        devel/php70-tokenizer textproc/php70-wddx textproc/php70-xml \
-        textproc/php70-xmlreader net/php70-xmlrpc textproc/php70-xmlwriter \
-        textproc/php70-xsl archivers/php70-zip archivers/php70-zlib"
+                textproc/php70-ctype ftp/php70-curl textproc/php70-dom graphics/php70-exif \
+                sysutils/php70-fileinfo security/php70-filter ftp/php70-ftp graphics/php70-gd \
+                devel/php70-gettext security/php70-hash converters/php70-iconv mail/php70-imap \
+                devel/php70-json converters/php70-mbstring security/php70-mcrypt \
+                databases/php70-mysqli databases/php70-odbc www/php70-opcache \
+                security/php70-openssl databases/php70-pdo databases/php70-pdo_mysql \
+                databases/php70-pdo_sqlite archivers/php70-phar sysutils/php70-posix \
+                textproc/php70-pspell devel/php70-readline converters/php70-recode \
+                www/php70-session textproc/php70-simplexml net-mgmt/php70-snmp \
+                net/php70-soap net/php70-sockets databases/php70-sqlite3 www/php70-tidy \
+                devel/php70-tokenizer textproc/php70-wddx textproc/php70-xml \
+                textproc/php70-xmlreader net/php70-xmlrpc textproc/php70-xmlwriter \
+                textproc/php70-xsl archivers/php70-zip archivers/php70-zlib"
         ;;
     *) printf "*** Error: php_install(): Wrong PHP version selected. (Script error)\n"; exit ;;
   esac
@@ -3858,18 +3938,19 @@ php_install() {
   if [ -z "${PHP_MAKE_SET}" ] && [ -z "${PHP_MAKE_UNSET}" ]; then
     ## Base PHP Installation (includes FPM, CGI, CLI modes)
     case ${OPT_PHP1_MODE} in
-      "fpm")
-          pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
+      "php-fpm")
+          pkgi ${PORT_PHP} ${PHP_EXT_LIST}
+          ;;
       "mod_php")
-          pkgi "${PORT_MOD_PHP}" "${PHP_EXT_LIST}" ;;
+          pkgi ${PORT_MOD_PHP} ${PHP_EXT_LIST} ;;
       "suphp")
-          pkgi "${PORT_SUPHP}" "${PHP_EXT_LIST}" ;;
+          pkgi ${PORT_SUPHP} ${PHP_EXT_LIST} ;;
       # fastcgi) pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
       # fcgid) pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
     esac
   else
     case ${OPT_PHP1_MODE} in
-      "fpm")
+      "php-fpm")
           ## Base PHP Installation (includes FPM, CGI, CLI modes)
           ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" rmconfig
           ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP}" \
@@ -3906,12 +3987,17 @@ php_install() {
           ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_PHP_EXT}" clean
           ;;
       "suphp")
-          pkgi "${PORT_SUPHP}" "${PORT_PHP_EXT}"
+          pkgi ${PORT_SUPHP} ${PORT_PHP_EXT}
           ;;
       # fastcgi) echo "not done" ;;
       # fcgid) echo "not done" ;;
       *) printf "*** Error: php_install(): Wrong PHP mode selected. (Script error)\n"; exit ;;
     esac
+  fi
+
+  if [ "${OPT_PHP1_MODE}" = "php-fpm" ] && [ ! -d "${PHP_SOCKETS_PATH}" ]; then
+    printf "*** Notice: Creating directory: %s" "${PHP_SOCKETS_PATH}"
+    mkdir -p "${PHP_SOCKETS_PATH}"
   fi
 
   # ${MAKE} -DNO_DIALOG -C "${PORT_PHP_EXT}" reinstall clean
@@ -3932,6 +4018,7 @@ php_install() {
         echo "LoadModule suphp_module ${APACHE_LIBS}/mod_suphp.so" >> ${PHPMODULES}
       fi
 
+      ## Mod Security
       COUNT_MODSEC="$(grep -m1 -c 'httpd-modsecurity' ${PHPMODULES})"
       if [ "${OPT_MODSECURITY}" = "YES" ] && [ ! -e "${APACHE_LIBS}/mod_security2.so" ]; then
         modsecurity_install
@@ -3943,6 +4030,7 @@ php_install() {
         cp -pf "${MODSECURITY_APACHE_INCLUDE}" "${APACHE_EXTRAS}/httpd-modsecurity.conf"
       fi
 
+      ## HTScanner
       if [ "${HAVE_CLI}" = "NO" ]; then
         COUNT_HTSCANNER="$(grep -m1 -c 'htscanner_module' ${PHPMODULES})"
         if [ "${OPT_HTSCANNER}" = "YES" ] && [ "${COUNT_HTSCANNER}" -eq 0 ]; then
@@ -4036,6 +4124,8 @@ php_install() {
 
   fpmChecks
 
+  # cp -f "${PB_PATH}/directadmin/data/templates/custom/php-fpm.conf" "${DA_PATH}/data/templates/custom/php-fpm.conf"
+
   if [ "${OPT_WEBSERVER}" = "apache" ]  || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     printf "Rewriting all users httpd.conf files, please wait...\n"
     echo "action=rewrite&value=httpd" >> ${DA_TASK_QUEUE}
@@ -4107,7 +4197,7 @@ php_fpm_restart() {
     #     ${SERVICE} php-fpm70 reload
     #   fi
     # else
-      ${SERVICE} php-fpm reload
+      ${SERVICE} "php-fpm" reload
     # fi
   else
     printf "*** Warning: Aborting automatic PHP-FPM restart due to configuration verification failure.\n"
@@ -4415,6 +4505,7 @@ apache_install() {
   setVal apachecert "${APACHE_SSL_CRT}" "${DA_CONF_TEMPLATE}"
   setVal apachekey "${APACHE_SSL_KEY}" "${DA_CONF_TEMPLATE}"
   setVal apacheca "${APACHE_SSL_CA}" "${DA_CONF_TEMPLATE}"
+  setVal apache_pid /var/run/httpd.pid "${DA_CONF_TEMPLATE}"
   setVal htpasswd "${APACHE_HTPASSWD}" "${DA_CONF_TEMPLATE}"
   setVal cloud_cache 0 "${DA_CONF_TEMPLATE}"
   setVal nginx 0 "${DA_CONF_TEMPLATE}"
@@ -4428,6 +4519,7 @@ apache_install() {
     setVal apachecert "${APACHE_SSL_CRT}" "${DA_CONF}"
     setVal apachekey "${APACHE_SSL_KEY}" "${DA_CONF}"
     setVal apacheca "${APACHE_SSL_CA}" "${DA_CONF}"
+    setVal apache_pid /var/run/httpd.pid "${DA_CONF}"
     setVal htpasswd "${APACHE_HTPASSWD}" "${DA_CONF}"
     setVal cloud_cache 0 "${DA_CONF}"
     setVal nginx 0 "${DA_CONF}"
@@ -4583,9 +4675,9 @@ apache_install() {
 
   ## Generate self-signed SSL Key and Certificate for Apache if they don't exist
   if [ ! -s "${APACHE_SSL_KEY}" ] || [ ! -s "${APACHE_SSL_CRT}" ]; then
-    mkdir -p "${APACHE_PATH}/ssl"
+    printf "*** Notice: Generating a self-signed SSL certificate and key for Apache.\n"
 
-    printf "*** Notice: Generating Apache self-signed SSL certificate and key.\n"
+    mkdir -p "${APACHE_PATH}/ssl"
 
     ${OPENSSL} req -x509 -newkey rsa:2048 -keyout "${APACHE_SSL_KEY}" \
     -out "${APACHE_SSL_CRT}" -days 9999 -nodes -config "${SSL_REQ_CONF}"
@@ -4596,13 +4688,17 @@ apache_install() {
 
   doApacheCheck
 
-  mkdir -p "${WWW_DIR}"
+  if [ ! -d "${WWW_DIR}" ]; then
+    printf "*** Notice: Creating directory: %s\n" "${WWW_DIR}"
+    mkdir -p "${WWW_DIR}"
+  fi
 
   ## Create default "blank" page
   if [ ! -e "${WWW_DIR}/index.html" ]; then
     if [ -e "${WWW_DIR}/index.html.en" ]; then
       cp -f "${WWW_DIR}/index.html.en" "${WWW_DIR}/index.html"
     else
+      printf "*** Notice: Creating default index.html under %s\n" "${WWW_DIR}"
       printf "<html>\n<head>\n<title>Default Page</title>\n</head>\n<body>\n \
       <p>Apache is functioning normally</p>\n</body>\n</html>\n" > "${WWW_DIR}/index.html"
     fi
@@ -4724,6 +4820,11 @@ apache_install() {
   ## CB2: doModLsapi 0
   ## CB2: ldconfig
 
+  ## PB: Moved this out of COMPAT
+  if [ -e "${APACHE_HTTPD}" ]; then
+    ln -s "${APACHE_HTTPD}" /usr/sbin/httpd
+  fi
+
   if [ "${COMPAT_APACHE24_SYMLINKS}" = "YES" ]; then
     printf "PortsBuild+DirectAdmin Compatibility mode: Creating symlinks for Apache\n"
 
@@ -4761,10 +4862,6 @@ apache_install() {
     ln -s "${APACHE_SSL_CRT}" "${APACHE_PATH}/ssl.crt/server.crt"
     ln -s "${APACHE_SSL_KEY}" "${APACHE_PATH}/ssl.key/server.key"
     ln -s "${APACHE_SSL_CA}" "${APACHE_PATH}/ssl.crt/server.ca"
-
-    if [ -e "${APACHE_HTTPD}" ]; then
-      ln -s "${APACHE_HTTPD}" /usr/sbin/httpd
-    fi
   fi
 
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
@@ -4791,6 +4888,8 @@ apache_uninstall() {
 
   ${SYSRC} -q -x apache24_enable
   ${SYSRC} -q -x apache24_http_accept_enable
+
+  rm /usr/sbin/httpd
 
   return
 }
@@ -6290,7 +6389,11 @@ apache_host_conf() {
         printf "  <FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)\$\">\n"
         ## PB: Single PHP installation for now:
         ## echo "    AddHandler \"proxy:unix:/usr/local/php${OPT_PHP1_VER}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${OPT_PHP1_VER} .phtml"
-        printf "    AddHandler \"proxy:unix:/usr/local/php/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php%s .phtml\n" "${OPT_PHP1_VER}"
+        if [ ${DUAL_PHP_MODE} = "YES" ]; then
+          printf "    AddHandler \"proxy:unix:/usr/local/php/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php%s .phtml\n" "${OPT_PHP1_VER}"
+        else
+          printf "    AddHandler \"proxy:unix:/var/run/php/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php%s .phtml\n" "${OPT_PHP1_VER}"
+        fi
         printf "  </FilesMatch>"
       fi
 
@@ -7602,7 +7705,7 @@ php_conf() {
     fi
   else
     if [ "${HAVE_FPM_CGI}" = "YES" ]; then
-      set_service php-fpm OFF
+      set_service "php-fpm" OFF
     else
       set_service "php-fpm" delete
     fi
@@ -8601,6 +8704,14 @@ update_da_conf() {
   setVal openssl ${OPENSSL} ${DA_CONF_TEMPLATE}
   setVal openssl ${OPENSSL} ${DA_CONF}
 
+  if [ "${DUAL_PHP_MODE}" = "YES" ]; then
+    setVal php_version_selector 1 ${DA_CONF_TEMPLATE}
+    setVal php_version_selector 1 ${DA_CONF}
+  else
+    setVal php_version_selector 0 ${DA_CONF_TEMPLATE}
+    setVal php_version_selector 0 ${DA_CONF}
+  fi
+
   # setVal pureftp 0 "${DA_CONF_TEMPLATE}"
   # setVal pureftp 0 "${DA_CONF}"
 
@@ -8656,6 +8767,8 @@ update_da_conf() {
   setVal frontpage_on 0 "${DA_CONF}"
 
   if [ "${OPT_WEBSERVER}" = "apache" ]; then
+    setVal apache_pid /var/run/httpd.pid "${DA_CONF_TEMPLATE}"
+    setVal apache_pid /var/run/httpd.pid "${DA_CONF}"
     setVal apache_ver 2.0 "${DA_CONF_TEMPLATE}"
     setVal apache_ver 2.0 "${DA_CONF}"
     setVal apacheca "${APACHE_SSL_CA}" "${DA_CONF_TEMPLATE}"
@@ -8698,14 +8811,13 @@ update_da_conf() {
   if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     setVal nginx_proxy 1 "${DA_CONF_TEMPLATE}"
     setVal nginx_proxy 1 "${DA_CONF}"
-    setVal litespeed 0 "${DA_CONF_TEMPLATE}"
-    setVal litespeed 0 "${DA_CONF}"
   elif [ "${OPT_WEBSERVER}" = "apache" ]; then
     setVal nginx_proxy 0 "${DA_CONF_TEMPLATE}"
     setVal nginx_proxy 0 "${DA_CONF}"
-    setVal litespeed 0 "${DA_CONF_TEMPLATE}"
-    setVal litespeed 0 "${DA_CONF}"
   fi
+
+  setVal litespeed 0 "${DA_CONF_TEMPLATE}"
+  setVal litespeed 0 "${DA_CONF}"
 
   printf "*** Notice: Completed directadmin.conf updates.\n"
 
@@ -8832,7 +8944,7 @@ upgrade_app() {
     "modsecurity"|"modsec"|"mod_security") modsecurity_upgrade ;;
     "mysql"|"sql") mysql_upgrade ;;
     "nginx") nginx_upgrade ;;
-    "php"|"fpm"|"php-fpm") php_upgrade ;;
+    "php"|"fpm"|"php-fpm"|"php_fpm") php_upgrade ;;
     "phpmyadmin"|"pma") phpmyadmin_upgrade ;;
     "pigeonhole"|"ph") pigeonhole_upgrade ;;
     "portsbuild"|"pb") portsbuild_upgrade ;;

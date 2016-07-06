@@ -19,17 +19,15 @@ syslog.ident = php-fpm
 ; Default Value: notice
 log_level = notice
 
-; events.mechanism = kqueue
-
 ;;;;;;;;;;;;;;;;;;;;
-; Pool Definitions ;
+; Pool Definitions ; 
 ;;;;;;;;;;;;;;;;;;;;
 
 [webapps]
 user = $pool
 group = $pool
 
-listen = /var/run/php/sockets/$pool.sock
+listen = /usr/local/php70/sockets/$pool.sock
 listen.owner = $pool
 listen.group = apache
 listen.mode = 660
@@ -48,9 +46,9 @@ pm.max_requests = 1000
 ;slowlog = log/$pool.log.slow
 ;request_slowlog_timeout = 0
 ;request_terminate_timeout = 30s
-
-security.limit_extensions = .php .php5 .php56 .inc .phtml
-
+ 
+security.limit_extensions = .php .php5 .php70 .inc .phtml
+ 
 ; Pass environment variables like LD_LIBRARY_PATH. All $VARIABLEs are taken from
 ; the current environment.
 ; Default Value: clean env
@@ -64,7 +62,7 @@ security.limit_extensions = .php .php5 .php56 .inc .phtml
 ;php_admin_value[error_log] = /var/log/fpm-php.www.log
 ;php_admin_flag[log_errors] = on
 ;php_admin_value[memory_limit] = 32M
-php_admin_value[open_basedir] = /tmp:/var/tmp:/usr/local/www:/usr/local/php56/lib/php
+;php_admin_value[open_basedir] = /tmp:/var/tmp:/usr/local/www:/usr/local/php70/lib/php
 
 ; Load all DA User configs
-include=/usr/local/directadmin/data/users/*/php/php-fpm56.conf
+include=/usr/local/directadmin/data/users/*/php/php-fpm70.conf 

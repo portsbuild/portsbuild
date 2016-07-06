@@ -19,7 +19,9 @@ syslog.ident = php-fpm
 ; Default Value: notice
 log_level = notice
 
-; events.mechanism = kqueue
+
+events.mechanism = kqueue
+
 
 ;;;;;;;;;;;;;;;;;;;;
 ; Pool Definitions ;
@@ -29,7 +31,7 @@ log_level = notice
 user = $pool
 group = $pool
 
-listen = /var/run/php/sockets/$pool.sock
+listen = /usr/local/php56/sockets/$pool.sock
 listen.owner = $pool
 listen.group = apache
 listen.mode = 660

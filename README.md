@@ -56,6 +56,8 @@ PortsBuild will NOT support:
 ### Changes from DA/CB defaults
 * PHP Sockets are now found under /var/run/php/sockets (used to be: /usr/local/php%VER%/sockets)
 * The WWW directory is now /usr/local/www (used to be: /var/www/html)
+* Default SQL database path has been moved to /var/db/mysql (used to be: /home/mysql) but can be changed.
+
 
 ### Additional documentation to add
 * Virtualization (FreeBSD+DA as a Guest VM)
