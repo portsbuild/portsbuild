@@ -1,8 +1,8 @@
 #/bin/sh
 
 if [ "${1}" != "zip" ]; then
-        echo "$0: we can only scan zip files";
-        exit 0
+  echo "$0: we can only scan zip files";
+  exit 0
 fi
 
 UNZIP=/usr/bin/unzip
@@ -13,7 +13,7 @@ Z=${D}/${3}
 cd "${P}"
 
 if [ ! -s $Z ]; then
-        exit 0;
+  exit 0
 fi
 
 if [ $( ${UNZIP} -l "${Z}" | \
