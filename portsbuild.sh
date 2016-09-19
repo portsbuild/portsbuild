@@ -50,7 +50,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20160706
+PB_BUILD_DATE=20160919
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -5082,9 +5082,12 @@ letsencrypt_install() {
     return
   fi
 
-  pkgi "${PORT_LETSENCRYPT}"
+  ## DirectAdmin Version of Let's Encrypt
+  ${WGET} -O "${DA_SCRIPTS}/letsencrypt.sh" http://files.directadmin.com/services/all/letsencrypt.sh
 
-  ${SYSRC} -f /etc/periodic.conf weekly_letsencrypt_enable="YES"
+  # pkgi "${PORT_LETSENCRYPT}"
+
+  # ${SYSRC} -f /etc/periodic.conf weekly_letsencrypt_enable="YES"
 
   # To run the certification renenewal as a different user:
   # ${SYSRC} -f /etc/periodic.confweekly_letsencrypt_user="_letsencrypt"
@@ -5101,9 +5104,9 @@ letsencrypt_install() {
 
 letsencrypt_uninstall() {
 
-  pkgd "${PORT_LETSENCRYPT}"
+  # pkgd "${PORT_LETSENCRYPT}"
 
-  ${SYSRC} -q -f /etc/periodic.conf -x weekly_letsencrypt_enable="YES"
+  # ${SYSRC} -q -f /etc/periodic.conf -x weekly_letsencrypt_enable="YES"
 
   # ${SYSRC} -q -f /etc/periodic.conf -x weekly_letsencrypt_user
   # ${SYSRC} -q -f /etc/periodic.conf -x weekly_letsencrypt_deployscript
