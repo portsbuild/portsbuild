@@ -86,7 +86,7 @@ endif
 
 ## -----------------------------------------------------------------------
 # Attempt to catch embedded VBS attachments
-# in emails.   These were used as the basis for 
+# in emails.   These were used as the basis for
 # the ILOVEYOU virus and its variants - many many varients
 # Quoted filename - [body_quoted_fn_match]
 if $message_body matches "(?:Content-(?:Type:(?>\\\\s*)[\\\\w-]+/[\\\\w-]+|Disposition:(?>\\\\s*)attachment);(?>\\\\s*)(?:file)?name=|begin(?>\\\\s+)[0-7]{3,4}(?>\\\\s+))\"([^\"]+\\\\.(?:ad[ep]|ba[st]|chm|cmd|com|cpl|crt|eml|exe|hlp|hta|in[fs]|isp|jse?|lnk|md[be]|ms[cipt]|pcd|pif|reg|sc[mrt]|shs|url|vb[se]?|ws[fhc]))\"[\\\\s;]"
@@ -161,12 +161,12 @@ endif
 # 0.17b Wed 01-May-2002; Douglas Gray Stephens
 #        Block mal formed mime messages that have a space in the name
 # 0.17c Wed 15-May-2002; Douglas Gray Stephens
-#        Block mal formed mime messages that have a space and period 
+#        Block mal formed mime messages that have a space and period
 #        in the name.
 #	 Also block .vb extensions
 # 0.17d Thu 16-May-2002; Douglas Gray Stephens
-#        Update the notes as Exim 4 uses system_filter_* rather 
-#        than message_filter_* 
+#        Update the notes as Exim 4 uses system_filter_* rather
+#        than message_filter_*
 #        (after feedback from  David Broome <dbroome@finearts.uvic.ca>)
 # 0.17e Fri 19-Jul-2002; Douglas Gray Stephens
 #        Block SCM (ScreenCam Movie) files
@@ -197,7 +197,7 @@ endif
 # options, but they default to the standard exim user and so can
 # be left untouched.  The other message_filter_* (or system_filter_*
 # for Exim 4) options are only needed if you modify this to do other
-# functions such as deliveries. 
+# functions such as deliveries.
 # The main exim documentation is quite thorough and so I see no need
 # to expand it here...
 #
@@ -217,7 +217,7 @@ endif
 #### BASIS
 #
 # The regexp that is used to pickup MIME/uuencoded body parts with
-# quoted filenames is replicated below (in perl format).  
+# quoted filenames is replicated below (in perl format).
 # You need to remember that exim converts newlines to spaces in
 # the message_body variable.
 #
@@ -227,7 +227,7 @@ endif
 #	    |Disposition: (?>\s*)			# content-disposition hdr
 #	    attachment)					# content-disposition
 #	  ;(?>\s*)					# ; space or newline
-#	  (?:file)?name=				# filename=/name= 
+#	  (?:file)?name=				# filename=/name=
 #	  |begin (?>\s+) [0-7]{3,4} (?>\s+)) 		# begin octal-mode
 #	  (\"[^\"]+\.					# quoted filename.
 #		(?:ad[ep]				# list of extns
