@@ -1,9 +1,8 @@
 #!/bin/sh
-#
-# Alternative to DirectAdmin's CustomBuild for FreeBSD systems using ports and packages
-#
 # ******************************************************************************
 # >>> PortsBuild
+#
+#  Alternative to DirectAdmin's CustomBuild for FreeBSD systems using ports and packages
 #
 #  Scripted by mmx aka -sg aka sarog aka Saro.
 #
@@ -50,7 +49,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20160919
+PB_BUILD_DATE=20160915
 
 IFS="$(printf '\n\t')"
 LANG=C
@@ -159,7 +158,7 @@ readonly SYSRC=/usr/sbin/sysrc
 readonly SYSCTL=/sbin/sysctl
 readonly TOUCH=/usr/bin/touch
 readonly WGET=/usr/local/bin/wget
-readonly WGET_CONNECT_OPTIONS="--connect-timeout=5 --read-timeout=10 --tries=3"
+readonly WGET_CONNECT_OPTIONS='--connect-timeout=10 --read-timeout=10 --tries=3'
 readonly TAR=/usr/bin/tar
 
 ## Runtime Discovery
@@ -549,7 +548,7 @@ readonly PORT_MARIADB101_CLIENT='databases/mariadb101-client'
 readonly PORT_AWSTATS='www/awstats'
 readonly PORT_WEBALIZER='www/webalizer'
 
-readonly PORT_LETSENCRYPT='security/letsencrypt.sh'
+# to remove: readonly PORT_LETSENCRYPT='security/letsencrypt.sh'
 
 ################################################################################
 ### File: make.conf
@@ -708,23 +707,6 @@ fi
 readonly NEWCONFIGS
 
 ################################################################################
-##
-## Todo: Recreate missing options.conf
-##
-################################################################################
-
-# if [ ! -f options.conf ]; then
-# # recreate file
-# # exit
-# fi
-
-################################################################################
-## Source (include) additional files into the script:
-################################################################################
-
-. options.conf
-
-################################################################################
 
 ## Get DirectAdmin Option Values (from CB2)
 ## Retrieves values from directadmin/conf/options.conf
@@ -750,9 +732,7 @@ getDA_Opt() {
 }
 
 ################################################################################
-##
 ## Emulate ${!variable} (from CB2)
-##
 ################################################################################
 
 eval_var() {
@@ -768,10 +748,8 @@ eval_var() {
 }
 
 ################################################################################
-##
 ## Get Option (from CB2)
 ## Used to retrieve CB options.conf
-##
 ################################################################################
 
 getOpt() {
@@ -790,10 +768,8 @@ getOpt() {
 }
 
 ################################################################################
-##
 ## Set Option (from CB2)
 ## Used to manipulate CB options.conf
-##
 ################################################################################
 
 setOpt() {
@@ -833,9 +809,7 @@ setOpt() {
 }
 
 ################################################################################
-##
 ## Set Value ($1) to ($2) in file ($3) (from CB2)
-##
 ################################################################################
 
 setVal() {
@@ -880,10 +854,8 @@ setVal() {
 }
 
 ################################################################################
-##
 ## Get Value ($1) from file ($2)
 ## Returns 0 if option is undefined (doesn't exist or is blank).
-##
 ################################################################################
 
 getVal() {
@@ -909,10 +881,8 @@ getVal() {
 }
 
 ################################################################################
-##
 ## Used to set values ON/OFF in the services.status (from CB2)
 ## Usage: set_service name ON|OFF|delete
-##
 ################################################################################
 
 set_service() {
@@ -951,29 +921,26 @@ set_service() {
 }
 
 ################################################################################
-##
-## Todo: Get File from PB Mirror
+## Get File from PB Mirror
 ## $1 = source and $2 = target
 ## Usage: getFile configure/proftpd/proftpd.conf ${PROFTPD_CONF}
-##
 ################################################################################
 
-getfile() {
+getFile() {
 
-  local SOURCE_FILE="$2" ## $2 = source (input, from PB mirror)
-  local TARGET_FILE="$3" ## $3 = target (output)
+  local SOURCE_FILE="$1" ## $1 = source (input, from PB mirror)
+  local TARGET_FILE="$2" ## $2 = target (output)
+  local IFS=' '
 
-  printf "Downloading %s to %s\n" "${SOURCE_FILE}" "${TARGET_FILE}"
+  printf "*** Notice: Downloading %s to %s\n" "${SOURCE_FILE}" "${TARGET_FILE}"
 
-  "${WGET}" "${WGET_CONNECT_OPTIONS}" -O "${TARGET_FILE}" "${PB_MIRROR}/${SOURCE_FILE}"
+  ${WGET} ${WGET_CONNECT_OPTIONS} -O ${TARGET_FILE} "${PB_MIRROR}/${SOURCE_FILE}"
 
   return
 }
 
 ################################################################################
-##
 ## Convert string to lowercase
-##
 ################################################################################
 
 lc() {
@@ -988,9 +955,7 @@ lc() {
 }
 
 ################################################################################
-##
 ## Convert string to uppercase
-##
 ################################################################################
 
 uc() {
@@ -1004,10 +969,8 @@ uc() {
 }
 
 ################################################################################
-##
 ## Ask User a Question
 ## Usage: ask_user "Question"
-##
 ################################################################################
 
 ask_user() {
@@ -1029,9 +992,7 @@ ask_user() {
 }
 
 ################################################################################
-##
 ## Update /usr/ports via portsnap
-##
 ################################################################################
 
 ports_update() {
@@ -1087,10 +1048,8 @@ apxs_enable() { ${APXS} -e -a -n "$1" "$2"; }
 apxs_disable() { ${APXS} -e -A -n "$1" "$2"; }
 
 ################################################################################
-##
 ## Todo: Rinse & Repeat
 ## (Need to work with eval)
-##
 ################################################################################
 
 make_install_clean() {
@@ -1119,9 +1078,7 @@ make_install_clean() {
 }
 
 ################################################################################
-##
 ## Update /etc/hosts
-##
 ################################################################################
 
 update_hosts() {
@@ -1136,9 +1093,7 @@ update_hosts() {
 }
 
 ################################################################################
-##
 ## Get System Timezone (from CB2)
-##
 ################################################################################
 
 getTimezone() {
@@ -1159,9 +1114,7 @@ getTimezone() {
 }
 
 ################################################################################
-##
 ## Add (new) User to (new) Group (from CB2)
-##
 ################################################################################
 
 addUserGroup() {
@@ -1179,9 +1132,7 @@ addUserGroup() {
 }
 
 ################################################################################
-##
 ## Random Password Generator (from CB2)
-##
 ################################################################################
 
 random_pass() {
@@ -1194,10 +1145,8 @@ random_pass() {
 }
 
 ################################################################################
-##
 ## Setup PortsBuild and DirectAdmin
 ## Possible arguments: <USER_ID> <LICENSE_ID> <SERVER_FQDN> <ETH_DEV> (<IP_ADDRESS>)"
-##
 ################################################################################
 
 global_setup() {
@@ -1416,10 +1365,10 @@ global_setup() {
     fi
 
     if [ ! -e "${CB_CONF}" ]; then
-      if [ ! -e "${PB_CUSTOM}build/options.conf" ]; then
+      if [ ! -e "${PB_CUSTOM}/build/options.conf" ]; then
         ${WGET} -O "${CB_CONF}" "${PB_MIRROR}/custombuild/options.conf"
       else
-        cp "${PB_CUSTOM}build/options.conf" "${CB_CONF}"
+        cp "${PB_CUSTOM}/build/options.conf" "${CB_CONF}"
       fi
     fi
 
@@ -1496,10 +1445,8 @@ global_setup() {
 }
 
 ################################################################################
-##
 ## Update System Startup Scripts
 ## Modifies /etc/rc.conf, /boot/loader.conf, /etc/periodic.conf, etc.
-##
 ################################################################################
 
 update_rc() {
@@ -1631,9 +1578,7 @@ update_rc() {
 }
 
 ################################################################################
-##
 ## PB: Verify: Control Service
-##
 ################################################################################
 
 control_service() {
@@ -1704,9 +1649,7 @@ control_service() {
 }
 
 ################################################################################
-##
 ## Setup BIND (named) for DNS services
-##
 ################################################################################
 
 bind_setup() {
@@ -1794,10 +1737,8 @@ bind_setup() {
 }
 
 ################################################################################
-##
 ## DirectAdmin Installation
 ## Replaces scripts/install.sh
-##
 ################################################################################
 
 directadmin_install() {
@@ -2117,9 +2058,7 @@ directadmin_install() {
 }
 
 ################################################################################
-##
 ## DirectAdmin Update via CLI (from CB2: daUpdateDA())
-##
 ################################################################################
 
 directadmin_update() {
@@ -2132,9 +2071,7 @@ directadmin_update() {
 }
 
 ################################################################################
-##
 ## DirectAdmin Restart
-##
 ################################################################################
 
 directadmin_restart() {
@@ -2147,9 +2084,7 @@ directadmin_restart() {
 }
 
 ################################################################################
-##
 ## Basic System Security Tasks
-##
 ################################################################################
 
 basic_system_security() {
@@ -2174,9 +2109,7 @@ basic_system_security() {
 }
 
 ################################################################################
-##
 ## Install DA cron (from: scripts/install.sh)
-##
 ################################################################################
 
 install_cron() {
@@ -2205,9 +2138,7 @@ install_cron() {
 }
 
 ################################################################################
-##
 ## Deny Specific Users from Cron (from install.sh)
-##
 ################################################################################
 
 deny_cron() {
@@ -2235,10 +2166,8 @@ deny_cron() {
 }
 
 ################################################################################
-##
 ## Newsyslog Setup (from install.sh)
 ## PB: Todo: Use/Merge with freebsd_set_newsyslog?
-##
 ################################################################################
 
 newsyslog_setup() {
@@ -2347,9 +2276,7 @@ newsyslog_setup() {
 }
 
 ################################################################################
-##
 ## FreeBSD Set NewSyslog (from CB2)
-##
 ################################################################################
 
 freebsd_set_newsyslog() {
@@ -2382,9 +2309,7 @@ freebsd_set_newsyslog() {
 }
 
 ################################################################################
-##
 ## Verify Webapps Log Rotation (from CB2: ensure_webapps_lograte())
-##
 ################################################################################
 
 verify_webapps_logrotate() {
@@ -2602,9 +2527,7 @@ exim_install() {
 }
 
 ################################################################################
-##
 ## Exim Restart with configuration file verification
-##
 ################################################################################
 
 exim_restart() {
@@ -2627,9 +2550,7 @@ exim_restart() {
 }
 
 ################################################################################
-##
 ## Todo: Exim Upgrade
-##
 ################################################################################
 
 exim_upgrade() {
@@ -2644,9 +2565,7 @@ exim_upgrade() {
 }
 
 ################################################################################
-##
 ## Uninstall Exim
-##
 ################################################################################
 
 exim_uninstall() {
@@ -2674,9 +2593,7 @@ exim_uninstall() {
 }
 
 ################################################################################
-##
 ## SpamAssassin Installation Tasks
-##
 ################################################################################
 
 spamassassin_install() {
@@ -2719,9 +2636,7 @@ spamassassin_install() {
 }
 
 ################################################################################
-##
 ## Todo: SpamAssassin Upgrade
-##
 ################################################################################
 
 spamassassin_upgrade() {
@@ -2746,9 +2661,7 @@ spamassassin_upgrade() {
 }
 
 ################################################################################
-##
 ## Uninstall SpamAssassin
-##
 ################################################################################
 
 spamassassin_uninstall() {
@@ -2768,9 +2681,7 @@ spamassassin_uninstall() {
 }
 
 ################################################################################
-##
 ## SpamAssassin Utilities Installation Tasks
-##
 ################################################################################
 
 spamassassin_utilities_install() {
@@ -2809,9 +2720,7 @@ spamassassin_utilities_install() {
 }
 
 ################################################################################
-##
 ## Uninstall SpamAssassin Utilities
-##
 ################################################################################
 
 spamassassin_utilities_uninstall() {
@@ -2832,9 +2741,7 @@ spamassassin_utilities_uninstall() {
 }
 
 ################################################################################
-##
 ## Todo: Install Exim BlockCracking (BC)
-##
 ################################################################################
 
 blockcracking_install() {
@@ -2881,9 +2788,7 @@ blockcracking_install() {
 }
 
 ################################################################################
-##
 ## Todo: Install Easy Spam Figter (ESF)
-##
 ################################################################################
 
 easyspamfighter_install() {
@@ -2952,9 +2857,7 @@ easyspamfighter_install() {
 }
 
 ################################################################################
-##
 ## Dovecot2 Installation
-##
 ################################################################################
 
 dovecot_install() {
@@ -3013,7 +2916,7 @@ dovecot_install() {
     # ${SERVICE} exim restart
     # ${PERL} -pi -e 's/^imap/#imap/' /etc/inetd.conf
     # killall -HUP inetd
-    # /usr/local/etc/rc.d/vm-pop3d stop
+    # /usr/local/etc/rc.dv/m-pop3d stop
 
     # grep -v vm-pop3d /usr/local/etc/rc.d/boot.sh > /usr/local/etc/rc.d/boot.sh.new
     # mv -f /usr/local/etc/rc.d/boot.sh /usr/local/etc/rc.d/boot.sh.old
@@ -3323,9 +3226,7 @@ dovecot_restart() {
 }
 
 ################################################################################
-##
 ## Dovecot Uninstall
-##
 ################################################################################
 
 dovecot_uninstall() {
@@ -3342,9 +3243,7 @@ dovecot_uninstall() {
 }
 
 ################################################################################
-##
 ## Todo: Pigeonhole Installation
-##
 ################################################################################
 
 pigeonhole_install() {
@@ -3373,9 +3272,7 @@ pigeonhole_install() {
 }
 
 ################################################################################
-##
 ## Todo: Webalizer Installation
-##
 ################################################################################
 
 webalizer_install() {
@@ -3418,9 +3315,7 @@ webalizer_install() {
 }
 
 ################################################################################
-##
 ## Todo: AwStats Installation
-##
 ################################################################################
 
 awstats_install() {
@@ -3464,9 +3359,7 @@ awstats_install() {
 }
 
 ################################################################################
-##
 ## Verify my.cnf (from CB2: verify_my_cnf())
-##
 ################################################################################
 
 verify_my_cnf() {
@@ -3523,9 +3416,7 @@ verify_my_cnf() {
 }
 
 ################################################################################
-##
 ## Initialize SQL Parameters (from CB2: initMySQL())
-##
 ################################################################################
 
 get_sql_settings() {
@@ -3579,9 +3470,7 @@ get_sql_settings() {
 }
 
 ################################################################################
-##
 ## Prepare SQL DB Settings (first-time installations)
-##
 ################################################################################
 
 sql_prepare() {
@@ -4498,14 +4387,14 @@ phpmyadmin_install() {
 
   ## Auth log patch for BFM compat (not done):
   ## Currently outputs to /var/log/auth.log
-  if [ ! -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
-    ${WGET} -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+  if [ ! -e "${PB_PATH}/patches/pma_auth_logging.patch" ]; then
+    ${WGET} -O "${PB_PATH}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
   fi
 
-  if [ -e "${PB_DIR}/patches/pma_auth_logging.patch" ]; then
+  if [ -e "${PB_PATH}/patches/pma_auth_logging.patch" ]; then
     printf "Patching phpMyAdmin for BFM to log failed authentications\n"
     cd ${PMA_PATH} || exit
-    ${PATCH} -p0 < "${PB_DIR}/patches/pma_auth_logging.patch"
+    ${PATCH} -p0 < "${PB_PATH}/patches/pma_auth_logging.patch"
   fi
 
   ## Verify: Update /etc/groups:
@@ -5085,15 +4974,9 @@ letsencrypt_install() {
   ## DirectAdmin Version of Let's Encrypt
   ${WGET} -O "${DA_SCRIPTS}/letsencrypt.sh" http://files.directadmin.com/services/all/letsencrypt.sh
 
-  # pkgi "${PORT_LETSENCRYPT}"
-
-  # ${SYSRC} -f /etc/periodic.conf weekly_letsencrypt_enable="YES"
-
-  # To run the certification renenewal as a different user:
-  # ${SYSRC} -f /etc/periodic.confweekly_letsencrypt_user="_letsencrypt"
-
-  # To run a script after the renewal (as root):
-  # ${SYSRC} -f /etc/periodic.conf weekly_letsencrypt_deployscript="/usr/local/etc/letsencrypt.sh/deploy.sh"
+  ## Enable in DA's options.conf
+  setVal letsencrypt 1 "${DA_CONF}"
+  setVal letsencrypt 1 "${DA_CONF_TEMPLATE}"
 
   return
 }
@@ -5103,13 +4986,6 @@ letsencrypt_install() {
 ################################################################################
 
 letsencrypt_uninstall() {
-
-  # pkgd "${PORT_LETSENCRYPT}"
-
-  # ${SYSRC} -q -f /etc/periodic.conf -x weekly_letsencrypt_enable="YES"
-
-  # ${SYSRC} -q -f /etc/periodic.conf -x weekly_letsencrypt_user
-  # ${SYSRC} -q -f /etc/periodic.conf -x weekly_letsencrypt_deployscript
 
   return
 }
@@ -5524,9 +5400,7 @@ proftpd_install() {
 }
 
 ################################################################################
-##
 ## ProFTPD Uninstall
-##
 ################################################################################
 
 proftpd_uninstall() {
@@ -5545,9 +5419,7 @@ proftpd_uninstall() {
 }
 
 ################################################################################
-##
 ## ClamAV Installation Tasks
-##
 ################################################################################
 
 clamav_install() {
@@ -5626,9 +5498,7 @@ clamav_install() {
 }
 
 ################################################################################
-##
 ## ClamAV Uninstall
-##
 ################################################################################
 
 clamav_uninstall() {
@@ -5647,9 +5517,7 @@ clamav_uninstall() {
 }
 
 ################################################################################
-##
 ## Install RoundCube (from CB2: doroundcube())
-##
 ################################################################################
 
 roundcube_install() {
@@ -6024,9 +5892,7 @@ roundcube_install() {
 }
 
 ################################################################################
-##
 ## Webapps Installation
-##
 ################################################################################
 
 webapps_install() {
@@ -6070,9 +5936,7 @@ webapps_install() {
 }
 
 ################################################################################
-##
 ## Secure php.ini (from CB2)
-##
 ################################################################################
 
 secure_php_ini() {
@@ -6101,9 +5965,7 @@ secure_php_ini() {
 }
 
 ################################################################################
-##
 ## Configure php.ini (from CB2: doPhpIni())
-##
 ################################################################################
 
 configure_php_ini() {
@@ -6195,9 +6057,7 @@ configure_php_ini() {
 }
 
 ################################################################################
-##
 ## ModSecurity Installation
-##
 ################################################################################
 
 modsecurity_install() {
@@ -6280,9 +6140,7 @@ modsecurity_install() {
 }
 
 ################################################################################
-##
 ## ModSecurity Upgrade
-##
 ################################################################################
 
 modsecurity_upgrade() {
@@ -6293,9 +6151,7 @@ modsecurity_upgrade() {
 }
 
 ################################################################################
-##
 ## Todo: Update ModSecurity Rules (from CB2: doModSecurityRules())
-##
 ################################################################################
 
 update_modsecurity_rules() {
@@ -6424,9 +6280,7 @@ update_modsecurity_rules() {
 }
 
 ################################################################################
-##
 ## Verify Webapps php.ini (from CB2)
-##
 ################################################################################
 
 verify_webapps_php_ini() {
@@ -6462,9 +6316,7 @@ verify_webapps_php_ini() {
 }
 
 ################################################################################
-##
 ## Verify Webapps Temp Directory (from CB2)
-##
 ################################################################################
 
 verify_webapps_tmp() {
@@ -6481,9 +6333,7 @@ verify_webapps_tmp() {
 }
 
 ################################################################################
-##
 ## Get Webmail Link (from CB2)
-##
 ################################################################################
 
 get_webmail_link() {
@@ -6503,10 +6353,8 @@ get_webmail_link() {
 }
 
 ################################################################################
-##
 ## Apache Host Configuration (from CB2: doApacheHostConf())
 ## Generates extra/httpd-hostname.conf
-##
 ################################################################################
 
 apache_host_conf() {
@@ -6617,9 +6465,7 @@ apache_host_conf() {
 }
 
 ################################################################################
-##
 ## Add Alias Redirect (from CB2: add_alias_redirect())
-##
 ################################################################################
 
 add_alias_redirect() {
@@ -6671,9 +6517,7 @@ add_alias_redirect() {
 }
 
 ################################################################################
-##
 ## Rewrite httpd Alias (from CB2: do_rewrite_httpd_alias())
-##
 ################################################################################
 
 do_rewrite_httpd_alias() {
@@ -6749,9 +6593,7 @@ do_rewrite_httpd_alias() {
 }
 
 ################################################################################
-##
 ## Add Nginx Alias Redirect (from CB2: add_nginx_alias_redirect())
-##
 ################################################################################
 
 add_nginx_alias_redirect() {
@@ -6768,9 +6610,7 @@ add_nginx_alias_redirect() {
 }
 
 ################################################################################
-##
 ## Verify: Todo: Add Nginx Alias (from CB2: add_nginx_alias())
-##
 ################################################################################
 
 add_nginx_alias() {
@@ -6817,9 +6657,7 @@ add_nginx_alias() {
 }
 
 ################################################################################
-##
 ## Verify: Todo: Rewrite Nginx Webapps (from CB2: do_rewrite_nginx_webapps())
-##
 ################################################################################
 
 do_rewrite_nginx_webapps() {
@@ -6922,9 +6760,7 @@ do_rewrite_nginx_webapps() {
 }
 
 ################################################################################
-##
 ## Create httpd Nginx (from CB2: create_httpd_nginx())
-##
 ################################################################################
 
 create_httpd_nginx() {
@@ -6952,9 +6788,7 @@ create_httpd_nginx() {
 }
 
 ################################################################################
-##
 ## Do Apache Check (from CB2: doApacheCheck())
-##
 ################################################################################
 
 doApacheCheck() {
@@ -6979,9 +6813,7 @@ doApacheCheck() {
 }
 
 ################################################################################
-##
 ## Rewrite Confs (from CB2: doRewriteConfs())
-##
 ################################################################################
 
 rewrite_confs() {
@@ -7330,9 +7162,7 @@ rewrite_confs() {
 }
 
 ################################################################################
-##
 ## Run DirectAdmin Task Query (from CB2)
-##
 ################################################################################
 
 run_dataskq() {
@@ -7347,9 +7177,7 @@ run_dataskq() {
 }
 
 ################################################################################
-##
 ## Rewrite directadmin-vhosts.conf (from CB2: doVhosts())
-##
 ################################################################################
 
 rewrite_vhosts() {
@@ -7393,9 +7221,7 @@ rewrite_vhosts() {
 }
 
 ################################################################################
-##
 ## Verify Server CA Certificate (from CB2: ensure_server_ca())
-##
 ################################################################################
 
 verify_server_ca() {
@@ -7481,9 +7307,7 @@ verify_server_ca() {
 }
 
 ################################################################################
-##
 ## Backup HTTP (from CB2: backupHttp())
-##
 ################################################################################
 
 backup_http() {
@@ -7509,9 +7333,7 @@ backup_http() {
 }
 
 ################################################################################
-##
 ## Restore HTTP (from CB2: restoreHttp())
-##
 ################################################################################
 
 restore_http() {
@@ -7541,9 +7363,7 @@ restore_http() {
 }
 
 ################################################################################
-##
 ## Suhosin Installation
-##
 ################################################################################
 
 suhosin_install() {
@@ -7575,9 +7395,7 @@ suhosin_install() {
 }
 
 ################################################################################
-##
 ## Tokenize the IP (from CB2: tokenizeIP())
-##
 ################################################################################
 
 tokenize_IP() {
@@ -7668,9 +7486,7 @@ tokenize_IP() {
 }
 
 ################################################################################
-##
 ## Tokenize Ports (from CB2: tokenize_ports())
-##
 ################################################################################
 
 tokenize_ports() {
@@ -7828,9 +7644,7 @@ tokenize_ports() {
 }
 
 ################################################################################
-##
 ## Verify: Todo: PHP Configuration (from CB2: doPhpConf())
-##
 ################################################################################
 
 php_conf() {
@@ -8047,9 +7861,7 @@ php_conf() {
 }
 
 ################################################################################
-##
 ## Todo: Setup Brute-Force Monitor
-##
 ################################################################################
 
 bfm_setup() {
@@ -8065,18 +7877,16 @@ bfm_setup() {
   fi
 
   ## Todo:
-  if [ -e "${PB_DIR}/patches/${PORT_PHPMYADMIN}/pma_auth_logging.patch" ]; then
-    ## ${WGET} "${WGET_CONNECT_OPTIONS}" -O "${PB_DIR}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
-    # cp -f "${PB_DIR}/patches/${PORT_PHPMYADMIN}/pma_auth_logging.patch"
+  if [ -e "${PB_PATH}/patches/${PORT_PHPMYADMIN}/pma_auth_logging.patch" ]; then
+    ## ${WGET} "${WGET_CONNECT_OPTIONS}" -O "${PB_PATH}/patches/pma_auth_logging.patch" "${PB_MIRROR}/patches/pma_auth_logging.patch"
+    # cp -f "${PB_PATH}/patches/${PORT_PHPMYADMIN}/pma_auth_logging.patch"
   fi
 
   return
 }
 
 ################################################################################
-##
 ## Verify: Test: IPFW Enable
-##
 ################################################################################
 
 ipfw_enable() {
@@ -8122,9 +7932,7 @@ ipfw_enable() {
 }
 
 ################################################################################
-##
 ## Disable IPFW
-##
 ################################################################################
 
 ipfw_disable() {
@@ -8138,9 +7946,7 @@ ipfw_disable() {
 }
 
 ################################################################################
-##
 ## Remove IPFW Settings
-##
 ################################################################################
 
 ipfw_remove() {
@@ -8186,10 +7992,8 @@ err() {
 }
 
 ################################################################################
-##
 ## info message (from /etc/rc.subr)
 ## Display informational message to stdout and log to syslog.
-##
 ################################################################################
 
 info() {
@@ -8204,11 +8008,9 @@ info() {
 }
 
 ################################################################################
-##
 ## Debug message (from /etc/rc.subr)
 ## If debugging is enabled output message to stderr.
 ## BEWARE that you don't call any subroutine that itself calls this function.
-##
 ################################################################################
 
 debug() {
@@ -8223,10 +8025,8 @@ debug() {
 }
 
 ################################################################################
-##
 ## Warning message (from /etc/rc.subr)
 ## Display message to stderr and log to the syslog.
-##
 ################################################################################
 
 warn() {
@@ -8237,12 +8037,10 @@ warn() {
 }
 
 ################################################################################
-##
 ## checkyesno var (from /etc/rc.subr)
 ## Test $1 variable, and warn if not set to YES or NO.
 ## Return 0 if it's "yes" (et al), nonzero otherwise.
 ## NOTE: Modified to return 0 for yes or no, 1 for incorrect values
-##
 ################################################################################
 
 checkyesno_opt() {
@@ -8258,11 +8056,9 @@ checkyesno_opt() {
 }
 
 ################################################################################
-##
 ## checkyesno var (from /etc/rc.subr)
 ## Test $1 variable, and warn if not set to YES or NO.
 ## Return 0 if it's "yes" (et al), nonzero otherwise.
-##
 ################################################################################
 
 checkyesno() {
@@ -8285,9 +8081,27 @@ checkyesno() {
 }
 
 ################################################################################
-##
+## Check options.conf file
+################################################################################
+
+check_options_file() {
+
+  if [ ! -f options.conf ]; then
+    printf "*** Notice: PortsBuild's options.conf file is missing. Downloading a fresh copy now.\n"
+    getFile options.conf "${PB_PATH}/options.conf"
+
+    if [ ! -f options.conf ]; then
+      printf "*** Error: options.conf is still missing. Can't continue.\n"
+      exit 1
+    fi
+  fi
+
+  return
+}
+
+################################################################################
 ## Validate Options
-##
+## Parse Defaults and User Options, then pass computed values to PB
 ################################################################################
 
 validate_options() {
@@ -8295,15 +8109,12 @@ validate_options() {
   local IFS=' '
   local UNIFIED_FTP
 
-  ## Parse Defaults and User Options, then pass computed values to PB
-
   # if [ -n "${ETHERNET_DEV}" ]; then
   #   OPT_ETHERNET_DEV=${ETHERNET_DEV}
   # fi
 
   # SERVER_IP=${DA_SERVER_IP}
   # SERVER_IP_MASK=${DA_SERVER_IP_MASK}
-
 
   ## Default SSL Certificates to use
   OPT_PREFER_APACHE_SSL_CERTS="NO"
@@ -9237,9 +9048,7 @@ show_debug() {
 }
 
 ################################################################################
-##
 ## Verify: Rewrite Menu
-##
 ################################################################################
 
 rewrite_app() {
@@ -9262,9 +9071,7 @@ rewrite_app() {
 }
 
 ################################################################################
-##
 ## Show Rewrite Menu
-##
 ################################################################################
 
 show_rewrite_menu() {
@@ -9291,9 +9098,7 @@ show_rewrite_menu() {
 }
 
 ################################################################################
-##
 ## Show Installation Menu
-##
 ################################################################################
 
 show_install_menu() {
@@ -9334,9 +9139,7 @@ show_install_menu() {
 }
 
 ################################################################################
-##
 ## Show logo :)
-##
 ################################################################################
 
 show_logo() {
@@ -9353,9 +9156,7 @@ show_logo() {
 }
 
 ################################################################################
-##
 ## Show version
-##
 ################################################################################
 
 show_version() {
@@ -9365,9 +9166,7 @@ show_version() {
 }
 
 ################################################################################
-##
 ## Show Application Versions
-##
 ################################################################################
 
 show_versions() {
@@ -9392,9 +9191,7 @@ show_versions() {
 }
 
 ################################################################################
-##
 ## Show versions of (select) packages
-##
 ################################################################################
 
 show_outdated() {
@@ -9418,9 +9215,7 @@ show_outdated() {
 }
 
 ################################################################################
-##
 ## Show Audit
-##
 ################################################################################
 
 show_audit() {
@@ -9434,9 +9229,7 @@ show_audit() {
 }
 
 ################################################################################
-##
 ## About PortsBuild
-##
 ################################################################################
 
 show_about() {
@@ -9449,17 +9242,13 @@ show_about() {
 }
 
 ################################################################################
-##
 ## Show the main menu
-##
 ################################################################################
 
 show_main_menu() { show_logo; show_version; show_menu; }
 
 ################################################################################
-##
 ## Show selection menu
-##
 ################################################################################
 
 show_menu() {
@@ -9509,6 +9298,10 @@ show_menu() {
 }
 
 ################################################################################
+
+check_options_file
+
+. options.conf
 
 validate_options
 
