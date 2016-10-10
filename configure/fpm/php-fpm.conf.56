@@ -64,7 +64,8 @@ security.limit_extensions = .php .php5 .php56 .inc .phtml
 ;php_admin_value[error_log] = /var/log/fpm-php.www.log
 ;php_admin_flag[log_errors] = on
 ;php_admin_value[memory_limit] = 32M
-php_admin_value[open_basedir] = /tmp:/var/tmp:/usr/local/www:/usr/local/php56/lib/php
+;php_admin_value[open_basedir] = /tmp:/var/tmp:/usr/local/www:/usr/local/php56/lib/php
+php_admin_value[open_basedir] = /tmp:/var/tmp:/usr/local/www:/usr/local/php/lib/php
 
 ; Load all DA User configs
 include=/usr/local/directadmin/data/users/*/php/php-fpm56.conf

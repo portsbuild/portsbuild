@@ -10,7 +10,7 @@ if [ "$1" != "" ]; then
   shift
 fi
 
-SENDMAIL_FROM="`echo $@ | grep -o 'sendmail_from=[^ ]*' | cut -d'\"' -f2`"
+SENDMAIL_FROM="$(echo $@ | grep -o 'sendmail_from=[^ ]*' | cut -d'\"' -f2)"
 if [ "${SENDMAIL_FROM}" != "" ]; then
   SENDMAIL_ADD="-f ${SENDMAIL_FROM}"
 fi
@@ -26,4 +26,4 @@ export PHP_FCGI_MAX_REQUESTS
 # See http://www.webhostingtalk.com/archive/index.php/t-1165678.html
 PHP_FCGI_CHILDREN=0
 export PHP_FCGI_CHILDREN
-exec /usr/local/php55/bin/php-cgi55 ${OPTIONS} -d sendmail_path="'/usr/sbin/sendmail -t -i ${SENDMAIL_ADD}'" $@
+exec /usr/local/bin/php-cgi ${OPTIONS} -d sendmail_path="'/usr/sbin/sendmail -t -i ${SENDMAIL_ADD}'" $@
