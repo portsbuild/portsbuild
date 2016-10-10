@@ -1009,7 +1009,7 @@ ports_update() {
 ################################################################################
 
 pkgi() { ${PKG} install -y "$@"; }
-pkgu() { ${PKG} upgrade -y "$@"; }
+pkgu() { ${PKG} upgrade -f -y "$@"; }
 pkgd() { ${PKG} delete -f "$@"; }
 pkgq() { ${PKG} query "$@"; }
 
@@ -4140,12 +4140,12 @@ php_install() {
         databases/php55-pdo_mysql databases/php55-pdo_sqlite archivers/php55-phar \
         sysutils/php55-posix textproc/php55-pspell devel/php55-readline \
         converters/php55-recode www/php55-session textproc/php55-simplexml \
-        net-mgmt/php55-snmp net/php55-soap net/php55-sockets \
+        net/php55-soap net/php55-sockets \
         databases/php55-sqlite3 www/php55-tidy devel/php55-tokenizer \
         textproc/php55-wddx textproc/php55-xml textproc/php55-xmlreader \
         net/php55-xmlrpc textproc/php55-xmlwriter textproc/php55-xsl \
         archivers/php55-zip archivers/php55-zlib"
-        ;;
+        ;; # net-mgmt/php55-snmp
     "56")
         PORT_PHP="${PORT_PHP56}"
         PORT_PHP_EXT="${PORT_PHP56_EXT}"
@@ -4192,12 +4192,12 @@ php_install() {
                 security/php70-openssl databases/php70-pdo databases/php70-pdo_mysql \
                 databases/php70-pdo_sqlite archivers/php70-phar sysutils/php70-posix \
                 textproc/php70-pspell devel/php70-readline converters/php70-recode \
-                www/php70-session textproc/php70-simplexml net-mgmt/php70-snmp \
+                www/php70-session textproc/php70-simplexml \
                 net/php70-soap net/php70-sockets databases/php70-sqlite3 www/php70-tidy \
                 devel/php70-tokenizer textproc/php70-wddx textproc/php70-xml \
                 textproc/php70-xmlreader net/php70-xmlrpc textproc/php70-xmlwriter \
                 textproc/php70-xsl archivers/php70-zip archivers/php70-zlib"
-        ;;
+        ;; # net-mgmt/php70-snmp
     *) printf "*** Error: php_install(): Wrong PHP version selected. (Script error)\n"; exit ;;
   esac
 
