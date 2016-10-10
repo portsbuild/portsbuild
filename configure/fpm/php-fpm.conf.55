@@ -6,13 +6,13 @@ error_log = log/php-fpm.log
 ; will be handled differently.
 ; See syslog(3) for possible values (ex daemon equiv LOG_DAEMON)
 ; Default Value: daemon
-;syslog.facility = daemon
+syslog.facility = daemon
 
 ; syslog_ident is prepended to every message. If you have multiple FPM
 ; instances running on the same server, you can change the default value
 ; which must suit common needs.
 ; Default Value: php-fpm
-;syslog.ident = php-fpm
+syslog.ident = php-fpm
 
 ; Log level
 ; Possible Values: alert, error, warning, notice, debug
@@ -62,7 +62,7 @@ security.limit_extensions = .php .php5 .php55 .inc .phtml
 ;php_admin_value[error_log] = /var/log/fpm-php.www.log
 ;php_admin_flag[log_errors] = on
 ;php_admin_value[memory_limit] = 32M
-;php_admin_value[open_basedir] = /tmp:/var/tmp:/usr/local/www:/usr/local/php55/lib/php
+php_admin_value[open_basedir] = /tmp:/var/tmp:/usr/local/www:/usr/local/lib/php
 
 ; Load all DA User configs
 include=/usr/local/directadmin/data/users/*/php/php-fpm55.conf
