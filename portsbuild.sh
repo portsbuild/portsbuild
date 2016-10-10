@@ -1013,8 +1013,28 @@ pkgu() { ${PKG} upgrade -y "$@"; }
 pkgd() { ${PKG} delete -f "$@"; }
 pkgq() { ${PKG} query "$@"; }
 
+pkg_clean() { ${PKG} clean -y; }
 pkg_update() { ${PKG} update; }
 pkg_update_force() { ${PKG} update -f; }
+
+################################################################################
+## Setup latest pkg repo
+################################################################################
+
+pkg_repo_setup() {
+
+  local PKG_REPO_DIR=/usr/local/etc/pkg/repos
+
+  if [ "${OPT_LATEST_PKG_REPO}" = "YES" ]; then
+    if [ ! -e "${PKG_REPO_DIR}/FreeBSD.conf" ]; then
+      ${MKDIR} -p "${PKG_REPO_DIR}"
+      ${TOUCH} "${PKG_REPO_DIR}/FreeBSD.conf"
+      printf "FreeBSD: {\n  url: \"pkg+http://pkg.FreeBSD.org/\${ABI}/latest\"\n}" > "${PKG_REPO_DIR}/FreeBSD.conf"
+    fi
+  fi
+
+  return
+}
 
 ################################################################################
 ## synth shortcuts
@@ -1125,6 +1145,8 @@ addUserGroup() {
   if ! /usr/bin/id "${USER}" > /dev/null; then
     ${PW} useradd -g "${GROUP}" -n "${USER}" -s /sbin/nologin
   fi
+
+  return
 }
 
 ################################################################################
@@ -1138,6 +1160,8 @@ random_pass() {
   MIN_PASS_LENGTH="${min:=12}"
 
   ${PERL} -le "print map+(A..Z,a..z,0..9)[rand 62],0..${MIN_PASS_LENGTH}"
+
+  return
 }
 
 ################################################################################
@@ -1238,6 +1262,8 @@ global_setup() {
   if [ "$?" -eq 1 ]; then
     printf "Bootstrapping and updating pkg\n"
     /usr/bin/env ASSUME_ALWAYS_YES=YES pkg bootstrap
+
+    pkg_repo_setup
 
     pkg_update
 
@@ -2621,17 +2647,19 @@ exim_conf_version() {
 }
 
 ################################################################################
-## Generate Exim.conf (from CB2)
+## Verify: Generate Exim.conf (from CB2)
 ################################################################################
 
 doEximConf() {
+
+  local EXIMV EXIM_CONF_MERGED EXIM_CONF_DEFAULT EXIM_CONF_CUSTOM
 
   if [ "${OPT_EXIMCONF}" != "YES" ]; then
     printf "*** Error: You cannot update Exim configuration files because you do not have it set in options.conf.\n"
     exit 1
   fi
 
-  ${WGET} ${WGET_CONNECT_OPTIONS} -O /etc/exim.conf.cb20 http://${DOWNLOADSERVER_OPT}/services/SpamBlocker/${EXIM_CONF_VER}/exim.conf-SpamBlockerTechnology-v${EXIM_CONF_VER}.txt
+  ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.conf.cb20" http://${DOWNLOADSERVER_OPT}/services/SpamBlocker/${EXIM_CONF_VER}/exim.conf-SpamBlockerTechnology-v${EXIM_CONF_VER}.txt
 
   ## CB2: Don't overwrite exim.conf if wget failed (empty exim.conf file)
   if [ -s "${EXIM_PATH}/exim.conf.cb20" ]; then
@@ -2645,44 +2673,46 @@ doEximConf() {
   EXIMV="$(exim_version)"
 
   ## CB2: Download additional files for exim.conf
-  if [ "${EXIMCONF_RELEASE_OPT}" != "2.1" ] && [ "${EXIMCONF_RELEASE_OPT}" != "4.2" ]; then
+  if [ "${OPT_EXIMCONF_RELEASE}" != "2.1" ] && [ "${OPT_EXIMCONF_RELEASE}" != "4.2" ]; then
     ${WGET} ${WGET_CONNECT_OPTIONS} -O ${EXIM_PATH}/exim.strings.conf.cb20 http://${DOWNLOADSERVER_OPT}/services/SpamBlocker/${EXIM_CONF_VER}/exim.strings.conf
     ${WGET} ${WGET_CONNECT_OPTIONS} -O ${EXIM_PATH}/exim.variables.conf.cb20 http://${DOWNLOADSERVER_OPT}/services/SpamBlocker/${EXIM_CONF_VER}/exim.variables.conf.default
 
-    EXIM_CONF_MERGED=${EXIM_PATH}/exim.variables.conf.merged
-    EXIM_CONF_DEFAULT=${EXIM_PATH}/exim.variables.conf.default
-    EXIM_CONF_CUSTOM=${EXIM_PATH}/exim.variables.conf.custom
+    EXIM_CONF_MERGED="${EXIM_PATH}/exim.variables.conf.merged"
+    EXIM_CONF_DEFAULT="${EXIM_PATH}/exim.variables.conf.default"
+    EXIM_CONF_CUSTOM="${EXIM_PATH}/exim.variables.conf.custom"
 
-    if [ -s ${EXIM_PATH}/exim.strings.conf.cb20 ]; then
-      mv -f ${EXIM_PATH}/exim.strings.conf.cb20 ${EXIM_PATH}/exim.strings.conf
+    if [ -s "${EXIM_PATH}/exim.strings.conf.cb20" ]; then
+      mv -f "${EXIM_PATH}/exim.strings.conf.cb20" "${EXIM_PATH}/exim.strings.conf"
     else
       rm -f "${EXIM_PATH}/exim.strings.conf.cb20"
-      echo "Download of /etc/exim.strings.conf failed"
+      printf "*** Error: Download of exim.strings.conf failed\n"
     fi
 
     if [ -s "${EXIM_PATH}/exim.variables.conf.cb20" ]; then
       mv -f "${EXIM_PATH}/exim.variables.conf.cb20" ${EXIM_CONF_DEFAULT}
     else
       rm -f "${EXIM_PATH}/exim.variables.conf.cb20"
-      echo "Download of ${EXIM_CONF_DEFAULT} failed"
+      printf "*** Error: Download of ${EXIM_CONF_DEFAULT} failed\n"
     fi
 
-    if [ -s ${EXIM_CONF_DEFAULT} ]; then
+    if [ -s "${EXIM_CONF_DEFAULT}" ]; then
       if [ "${IPV6}" = "0" ]; then
-        perl -pi -e 's|disable_ipv6=false|disable_ipv6=true|' ${EXIM_CONF_DEFAULT}
+        ${PERL} -pi -e 's|disable_ipv6=false|disable_ipv6=true|' ${EXIM_CONF_DEFAULT}
       else
-        perl -pi -e 's|disable_ipv6=true|disable_ipv6=false|' ${EXIM_CONF_DEFAULT}
+        ${PERL} -pi -e 's|disable_ipv6=true|disable_ipv6=false|' ${EXIM_CONF_DEFAULT}
       fi
     else
       printf "\n*** Error: %s does not exist or is empty.\n\n" ${EXIM_CONF_DEFAULT}
     fi
 
-    if [ ! -s "${EXIM_PATH}/exim.variables.conf" ] && [ -s ${EXIM_CONF_DEFAULT} ]; then
-      /bin/cp -f ${EXIM_CONF_DEFAULT} "${EXIM_PATH}/exim.variables.conf"
+    if [ ! -s "${EXIM_PATH}/exim.variables.conf" ] && [ -s "${EXIM_CONF_DEFAULT}" ]; then
+      cp -f ${EXIM_CONF_DEFAULT} "${EXIM_PATH}/exim.variables.conf"
     fi
 
     ########################################
-    #need to do a merge here with exim.variables.conf.default and exim.variables.conf.custom, and save to exim.variables.conf
+
+    ## CB2: need to do a merge here with exim.variables.conf.default
+    ##      and exim.variables.conf.custom, and save to exim.variables.conf
 
     printf "# Do not edit this file directly\n" > ${EXIM_CONF_MERGED}
     printf "# Edit %s\n" "${EXIM_CONF_CUSTOM}" >> ${EXIM_CONF_MERGED}
@@ -2692,14 +2722,14 @@ doEximConf() {
       cat ${EXIM_CONF_CUSTOM} >> ${EXIM_CONF_MERGED}
     fi
 
-    for i in `cat ${EXIM_CONF_DEFAULT} | cut -d= -f1`; do
+    for i in $(cat ${EXIM_CONF_DEFAULT} | cut -d= -f1); do
       if [ -e ${EXIM_CONF_CUSTOM} ]; then
         if [ "`grep -m1 -c ^${i}= ${EXIM_CONF_CUSTOM}`" = "1" ]; then
           continue
         fi
       fi
 
-      VALUE="`grep -m1 ^${i} ${EXIM_CONF_DEFAULT} | cut -d= -f2`"
+      VALUE="$(grep -m1 ^${i} ${EXIM_CONF_DEFAULT} | cut -d= -f2)"
       echo "${i}=${VALUE}" >> ${EXIM_CONF_MERGED}
     done
 
@@ -2729,31 +2759,33 @@ doEximConf() {
     fi
   fi
 
+  ## Todo:
   ensure_keep_environment ${OPT_EXIMCONF_RELEASE}
 
-  ${WGET} ${WGET_CONNECT_OPTIONS} -O ${EXIM_PATH}/exim.pl.cb20 http://${DOWNLOADSERVER_OPT}/services/exim.pl.${EXIM_PL_VER}
+  ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.pl.cb20" http://${DOWNLOADSERVER_OPT}/services/exim.pl.${EXIM_PL_VER}
 
-  if [ -s ${EXIM_PATH}/exim.pl.cb20 ]; then
-    mv -f ${EXIM_PATH}/exim.pl.cb20 ${EXIM_PATH}/exim.pl
+  if [ -s "${EXIM_PATH}/exim.pl.cb20" ]; then
+    mv -f "${EXIM_PATH}/exim.pl.cb20" "${EXIM_PATH}/exim.pl"
   else
     rm -f ${EXIM_PATH}/exim.pl.cb20
-    echo "Download of /etc/exim.pl failed"
+    printf "*** Error: Download of exim.pl failed\n"
   fi
 
-  ${CHMOD} 755 ${EXIM_PATH}/exim.pl
+  ${CHMOD} 755 "${EXIM_PATH}/exim.pl"
 
   if [ ! -e /etc/virtual/limit ]; then
-    echo "/etc/virtual/limit not found. Creating with a value of 0..."
-    echo "0" > /etc/virtual/limit
-    ${CHOWN} mail:mail /etc/virtual/limit
+    printf "/etc/virtual/limit not found. Creating it with a value of 0.\n"
+    printf "0\n" > /etc/virtual/limit
+    ${CHOWN} "${EXIM_USER}:${EXIM_GROUP}" /etc/virtual/limit
   fi
 
   if [ ! -d /etc/virtual/usage ]; then
     printf "/etc/virtual/usage not found. Creating...\n"
-    mkdir -p /etc/virtual/usage
-    ${CHOWN} mail:mail /etc/virtual/usage
+    ${MKDIR} -p /etc/virtual/usage
+    ${CHOWN} "${EXIM_USER}:${EXIM_GROUP}" /etc/virtual/usage
   fi
 
+  ## Todo:
   doEnsureEximFile /etc/virtual/bad_sender_hosts
   doEnsureEximFile /etc/virtual/bad_sender_hosts_ip
   doEnsureEximFile /etc/virtual/blacklist_domains
@@ -2766,76 +2798,77 @@ doEximConf() {
   doEnsureEximFile /etc/virtual/skip_av_domains
   doEnsureEximFile /etc/virtual/skip_rbl_domains
 
-  if [ "${OPT_DOVECOT}" = "yes" ] && [ "${OPT_EXIMCONF_RELEASE}" = "2.1" ]; then
+  if [ "${OPT_DOVECOT}" = "YES" ] && [ "${OPT_EXIMCONF_RELEASE}" = "2.1" ]; then
     cd ${PB_PATH}
     if [ -e exim.conf.dovecot.patch ]; then
-      patch -d/ -p0 < exim.conf.dovecot.patch
+      ${PATCH} -d/ -p0 < exim.conf.dovecot.patch
     fi
   fi
 
   if [ "${OPT_PIGEONHOLE}" = "YES" ]; then
     cd ${PB_PATH}
     if [ "${OPT_EXIMCONF_RELEASE}" = "2.1" ]; then
-      getFile patches/exim.conf.pigeonhole.patch eximpigeonholepatch
-      cd /etc
-      patch -p0 < ${PB_PATH}/patches/exim.conf.pigeonhole.patch
+      ## Todo: getFile patches/exim.conf.pigeonhole.patch eximpigeonholepatch
+      cd ${EXIM_PATH}
+      ${PATCH} -p0 < ${PB_PATCHES}/exim.conf.pigeonhole.patch
       cd ${PB_PATH}
     else
-      ${PERL} -pi -e 's#transport = virtual_localdelivery#transport = dovecot_lmtp_udp#' /etc/exim.conf
+      ${PERL} -pi -e 's#transport = virtual_localdelivery#transport = dovecot_lmtp_udp#' ${EXIM_CONF}
     fi
   else
     #we have LMTP enabled by default for 4.3+
     if [ "${OPT_EXIMCONF_RELEASE}" = "2.1" ] || [ "${OPT_EXIMCONF_RELEASE}" = "4.2" ]; then
-      ${PERL} -pi -e 's#transport = dovecot_lmtp_udp#transport = virtual_localdelivery#' /etc/exim.conf
+      ${PERL} -pi -e 's#transport = dovecot_lmtp_udp#transport = virtual_localdelivery#' ${EXIM_CONF}
     fi
   fi
 
   if [ "${OPT_BLOCKCRACKING}" = "YES" ]; then
     blockcracking_install norestart
   else
-    rm -rf /usr/local/etc/exim.blockcracking
+    rm -rf "${EXIM_PATH}/bc"
   fi
 
   if [ "${OPT_EASY_SPAM_FIGHTER}" = "YES" ]; then
     easyspamfighter_install norestart
   else
-    rm -rf /usr/local/etc/exim.easy_spam_fighter
+    rm -rf "${EXIM_PATH}/esf"
   fi
 
   if [ "${OPT_SPAMASSASSIN}" = "YES" ]; then
-    ${PERL} -pi -e 's|#.include_if_exists /etc/exim.spamassassin.conf|.include_if_exists /etc/exim.spamassassin.conf|' /etc/exim.conf
-    if [ ! -s /usr/local/etc/exim/exim.spamassassin.conf ]; then
-      wget ${WGET_CONNECT_OPTIONS} -O /etc/exim.spamassassin.conf http://${DOWNLOADSERVER_OPT}/services/exim.spamassassin.conf
+    ${PERL} -pi -e 's|#.include_if_exists ${EXIM_PATH}/exim.spamassassin.conf|.include_if_exists ${EXIM_PATH}/exim.spamassassin.conf|' ${EXIM_CONF}
+    if [ ! -s "${EXIM_PATH}/exim.spamassassin.conf" ]; then
+      ${WGET} ${WGET_CONNECT_OPTIONS} -O $"{EXIM_PATH}/exim.spamassassin.conf" http://${DOWNLOADSERVER_OPT}/services/exim.spamassassin.conf
     fi
   else
-    rm -f /usr/local/etc/exim/exim.spamassassin.conf
+    rm -f "${EXIM_PATH}/exim.spamassassin.conf"
   fi
 
+  ## ClamAV+Exim
   if [ "${OPT_CLAMAV_EXIM}" = "YES" ] && [ "${OPT_CLAMAV}" = "YES" ]; then
-    ${PERL} -pi -e 's|#.include_if_exists /etc/exim.clamav.load.conf|.include_if_exists /etc/exim.clamav.load.conf|' /etc/exim.conf
-    ${PERL} -pi -e 's|#.include_if_exists /etc/exim.clamav.conf|.include_if_exists /etc/exim.clamav.conf|' /etc/exim.conf
+    ${PERL} -pi -e 's|#.include_if_exists ${EXIM_PATH}/exim.clamav.load.conf|.include_if_exists ${EXIM_PATH}/exim.clamav.load.conf|' ${EXIM_CONF}
+    ${PERL} -pi -e 's|#.include_if_exists ${EXIM_PATH}/exim.clamav.conf|.include_if_exists ${EXIM_PATH}/exim.clamav.conf|' ${EXIM_CONF}
     if [ "${OPT_CLAMAV_EXIM}" = "YES" ]; then
-      if [ ! -s /etc/exim.clamav.load.conf ]; then
-        ${WGET} ${WGET_CONNECT_OPTIONS} -O /etc/exim.clamav.load.conf http://${DOWNLOADSERVER_OPT}/services/exim.clamav.load.conf
+      if [ ! -s "${EXIM_PATH}/exim.clamav.load.conf" ]; then
+        ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.clamav.load.conf" http://${DOWNLOADSERVER_OPT}/services/exim.clamav.load.conf
       fi
-      if [ ! -s /etc/exim.clamav.conf ]; then
-        ${WGET} ${WGET_CONNECT_OPTIONS} -O /etc/exim.clamav.conf http://${DOWNLOADSERVER_OPT}/services/exim.clamav.conf
+      if [ ! -s "${EXIM_PATH}/exim.clamav.conf" ]; then
+        ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.clamav.conf" http://${DOWNLOADSERVER_OPT}/services/exim.clamav.conf
       fi
     fi
   else
-    rm -f /etc/exim.clamav.load.conf
-    rm -f /etc/exim.clamav.conf
+    rm -f "${EXIM_PATH}/exim.clamav.load.conf"
+    rm -f "${EXIM_PATH}/exim.clamav.conf"
   fi
 
   exim_restart
 
   COUNT_LMTP=0
   if [ -e ${EXIM_CONF} ]; then
-    COUNT_LMTP=`grep -c 'transport = dovecot_lmtp_udp' ${EXIM_CONF}`
+    COUNT_LMTP=$(grep -c 'transport = dovecot_lmtp_udp' ${EXIM_CONF})
   fi
 
-  if [ ! -e /etc/dovecot/conf/lmtp.conf ] && [ "${COUNT_LMTP}" = "1" ] && [ -e /etc/dovecot/dovecot.conf ]; then
-    if ! grep -q 'protocol lmtp' /etc/dovecot/dovecot.conf; then
+  if [ ! -e "${DOVECOT_PATH}/conf/lmtp.conf" ] && [ "${COUNT_LMTP}" = "1" ] && [ -e ${DOVECOT_CONF} ]; then
+    if ! grep -q 'protocol lmtp' ${DOVECOT_CONF}; then
       printf "WARNING: make sure you have LMTP enabled in dovecot.conf, './build dovecot_conf' should fix it.\n"
     fi
   fi
@@ -3065,7 +3098,7 @@ easyspamfighter_install() {
 
     ## Check exim.conf version
     # if [ "${OPT_EXIMCONF_RELEASE}" = "2.1" ] || [ "${OPT_EXIMCONF_RELEASE}" = "4.2" ]; then
-    #   echo "${boldon}WARNING:${boldoff} Your exim.conf version might be incompatible with Easy Spam Fighter.""
+    #   echo "WARNING: Your exim.conf version might be incompatible with Easy Spam Fighter.""
     #   echo "Please make sure that your exim.conf release is 4.3 or higher."
     # fi
 
@@ -4224,8 +4257,8 @@ php_install() {
       "suphp")
           pkgi ${PORT_SUPHP} ${PORT_PHP_EXT}
           ;;
-      # fastcgi) echo "not done" ;;
-      # fcgid) echo "not done" ;;
+      "fastcgi") echo "not done" ;;
+      # "fcgid") echo "not done" ;;
       *) printf "*** Error: php_install(): Wrong PHP mode selected. (Script error)\n"; exit ;;
     esac
   fi
@@ -6152,10 +6185,10 @@ configure_php_ini() {
   COUNT=$(grep -m1 -c '^date.timezone' "php.ini-${OPT_PHP_INI_TYPE}")
   COUNT2=$(grep -m1 -c ';date.timezone' "php.ini-${OPT_PHP_INI_TYPE}")
   if [ "$COUNT" -eq 0 ] && [ "$COUNT2" -eq 0 ]; then
-    ## echo "${boldon}Adding date.timezone = \"${OPT_PHP_TIMEZONE}\" to php.ini, please change it by yourself to fit your own needs.${boldoff}"
+    ## echo "Adding date.timezone = \"${OPT_PHP_TIMEZONE}\" to php.ini, please change it by yourself to fit your own needs."
     echo "date.timezone = \"${OPT_PHP_TIMEZONE}\"" >> "php.ini-${OPT_PHP_INI_TYPE}"
   elif [ "$COUNT" -eq 0 ]; then
-    ## echo "${boldon}Adding date.timezone = \"${OPT_PHP_TIMEZONE}\" to php.ini, please change it by yourself to fit your own needs.${boldoff}"
+    ## echo "Adding date.timezone = \"${OPT_PHP_TIMEZONE}\" to php.ini, please change it by yourself to fit your own needs."
     ${PERL} -pi -e "s#;date.timezone.*#date.timezone = \"${OPT_PHP_TIMEZONE}\"#" "php.ini-${OPT_PHP_INI_TYPE}"
   fi
 
@@ -7315,7 +7348,7 @@ verify_server_ca() {
   fi
 
   if [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    mkdir -p ${NGINX_PATH}/ssl
+    ${MKDIR} -p ${NGINX_PATH}/ssl
   fi
 
   printf "Making sure %s exists.\n" "${SSL_CA}"
@@ -8116,13 +8149,13 @@ validate_options() {
   HAVE_CLI="NO"
   HAVE_FCGID="NO"
 
-  ## PB: Used for dual PHP mode:
-  for php_shortrelease in $(echo "${PHP_SHORTRELEASE_SET}"); do
-    eval "$(echo "HAVE_FPM${php_shortrelease}_CGI=NO")"
-    eval "$(echo "HAVE_FCGID${php_shortrelease}=NO")"
-    eval "$(echo "HAVE_SUPHP${php_shortrelease}_CGI=NO")"
-    eval "$(echo "HAVE_CLI${php_shortrelease}=NO")"
-  done
+  ## PB: Verify: Used for dual PHP mode:
+  # for php_shortrelease in $(echo "${PHP_SHORTRELEASE_SET}"); do
+  #   eval "$(echo "HAVE_FPM${php_shortrelease}_CGI=NO")"
+  #   eval "$(echo "HAVE_FCGID${php_shortrelease}=NO")"
+  #   eval "$(echo "HAVE_SUPHP${php_shortrelease}_CGI=NO")"
+  #   eval "$(echo "HAVE_CLI${php_shortrelease}=NO")"
+  # done
 
   ## Standard 443 and 80 ports
   readonly PORT_80=$(getDA_Opt port_80 80)
@@ -8173,6 +8206,10 @@ validate_options() {
   fi
   if checkyesno_opt INSTALL_SYNTH; then
     readonly OPT_INSTALL_SYNTH="$(uc ${INSTALL_SYNTH})"
+  fi
+  if checkyesno_opt LATEST_PKG_REPO; then
+    readonly OPT_LATEST_PKG_REPO="$(uc ${LATEST_PKG_REPO})"
+    pkg_repo_setup
   fi
   if checkyesno_opt LETSENCRYPT; then
     readonly OPT_LETSENCRYPT="$(uc "${LETSENCRYPT}")"
@@ -8442,23 +8479,21 @@ validate_options() {
 get_versions() {
 
   local VERSIONS ## 0 = auto-update, 1 == show info only
-  local DIRECTADMIN_VER APACHE_VER DOVECOT_CONF_VER
+  local DIRECTADMIN_VER DIRECTADMINV APACHE_VER APACHE2_VER DOVECOT_CONF_VER DOVECOT_CONFV DOVECTCONFFILE
   local EXIT_CODE
 
   ## DirectAdmin
   if [ -e "${DA_BIN}" ] && [ "${DIRECTADMIN_VER}" != "0" ]; then
     DIRECTADMINV="$(${DA_BIN} v | grep -m1 '^Version:' | grep -oE '[^ ]+$' | cut -d. -f2,3,4)"
     if [ "${VERSIONS}" = "1" ]; then
-      echo "Latest version of DirectAdmin: ${DIRECTADMIN_VER}"
-      echo "Installed version of DirectAdmin: ${DIRECTADMINV}"
-      echo ""
+      printf "Latest version of DirectAdmin: %s\n" "${DIRECTADMIN_VER}"
+      printf "Installed version of DirectAdmin: %s\n\n" "${DIRECTADMINV}"
     fi
     if [ "${DIRECTADMIN_VER}" != "${DIRECTADMINV}" ]; then
       if [ "${VERSIONS}" = "0" ] || [ "${VERSIONS}" = "3" ]; then
         directadmin_update
       elif [ "${VERSIONS}" = "1" ]; then
-        echo "${boldon}DirectAdmin ${DIRECTADMINV} to ${DIRECTADMIN_VER} update is available.${boldoff}"
-        echo ""
+        printf "DirectAdmin %s to %s update is available.\n" "${DIRECTADMINV}" "${DIRECTADMIN_VER}"
       fi
       EXIT_CODE=$((EXIT_CODE+1))
     fi
@@ -8472,17 +8507,15 @@ get_versions() {
       if [ -e "${APACHE_HTTPD}" ]; then
         APACHEV="$(${APACHE_HTTPD} -v | grep -m1 'Server version:' | awk '{ print $3 }' | cut -d/ -f2)"
         if [ "${VERSIONS}" = "1" ]; then
-          echo "Latest version of Apache: ${APACHE2_VER}"
-          echo "Installed version of Apache: ${APACHEV}"
-          echo ""
+          printf "Latest version of Apache: %s\n" "${APACHE2_VER}"
+          printf "Installed version of Apache: %s\n\n" "${APACHEV}"
         fi
         if [ "${APACHE2_VER}" != "${APACHEV}" ]; then
           if [ "${VERSIONS}" = "0" ]; then
-            echo "${boldon}Updating Apache${boldoff}"
+            printf "Updating Apache.\n"
             apache_install
           elif [ "${VERSIONS}" = "1" ]; then
-            echo "${boldon}Apache ${APACHEV} to ${APACHE2_VER} update is available.${boldoff}"
-            echo ""
+            printf "Apache %s to %s update is available.\n" "${APACHEV}" "${APACHE2_VER}"
           fi
           EXIT_CODE=$((EXIT_CODE+1))
         fi
@@ -8518,17 +8551,15 @@ get_versions() {
 
     if [ "${DOVECOT_CONF_VER}" != "0" ]; then
       if [ "${VERSIONS}" = "1" ]; then
-        echo "Latest version of dovecot.conf: ${DOVECOT_CONF_VER}"
-        echo "Installed version of dovecot.conf: ${DOVECOT_CONFV}"
-        echo ""
+        printf "Latest version of dovecot.conf: %s\n" "${DOVECOT_CONF_VER}"
+        printf "Installed version of dovecot.conf: %s\n" "${DOVECOT_CONFV}"
       fi
       if [ "${DOVECOT_CONF_VER}" != "${DOVECOT_CONFV}" ]; then
         if [ "${VERSIONS}" = "0" ]; then
-          echo "${boldon}Updating dovecot.conf${boldoff}"
+          printf "Updating dovecot.conf\n"
           dovecot_config
         elif [ "${VERSIONS}" = "1" ]; then
-          echo "${boldon}dovecot.conf ${DOVECOT_CONFV} to ${DOVECOT_CONF_VER} update is available.${boldoff}"
-          echo ""
+          printf "dovecot.conf %s to %s update is available.\n\n" "${DOVECOT_CONFV}" "${DOVECOT_CONF_VER}"
         fi
         EXIT_CODE=$((EXIT_CODE+1))
       fi
@@ -8539,17 +8570,15 @@ get_versions() {
   if [ "${OPT_EXIMCONF}" = "YES" ] && [ "${EXIM_CONF_VER}" != "0" ]; then
     EXIMCONFV=$(exim_conf_version)
     if [ "${VERSIONS}" = "1" ]; then
-      echo "Latest version of exim.conf: ${EXIM_CONF_VER}"
-      echo "Installed version of exim.conf: ${EXIMCONFV}"
-      echo ""
+      printf "Latest version of exim.conf: %s\n" "${EXIM_CONF_VER}"
+      printf "Installed version of exim.conf: %s\n" "${EXIMCONFV}"
     fi
     if [ "${EXIM_CONF_VER}" != "${EXIMCONFV}" ]; then
       if [ "${VERSIONS}" = "0" ]; then
-        echo "${boldon}Updating exim.conf${boldoff}"
+        printf "Updating exim.conf\n"
         doEximConf
       elif [ "${VERSIONS}" = "1" ]; then
-        echo "${boldon}exim.conf ${EXIMCONFV} to ${EXIM_CONF_VER} update is available.${boldoff}"
-        echo ""
+        printf "exim.conf %s to %s update is available.\n\n" "${EXIMCONFV}" "${EXIM_CONF_VER}"
       fi
       EXIT_CODE=$((EXIT_CODE+1))
     fi
@@ -8567,17 +8596,15 @@ get_versions() {
       BLOCKCRACKINGV=0
     fi
     if [ "${VERSIONS}" = "1" ]; then
-      echo "Latest version of BlockCracking: ${BLOCKCRACKING_VER}"
-      echo "Installed version of BlockCracking: ${BLOCKCRACKINGV}"
-      echo ""
+      printf "Latest version of BlockCracking: %s\n" "${BLOCKCRACKING_VER}"
+      printf "Installed version of BlockCracking: %s\n" "${BLOCKCRACKINGV}"
     fi
     if [ "${BLOCKCRACKING_VER}" != "${BLOCKCRACKINGV}" ]; then
       if [ "${VERSIONS}" = "0" ]; then
-        echo "${boldon}Updating BlockCracking${boldoff}"
+        printf "Updating BlockCracking\n"
         blockcracking_install
       elif [ "${VERSIONS}" = "1" ]; then
-        echo "${boldon}BlockCracking ${BLOCKCRACKINGV} to ${BLOCKCRACKING_VER} update is available.${boldoff}"
-        echo ""
+        printf "BlockCracking %s to %s update is available.\n\n" "${BLOCKCRACKINGV}" "${BLOCKCRACKING_VER}"
       fi
       EXIT_CODE=$((EXIT_CODE+1))
     fi
@@ -8590,22 +8617,20 @@ get_versions() {
       COUNT=$(head -n1 "${EXIM_ESF_PATH}/README.txt" | grep -c '^#')
     fi
     if [ "${COUNT}" -gt 0 ]; then
-      EASY_SPAM_FIGHTERV="`head -n1 /etc/exim.easy_spam_fighter/README.txt | cut -d'#' -f2`"
+      EASY_SPAM_FIGHTERV="$(head -n1 "${EXIM_PATH}/esf/README.txt" | cut -d'#' -f2)"
     else
       EASY_SPAM_FIGHTERV=0
     fi
     if [ "${VERSIONS}" = "1" ]; then
-      echo "Latest version of Easy Spam Fighter: ${EASY_SPAM_FIGHTER_VER}"
-      echo "Installed version of Easy Spam Fighter: ${EASY_SPAM_FIGHTERV}"
-      echo ""
+      printf "Latest version of Easy Spam Fighter: %s\n" "${EASY_SPAM_FIGHTER_VER}"
+      printf "Installed version of Easy Spam Fighter: %s\n" "${EASY_SPAM_FIGHTERV}"
     fi
     if [ "${EASY_SPAM_FIGHTER_VER}" != "${EASY_SPAM_FIGHTERV}" ]; then
       if [ "${VERSIONS}" = "0" ]; then
-        echo "${boldon}Updating Easy Spam Fighter${boldoff}"
+        printf "Updating Easy Spam Fighter\n"
         easyspamfighter_install
       elif [ "${VERSIONS}" = "1" ]; then
-        echo "${boldon}Easy Spam Fighter ${EASY_SPAM_FIGHTERV} to ${EASY_SPAM_FIGHTER_VER} update is available.${boldoff}"
-        echo ""
+        printf "Easy Spam Fighter %s to %s update is available.\n\n" "${EASY_SPAM_FIGHTERV}" "${EASY_SPAM_FIGHTER_VER}"
       fi
       EXIT_CODE=$((EXIT_CODE+1))
     fi
