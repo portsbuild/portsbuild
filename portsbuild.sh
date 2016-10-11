@@ -8329,35 +8329,35 @@ validate_options() {
   ## Verify and update CB/options.conf via setOpt()
   if checkyesno_opt AWSTATS; then
     readonly OPT_AWSTATS="$(uc ${AWSTATS})"
-    setOpt awstats yes
+    setOpt awstats ${OPT_AWSTATS}
   fi
   if checkyesno_opt BLOCKCRACKING; then
     readonly OPT_BLOCKCRACKING="$(uc ${BLOCKCRACKING})"
-    setOpt blockcracking yes
+    setOpt blockcracking ${OPT_BLOCKCRACKING}
   fi
   if checkyesno_opt CLAMAV; then
     readonly OPT_CLAMAV="$(uc ${CLAMAV})"
-    setOpt clamav yes
+    setOpt clamav ${OPT_CLAMAV}
   fi
   if checkyesno_opt CLAMAV_WITH_EXIM; then
     readonly OPT_CLAMAV_WITH_EXIM="$(uc ${CLAMAV_WITH_EXIM})"
-    setOpt clamav_exim yes
+    setOpt clamav_exim ${OPT_CLAMAV_WITH_EXIM}
   fi
   if checkyesno_opt DOVECOT; then
     readonly OPT_DOVECOT="$(uc ${DOVECOT})"
-    setOpt dovecot yes
+    setOpt dovecot ${OPT_DOVECOT}
   fi
   if checkyesno_opt EASY_SPAM_FIGHTER; then
     readonly OPT_EASY_SPAM_FIGHTER="$(uc ${EASY_SPAM_FIGHTER})"
-    setOpt easy_spam_fighter yes
+    setOpt easy_spam_fighter ${OPT_EASY_SPAM_FIGHTER}
   fi
   if checkyesno_opt EXIM; then
     readonly OPT_EXIM="$(uc ${EXIM})"
-    setOpt exim yes
+    setOpt exim ${OPT_EXIM}
   fi
   if checkyesno_opt HTSCANNER; then
     readonly OPT_HTSCANNER="$(uc ${HTSCANNER})"
-    setOpt htscanner yes
+    setOpt htscanner ${OPT_HTSCANNER}
   fi
   if checkyesno_opt INSTALL_PORTMASTER; then
     readonly OPT_INSTALL_PORTMASTER="$(uc ${INSTALL_PORTMASTER})"
@@ -8374,15 +8374,15 @@ validate_options() {
   fi
   if checkyesno_opt LETSENCRYPT; then
     readonly OPT_LETSENCRYPT="$(uc "${LETSENCRYPT}")"
-    setOpt letsencrypt yes
+    setOpt letsencrypt ${OPT_LETSENCRYPT}
   fi
   if checkyesno_opt MAJORDOMO; then
     readonly OPT_MAJORDOMO="$(uc ${MAJORDOMO})"
-    setOpt majordomo yes
+    setOpt majordomo ${OPT_MAJORDOMO}
   fi
   if checkyesno_opt MODSECURITY; then
     readonly OPT_MODSECURITY="$(uc ${MODSECURITY})"
-    setOpt modsecurity yes
+    setOpt modsecurity ${OPT_MODSECURITY}
   fi
   if checkyesno_opt NAMED; then
     readonly OPT_NAMED="$(uc ${NAMED})"
@@ -8392,75 +8392,75 @@ validate_options() {
   fi
   if checkyesno_opt PHP_INI_XMAILHEADER; then
     readonly OPT_PHP_INI_XMAILHEADER="$(uc ${PHP_INI_XMAILHEADER})"
-    setOpt x_mail_header yes
+    setOpt x_mail_header ${OPT_PHP_INI_XMAILHEADER}
   fi
   if checkyesno_opt PHP_IONCUBE; then
     readonly OPT_PHP_IONCUBE="$(uc ${PHP_IONCUBE})"
-    setOpt ioncube yes
+    setOpt ioncube ${OPT_PHP_IONCUBE}
   fi
   if checkyesno_opt PHP_OPCACHE; then
     readonly OPT_OPCACHE="$(uc ${PHP_OPCACHE})"
-    setOpt opcache yes
+    setOpt opcache ${OPT_OPCACHE}
   fi
   if checkyesno_opt PHPMYADMIN; then
     readonly OPT_PHPMYADMIN="$(uc ${PHPMYADMIN})"
-    setOpt phpmyadmin yes
+    setOpt phpmyadmin ${OPT_PHPMYADMIN}
   fi
   if checkyesno_opt PIGEONHOLE; then
     readonly OPT_PIGEONHOLE="$(uc ${PIGEONHOLE})"
-    setOpt pigeonhole yes
+    setOpt pigeonhole ${OPT_PIGEONHOLE}
   fi
   if checkyesno_opt PROFTPD_UPLOADSCAN; then
     readonly OPT_PROFTPD_UPLOADSCAN="$(uc ${PROFTPD_UPLOADSCAN})"
-    setOpt proftpd_uploadscan yes
+    setOpt proftpd_uploadscan ${OPT_PROFTPD_UPLOADSCAN}
   fi
   if checkyesno_opt PUREFTPD_UPLOADSCAN; then
     readonly OPT_PUREFTPD_UPLOADSCAN="$(uc ${PUREFTPD_UPLOADSCAN})"
-    setOpt pureftpd_uploadscan yes
+    setOpt pureftpd_uploadscan ${OPT_PUREFTPD_UPLOADSCAN}
   fi
   if checkyesno_opt REDIRECT_HOST_HTTPS; then
     readonly OPT_REDIRECT_HOST_HTTPS="$(uc ${REDIRECT_HOST_HTTPS})"
-    setOpt redirect_host_https yes
+    setOpt redirect_host_https ${OPT_REDIRECT_HOST_HTTPS}
   fi
   if checkyesno_opt ROUNDCUBE; then
     readonly OPT_ROUNDCUBE="$(uc ${ROUNDCUBE})"
-    setOpt roundcube yes
+    setOpt roundcube ${OPT_ROUNDCUBE}
   fi
   if checkyesno_opt SPAM_INBOX_PREFIX; then
     readonly OPT_SPAM_INBOX_PREFIX="$(uc ${SPAM_INBOX_PREFIX})"
-    setOpt spam_inbox_prefix yes
+    setOpt spam_inbox_prefix ${OPT_SPAM_INBOX_PREFIX}
   fi
   if checkyesno_opt SPAMASSASSIN; then
     readonly OPT_SPAMASSASSIN="$(uc ${SPAMASSASSIN})"
-    setOpt spamassassin yes
+    setOpt spamassassin ${OPT_SPAMASSASSIN}
   fi
   if checkyesno_opt SPAMASSASSIN_UTILITIES; then
     readonly OPT_SPAMASSASSIN_UTILITIES="$(uc ${SPAMASSASSIN_UTILITIES})"
-    setOpt pigeonhole yes
+    # setOpt pigeonhole yes
   fi
   if checkyesno_opt SUHOSIN; then
     readonly OPT_SUHOSIN="$(uc ${SUHOSIN})"
-    setOpt suhosin yes
+    setOpt suhosin ${OPT_SUHOSIN}
   fi
   if checkyesno_opt SUHOSIN_UPLOADSCAN; then
     readonly OPT_SUHOSIN_UPLOADSCAN="$(uc ${SUHOSIN_UPLOADSCAN})"
-    setOpt suhosin_php_uploadscan yes
+    setOpt suhosin_php_uploadscan ${OPT_SUHOSIN_UPLOADSCAN}
   fi
   if checkyesno_opt USE_HOSTNAME_FOR_ALIAS; then
     readonly OPT_USE_HOSTNAME_FOR_ALIAS="$(uc ${USE_HOSTNAME_FOR_ALIAS})"
-    setOpt use_hostname_for_alias yes
+    setOpt use_hostname_for_alias ${OPT_USE_HOSTNAME_FOR_ALIAS}
   fi
   if checkyesno_opt USERDIR_ACCESS; then
     readonly OPT_USERDIR_ACCESS="$(uc ${USERDIR_ACCESS})"
-    setOpt userdir_access yes
+    setOpt userdir_access ${OPT_USERDIR_ACCESS}
   fi
   if checkyesno_opt WEBALIZER; then
     readonly OPT_WEBALIZER="$(uc ${WEBALIZER})"
-    setOpt webalizer yes
+    setOpt webalizer ${OPT_WEBALIZER}
   fi
   if checkyesno_opt WEBAPPS_INBOX_PREFIX; then
     readonly OPT_WEBAPPS_INBOX_PREFIX="$(uc ${WEBAPPS_INBOX_PREFIX})"
-    setOpt webapps_inbox_prefix yes
+    setOpt webapps_inbox_prefix ${OPT_WEBAPPS_INBOX_PREFIX}
   fi
 
   ## Port/Package Options
