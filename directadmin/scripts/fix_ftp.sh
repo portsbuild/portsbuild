@@ -9,7 +9,7 @@
 #   chown root:ftp /etc/proftpd.passwd
 #   chmod 640 /etc/proftpd.passwd
 
-PF=/usr/local/etc/proftpd.passwd
+PF=/etc/proftpd.passwd
 
 cd /usr/local/directadmin/data/users || exit
 
