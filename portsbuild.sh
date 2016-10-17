@@ -5373,18 +5373,74 @@ majordomo_uninstall() {
 }
 
 ################################################################################
+## Todo: Fix FTP Accounts
+## From: https://help.directadmin.com/item.php?id=205
+################################################################################
+
+fix_ftp_accounts() {
+
+  local FTP_SHADOW UUID UGID FTP_COUNT PF
+
+  shift
+
+  PF="${1}"
+
+  printf "*** Notice: Fixing FTP Accounts (argument: %s)\n" "${PF}"
+
+  if [ ! -e "${DA_PATH}/data/users" ]; then
+    printf "*** Error: DirectAdmin users directory not found.\n"
+    exit 1
+  fi
+
+  for u in $(ls ${DA_PATH}/data/users); do {
+    if [ ! -d "${u}" ]; then
+      continue
+    fi
+
+    FTP_SHADOW="/home/${u}/.shadow"
+    if [ ! -e "${FTP_SHADOW}" ]; then
+      continue
+    fi
+
+    ## DA: Make sure it doesn't already exist
+    FTP_COUNT=$(grep -c -e "^${u}:" "${PF}")
+    if [ "${FTP_COUNT}" -ne 0 ]; then
+      continue
+    fi
+
+    UUID=$(id -u "${u}")
+    UGID=$(id -g "${u}")
+
+    echo "${u}:$(cat "/home/${u}/.shadow"):${UUID}:${UGID}:system:/home/${u}:/bin/false"
+  }
+  done
+}
+
+################################################################################
 ## PureFTPD Installation
 ################################################################################
 
 pureftpd_install() {
 
-  local PUREFTPD_PEM PUREFTPD_LOG PUREFTPD_DB PUREFTPD_DHPARAMS_PEM PUREPW
+  local PUREFTPD_PEM PUREFTPD_LOG PUREFTPD_DB PUREFTPD_PASSWD
+  local PUREFTPD_DHPARAMS_PEM PUREPW
 
-  PUREFTPD_PEM=/usr/local/etc/pure-ftpd.pem
+  ## From pureftpd's README.Virtual-Users
+  ## https://download.pureftpd.org/pub/pure-ftpd/doc/README.Virtual-Users
+  # If defined, a PURE_PASSWDFILE environment variable can set the default path
+  # to the pureftpd.passwd file. Without this variable, it defaults to
+  # /etc/pureftpd.passwd
+  # If defined, a PURE_DBFILE environment variable can set the default path
+  # to the pureftpd.pdb file. Without this variable, it defaults to
+  # /etc/pureftpd.pdb
+
+  PUREPW=/usr/local/bin/pure-pw
+  PURECONF=/usr/local/etc/pure-ftpd.conf
+  PUREFTPD_PEM=/etc/ssl/private/pure-ftpd.pem
   PUREFTPD_DHPARAMS_PEM=/usr/local/etc/pure-ftpd-dhparams.pem
   PUREFTPD_LOG="${LOGS}/pureftpd.log"
-  PUREFTPD_DB=/usr/local/etc/pureftpd.pdb
-  PUREPW=/usr/local/bin/pure-pw
+  PUREFTPD_DB=/etc/pureftpd.pdb
+  PUREFTPD_PASSWD=/etc/pureftpd.passwd
 
   if [ "${OPT_FTPD}" != "pureftpd" ]; then
     printf "*** Notice: FTPD not set to PUREFTPD in options.conf\n"
@@ -5408,6 +5464,10 @@ pureftpd_install() {
 
   ## Todo:
   ## Setup SSL Certificates
+
+  if [ ! -e /etc/ssl/private ]; then
+    ${MKDIR} -p /etc/ssl/private
+  fi
 
   if [ ! -e "${PUREFTPD_PEM}" ] && [ "${OPT_WEBSERVER}" = "nginx" ]; then
     if [ -e "${NGINX_SSL_CRT}" ] && [ -e "${NGINX_SSL_KEY}" ]; then
@@ -5437,8 +5497,6 @@ pureftpd_install() {
   ${CHMOD} 600 "${PUREFTPD_DHPARAMS_PEM}"
   ${CHMOD} 600 "${PUREFTPD_PEM}"
 
-  START_SCRIPT_UPLOADSCAN=1
-
   if [ "${OPT_PUREFTPD_UPLOADSCAN}" = "YES" ] && [ "${OPT_CLAMAV}" = "YES" ]; then
     if [ ! -e "${CLAMDSCAN}" ]; then
       clamav_install
@@ -5461,8 +5519,14 @@ pureftpd_install() {
     ${SYSRC} -q -x pureftpd_uploadscript
   fi
 
+  if [ -x "${RCD}/proftpd" ]; then
+    ${SERVICE} proftpd stop
+    ${SYSRC} -q -x proftpd_enable
+  fi
+
   ${SYSRC} pureftpd_enable="YES"
   ${SYSRC} pureftpd_flags="-B -A -C 15 -E -H -k 99 -L 10000:8 -O stats:${PUREFTPD_LOG} -l puredb:${PUREFTPD_DB} -p 35000:35999 -u 100 -U 133:022 -w -Z -Y 1 -J -S:HIGH:MEDIUM:+TLSv1:!SSLv2:+SSLv3"
+  ${SYSRC} pureftpd_config=""
 
   ## Update directadmin.conf
   setVal pureftp 1 "${DA_CONF_TEMPLATE}"
@@ -5471,21 +5535,47 @@ pureftpd_install() {
   setVal pure_pw ${PUREPW} "${DA_CONF_TEMPLATE}"
   setVal pure_pw ${PUREPW} "${DA_CONF}"
 
+  setVal ftpconfig ${PURECONF} "${DA_CONF_TEMPLATE}"
+  setVal ftpconfig ${PURECONF} "${DA_CONF}"
+
   setVal ftppasswd_db ${PUREFTPD_DB} "${DA_CONF_TEMPLATE}"
   setVal ftppasswd_db ${PUREFTPD_DB} "${DA_CONF}"
 
-  # ${SERVICE} directadmin restart
+  setVal ftppasswd ${PUREFTPD_PASSWD} "${DA_CONF_TEMPLATE}"
+  setVal ftppasswd ${PUREFTPD_PASSWD} "${DA_CONF}"
+
+  # setVal ftppasswd ${PROFTPD_PASSWD} "${DA_CONF_TEMPLATE}"
+  # setVal ftppasswd ${PROFTPD_PASSWD} "${DA_CONF}"
+
+  setVal pureftp_log ${PUREFTPD_LOG} "${DA_CONF_TEMPLATE}"
+  setVal pureftp_log ${PUREFTPD_LOG} "${DA_CONF}"
+
+  ## Create a blank file so the startup precmd routine does not complain.
+  if [ ! -e ${PURECONF} ]; then
+    ## cp "${PURECONF}.sample" ${PURECONF}
+    ${TOUCH} ${PURECONF}
+  fi
+
   directadmin_restart
 
   ## Update services.status
   set_service proftpd delete
   set_service pure-ftpd ON
 
-  ## Verify:
-  ${PUREPW} mkdb ${PUREFTPD_DB} -f ${PROFTPD_PASSWD}
+  if [ ! -e ${PUREFTPD_PASSWD} ]; then
+    ## fix_ftp_accounts "${PUREFTPD_PASSWD}" >> "${PUREFTPD_PASSWD}"
+    ${CHMOD} 755 ${PB_PATH}/directdamin/scripts/custom/fix_ftp.sh
+    ${TOUCH} ${PUREFTPD_PASSWD}
+    ${PB_PATH}/directdamin/scripts/fix_ftp.sh >> ${PUREFTPD_PASSWD}
+  fi
+
+  ${CHOWN} root:ftp ${PUREFTPD_PASSWD}
+  ${CHMOD} 640 ${PUREFTPD_PASSWD}
+
+  ${PUREPW} mkdb ${PUREFTPD_DB} -f ${PUREFTPD_PASSWD}
 
   printf "Restarting PureFTPD\n"
-  ${SERVICE} pureftpd restart
+  ${SERVICE} "pure-ftpd" restart
 
   return
 }
@@ -5498,14 +5588,20 @@ pureftpd_uninstall() {
 
   printf "Uninstalling PureFTPD\n"
 
+  set_service pure-ftpd delete
+
+  setVal pureftp 0 ${DA_CONF}
+  setVal pureftp 0 ${DA_CONF_TEMPLATE}
+
   ${SERVICE} pureftpd stop
 
-  pkgd "${PORT_PUREFTPD}"
-
   ${SYSRC} -q -x pureftpd_enable
+  ${SYSRC} -q -x pureftpd_config
   ${SYSRC} -q -x pureftpd_flags
   ${SYSRC} -q -x pureftpd_upload_enable
   ${SYSRC} -q -x pureftpd_uploadscript
+
+  pkgd -y "${PORT_PUREFTPD}"
 
   rm -f ${PUREFTPD_UPLOADSCAN_BIN}
 
@@ -5543,23 +5639,29 @@ proftpd_install() {
   fi
 
   ## Stop PureFTPD if it's running
-  ${SERVICE} pure-ftpd onestop
+  if [ -x "${RCD}/pure-ftpd" ]; then
+    ${SERVICE} "pure-ftpd" onestop
+  fi
 
-  ${SYSRC} -x pureftpd_enable
+  ${SYSRC} -q -x pureftpd_enable
+  ${SYSRC} -q -x pureftpd_config
+  ${SYSRC} -q -x pureftpd_flags
+  ${SYSRC} -q -x pureftpd_upload_enable
+  ${SYSRC} -q -x pureftpd_uploadscript
 
   ## Update directadmin.conf + template
   setVal pureftp 0 "${DA_CONF_TEMPLATE}"
   setVal ftpconfig "${PROFTPD_CONF}" "${DA_CONF_TEMPLATE}"
   setVal ftppasswd "${PROFTPD_PASSWD}" "${DA_CONF_TEMPLATE}"
   setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf "${DA_CONF_TEMPLATE}"
-  setVal ftppasswd_db /usr/local/etc/pureftpd.pdb "${DA_CONF_TEMPLATE}"
+  # setVal ftppasswd_db /usr/local/etc/pureftpd.pdb "${DA_CONF_TEMPLATE}"
 
   if [ -e "${DA_CONF}" ]; then
     setVal pureftp 0 "${DA_CONF}"
     setVal ftpconfig "${PROFTPD_CONF}" "${DA_CONF}"
     setVal ftppasswd "${PROFTPD_PASSWD}" "${DA_CONF}"
-    setVal ftppasswd_db /usr/local/etc/pureftpd.pdb "${DA_CONF}"
     setVal ftpvhosts /usr/local/etc/proftpd.vhosts.conf "${DA_CONF}"
+    # setVal ftppasswd_db /usr/local/etc/pureftpd.pdb "${DA_CONF}"
   fi
 
   ## Update services.status
@@ -5624,10 +5726,12 @@ proftpd_uninstall() {
 
   printf "Uninstalling ProFTPD\n"
 
+  set_service proftpd delete
+
   ${SERVICE} proftpd stop
 
-  pkgd "${PORT_PROFTPD}"
-  pkgd "${PORT_PROFTPD_CLAMAV}"
+  pkgd -y "${PORT_PROFTPD}"
+  pkgd -y "${PORT_PROFTPD_CLAMAV}"
 
   ${SYSRC} -q -x proftpd_enable
   ${SYSRC} -q -x proftpd_flags
@@ -7081,12 +7185,12 @@ rewrite_confs() {
     echo "HAVE_SUPHP56_CGI: ${HAVE_SUPHP56_CGI}"
     echo "HAVE_FCGID56: ${HAVE_FCGID56}"
     echo "HAVE_CLI56: ${HAVE_CLI56}"
-    echo "***"
-    echo "HAVE_FPM57_CGI: ${HAVE_FPM70_CGI}"
-    echo "HAVE_SUPHP70_CGI: ${HAVE_SUPHP70_CGI}"
-    echo "HAVE_FCGID70: ${HAVE_FCGID70}"
-    echo "HAVE_CLI70: ${HAVE_CLI70}"
-    echo "***"
+    printf "***"
+    printf "HAVE_FPM70_CGI: %s\t" "${HAVE_FPM70_CGI}"
+    printf "HAVE_SUPHP70_CGI: %s\t" "${HAVE_SUPHP70_CGI}"
+    printf "HAVE_FCGID70: %s\t" "${HAVE_FCGID70}"
+    printf "HAVE_CLI70: %s\t\n" "${HAVE_CLI70}"
+    printf "***\n"
     # echo "PHPMODULES: ${PHPMODULES}"
   fi
 
@@ -9564,6 +9668,7 @@ case "$1" in
   # "create_options") create_options ;;   ## create options.conf
   # "set") set_option "$@" ;;             ## set value in options.conf
   # check_options) check_options ;;       ## validate options.conf
+  "fix_ftp_accounts") fix_ftp_accounts "$@" ;; ## Fix FTP Accounts
   *) show_main_menu ;;
 esac
 
