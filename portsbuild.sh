@@ -49,8 +49,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20161011
-
+PB_BUILD_DATE=20161016
 IFS="$(printf '\n\t')"
 LANG=C
 
@@ -1435,8 +1434,12 @@ global_setup() {
       fi
     fi
 
+    setVal lan_ip "${LAN_IP}" "${DA_CONF}"
+    setVal lan_ip "${LAN_IP}" "${DA_CONF_TEMPLATE}"
+
     printf "Starting DirectAdmin\n"
     ${SERVICE} directadmin start
+
 
     install_cron
 
@@ -1539,6 +1542,8 @@ update_rc() {
   if [ "${OPT_FTPD}" = "pureftpd" ]; then
     ${SYSRC} ftpd_enable="NO"
     ${SYSRC} pureftpd_enable="YES"
+    # ${SYSRC} pureftpd_flags=""
+    ${SYSRC} pureftpd_config=""
     ${SYSRC} -q -x proftpd_enable
   else
     ${SYSRC} -q -x pureftpd_enable
@@ -1548,6 +1553,9 @@ update_rc() {
     ${SYSRC} ftpd_enable="NO"
     ${SYSRC} proftpd_enable="YES"
     ${SYSRC} -q -x pureftpd_enable
+    ${SYSRC} -q -x pureftpd_config
+    ${SYSRC} -q -x pureftpd_flags
+    ${SYSRC} -q -x pureftpd_uploadscript
   else
     ${SYSRC} -q -x proftpd_enable
   fi
@@ -5522,7 +5530,10 @@ pureftpd_install() {
   if [ -x "${RCD}/proftpd" ]; then
     ${SERVICE} proftpd stop
     ${SYSRC} -q -x proftpd_enable
+    ${SYSRC} -q -x proftpd_flags
   fi
+
+  ${SYSRC} ftpd_enable="NO"
 
   ${SYSRC} pureftpd_enable="YES"
   ${SYSRC} pureftpd_flags="-B -A -C 15 -E -H -k 99 -L 10000:8 -O stats:${PUREFTPD_LOG} -l puredb:${PUREFTPD_DB} -p 35000:35999 -u 100 -U 133:022 -w -Z -Y 1 -J -S:HIGH:MEDIUM:+TLSv1:!SSLv2:+SSLv3"
