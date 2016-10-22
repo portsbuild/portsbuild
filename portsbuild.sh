@@ -4730,9 +4730,10 @@ apache_install() {
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" \
     SUEXEC_UIDMIN=100 \
     SUEXEC_GIDMIN=100 \
-    SUEXEC_SAFEPATH="/usr/local/safe-bin" \
+    SUEXEC_SAFE_PATH="/usr/local/bin:/usr/bin:/bin" \
+    SUEXEC_SAFE_DIRECTORY="/usr/local/safe-bin" \
     SUEXEC_DOCROOT="/" \
-    SUEXEC_LOGFILE="${LOGS}/httpd/httpd-suexec.log" \
+    SUEXEC_LOGFILE="${LOGS}/httpd/suexec.log"
     SUEXEC_CALLER="${APACHE_USER}" \
     www_apache24_SET="${APACHE24_MAKE_SET}" \
     www_apache24_UNSET="${APACHE24_MAKE_UNSET}" \
