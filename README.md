@@ -51,7 +51,7 @@ PortsBuild will NOT support:
 ### Currently known issues and limitations
 * BIND (named) does not restart after adding a domain on 9.3 due to startup script location in /etc/rc.d/ instead of /usr/local/etc/rc.d/ (DirectAdmin limitation)
 * PHP-FPM does not restart after adding a user due to startup script being called "php-fpm" instead of "php-fpmXX" (XX= 55, 56, 70, etc.) (DirectAdmin limitation)
-* Only one instance of PHP can be installed through ports/packages (afaik). Multiple PHP versions may be possible, but requires testing.
+* Only one instance of PHP can be installed through ports/packages (afaik). Multiple PHP versions is possible (without ports).
 
 ### Changes from DA/CB defaults
 * PHP Sockets are now found under /var/run/php/sockets (used to be: /usr/local/php%VER%/sockets)
