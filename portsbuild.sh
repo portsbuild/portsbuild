@@ -20,7 +20,7 @@
 #
 #  Requirements:
 #  - DirectAdmin license
-#  - FreeBSD 9.3 or 10.3 (amd64 only)
+#  - FreeBSD 9.3 or 10.3+ (amd64 only)
 #  - chmod +x portsbuild.sh
 #  - Patience.
 #
@@ -49,7 +49,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20161016
+PB_BUILD_DATE=20161021
 IFS="$(printf '\n\t')"
 LANG=C
 
@@ -98,7 +98,7 @@ else
 fi
 
 readonly PB_PATH
-readonly PB_DEBUG="NO"
+readonly PB_DEBUG="YES"
 readonly PB_CONF="${PB_PATH}/options.conf"
 readonly PB_CONFIG="${PB_PATH}/configure"
 readonly PB_CUSTOM="${PB_PATH}/custom"
@@ -241,6 +241,7 @@ readonly PHP_FPM_CONF="/usr/local/etc/php-fpm.conf"
 readonly PHP_SOCKETS_PATH=/var/run/php/sockets
 readonly PHP_RELEASE_SET="5.5 5.6 7.0"
 readonly PHP_SHORTRELEASE_SET="$(echo "${PHP_RELEASE_SET}" | tr -d '.')"
+readonly PHP_FPM_BIN=/usr/local/sbin/php-fpm
 readonly SUPHP_CONF_FILE=/usr/local/etc/suphp.conf
 readonly SUPHP_AP2_CONF="${APACHE_EXTRAS}/httpd-suphp.conf"
 # readonly SUPHP_PATH=/usr/local/suphp
@@ -746,9 +747,9 @@ getOpt() {
   local GET_OPTION
 
   ## CB2: Added "grep -v" to workaround many lines with empty options
-  GET_OPTION="$(grep -v "^${OPTION_NAME}=$" "${OPTIONS_CONF}" | grep -m1 "^${OPTION_NAME}=" | cut -d= -f2)"
+  GET_OPTION="$(grep -v "^${OPTION_NAME}=$" "${CB_CONF}" | grep -m1 "^${OPTION_NAME}=" | cut -d= -f2)"
   if [ -z "${GET_OPTION}" ]; then
-    echo "${OPTION_NAME}=${OPTION_DEFAULT}" >> "${OPTIONS_CONF}"
+    echo "${OPTION_NAME}=${OPTION_DEFAULT}" >> "${CB_CONF}"
   fi
 
   echo "${GET_OPTION}"
@@ -765,31 +766,6 @@ setOpt() {
   local OPTION_VALUE="$2"
   local OPTION_DEFAULT="$3"
   local OPT_VALUE
-  # local VAR VALID
-
-  # ## Option Validation
-  # VAR=$(echo "${OPTION_NAME}" | tr "'a-z'" "'A-Z'")
-  # if [ -z "$(eval_var ${VAR}_DEF)" ]; then
-  #   err 50 "${OPTION_NAME} is not a valid option."
-  #   # EXIT_CODE=50
-  #   # return
-  # fi
-
-  # VALID="NO"
-  # ## CB2: Revalidate by asking user
-  # for i in $(eval_var "${VAR}_SET"); do
-  #   if [ "${i}" = "${2}" ] || [ "${i}" = "userinput" ]; then
-  #     VALID="YES"
-  #     break
-  #   fi
-  # done
-
-  # ## CB2: Invalid option
-  # if [ "${VALID}" = "NO" ]; then
-  #   err 51 "${OPTION_VALUE} is not a valid setting for ${OPTION_NAME} option."
-  #   # EXIT_CODE=51
-  #   # return
-  # fi
 
   OPT_VALUE="$(grep -m1 "^${OPTION_NAME}=" "${CB_CONF}" | cut -d= -f2)"
   ${PERL} -pi -e "s#${OPTION_NAME}=${OPT_VALUE}#${OPTION_NAME}=${OPTION_VALUE}#" "${CB_CONF}"
@@ -2079,6 +2055,9 @@ directadmin_install() {
     ${CHOWN} -R diradmin:diradmin "${DA_PATH}/data/templates/custom/"
   fi
 
+  ${MKDIR} -p /home/admin/domains/sharedip
+  ${CHOWN} -R "${DA_ADMIN_USER}:${DA_ADMIN_USER}" /home/admin/domains/sharedip
+
   return
 }
 
@@ -2461,30 +2440,28 @@ exim_install() {
   ## Symlink for DA compat:
   if [ "${COMPAT_EXIM_SYMLINKS}" = "YES" ]; then
     if [ -e ${EXIM_CONF} ]; then
-      if [ ! -e /etc/exim.conf ]; then
-        ln -s ${EXIM_CONF} /etc/exim.conf
-      fi
+      ln -sf ${EXIM_CONF} /etc/exim.conf
       ${CHOWN} -h "${EXIM_USER}:${EXIM_GROUP}" /etc/exim.conf
       ${CHMOD} -h 644 /etc/exim.conf
     fi
     if [ -e "${EXIM_SSL_CRT}" ]; then
-      if [ ! -e /etc/exim.cert ]; then
-        ln -s ${EXIM_SSL_CRT} /etc/exim.cert
-      fi
+      ln -sf ${EXIM_SSL_CRT} /etc/exim.cert
       ${CHOWN} -h "${EXIM_USER}:${EXIM_GROUP}" /etc/exim.cert
       ${CHMOD} -h 644 /etc/exim.cert
     fi
     if [ -e "${EXIM_SSL_KEY}" ]; then
-      if [ ! -e /etc/exim.key ]; then
-        ln -s ${EXIM_SSL_KEY} /etc/exim.key
-      fi
+      ln -sf ${EXIM_SSL_KEY} /etc/exim.key
       ${CHOWN} -h "${EXIM_USER}:${EXIM_GROUP}" /etc/exim.key
       ${CHMOD} -h 600 /etc/exim.key
     fi
   fi
 
+  ## Set Exim user/group in configuration
+  ${PERL} -pi -e "s#exim_user = mailnull#exim_user = ${EXIM_USER}#" ${EXIM_CONF}
+  ${PERL} -pi -e "s#exim_group = mail#exim_group = ${EXIM_GROUP}#" ${EXIM_CONF}
+
   ## Symlink configuration file (exim.conf -> configure)
-  ln -s ${EXIM_CONF} "${EXIM_PATH}/exim.conf"
+  # ln -s ${EXIM_CONF} "${EXIM_PATH}/exim.conf"
 
   ## Verify Exim config:
   ${EXIM_BIN} -C "${EXIM_CONF}" -bV
@@ -2604,13 +2581,61 @@ exim_uninstall() {
   return
 }
 
-
 ################################################################################
 ## Exim Version (from CB2)
 ################################################################################
 
 exim_version() {
   ${EXIM_BIN} -bV | grep -m1 'built' | head -n1 | awk '{ print $3 }'
+
+  return
+}
+
+################################################################################
+## Verify Exim Keep Environment (from CB2)
+################################################################################
+
+verify_exim_keep_env(){
+
+  local EXIMV FOR_EXIM_CONF_VER
+
+  EXIMV="$(exim_version)"
+
+  ## CB2:
+  ## This might be the current exim.conf, or the exim.conf being installed.
+  ## Set by whichever is calling the function.
+  FOR_EXIM_CONF_VER=$1
+
+  if [ "${FOR_EXIM_CONF_VER}" != "2.1" ] && [ "${FOR_EXIM_CONF_VER}" != "4.2" ]; then
+    ## CB2: for newer exim.conf files with exim.variables.conf:
+    ## CB2: remove variables from the default that don't work with older versions of exim.
+    if [ "$(version_cmp ${EXIMV} 4.86.2 'exim ver for keep_environment')" -lt 0 ]; then
+      echo "Exim ${EXIMV} is older than 4.86.2. Removing variable keep_environment.";
+      ${PERL} -pi -e 's/^keep_environment=.*$\n//' /etc/exim.variables.conf.default
+      ${PERL} -pi -e 's/^keep_environment=.*$\n//' /etc/exim.variables.conf
+    fi
+  else
+    ## CB2:
+    ## older exim.conf files without extra files.
+    ## remove variables from the exim.conf that don't work with older versions of exim.
+    if [ "$(version_cmp ${EXIMV} 4.86.2 'exim ver for keep_environment')" -lt 0 ]; then
+      echo "Exim ${EXIMV} is older than 4.86.2. Removing variable keep_environment from ${EXIM_CONF}.";
+      ${PERL} -pi -e 's/^keep_environment=/#keep_environment=/' ${EXIM_CONF}
+    else
+      ## CB2: else enable the feature, if available.
+      echo "Exim ${EXIMV} is at least 4.86.2.";
+      COUNT_KEEP_ENV=$(grep -c 'keep_environment' ${EXIM_CONF})
+      if [ "${COUNT_KEEP_ENV}" -gt 0 ]; then
+        echo "Uncommenting variable keep_environment in /etc/exim.conf.";
+        ${PERL} -pi -e 's/^#keep_environment=/keep_environment=/' ${EXIM_CONF}
+      else
+        echo "Adding variable keep_environment to /etc/exim.conf.";
+        ${PERL} -pi -e 's/^perl_startup/keep_environment=PWD\nperl_startup/' ${EXIM_CONF}
+      fi
+    fi
+  fi
+
+  return
 }
 
 ################################################################################
@@ -2646,10 +2671,10 @@ exim_conf_version() {
 }
 
 ################################################################################
-## Verify: Generate Exim.conf (from CB2)
+## Verify: Generate Exim.conf (from CB2: doEximConf())
 ################################################################################
 
-doEximConf() {
+exim_conf() {
 
   local EXIMV EXIM_CONF_MERGED EXIM_CONF_DEFAULT EXIM_CONF_CUSTOM
 
@@ -2716,7 +2741,7 @@ doEximConf() {
     printf "# Do not edit this file directly\n" > ${EXIM_CONF_MERGED}
     printf "# Edit %s\n" "${EXIM_CONF_CUSTOM}" >> ${EXIM_CONF_MERGED}
 
-    #because anything from custom, include extras (not in default), will always go in.
+    ## CB2: Because anything from custom, including extras (not in default), will always go in.
     if [ -s ${EXIM_CONF_CUSTOM} ]; then
       cat ${EXIM_CONF_CUSTOM} >> ${EXIM_CONF_MERGED}
     fi
@@ -2758,8 +2783,7 @@ doEximConf() {
     fi
   fi
 
-  ## Todo:
-  ensure_keep_environment "${OPT_EXIMCONF_RELEASE}"
+  verify_exim_keep_env "${OPT_EXIMCONF_RELEASE}"
 
   ## Todo:
   ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.pl.cb20" "http://${DOWNLOADSERVER_OPT}/services/exim.pl.${EXIM_PL_VER}"
@@ -2785,18 +2809,29 @@ doEximConf() {
     ${CHOWN} "${EXIM_USER}:${EXIM_GROUP}" /etc/virtual/usage
   fi
 
-  ## Todo:
-  doEnsureEximFile /etc/virtual/bad_sender_hosts
-  doEnsureEximFile /etc/virtual/bad_sender_hosts_ip
-  doEnsureEximFile /etc/virtual/blacklist_domains
-  doEnsureEximFile /etc/virtual/blacklist_senders
-  doEnsureEximFile /etc/virtual/whitelist_domains
-  doEnsureEximFile /etc/virtual/whitelist_hosts
-  doEnsureEximFile /etc/virtual/whitelist_hosts_ip
-  doEnsureEximFile /etc/virtual/whitelist_senders
-  doEnsureEximFile /etc/virtual/use_rbl_domains
-  doEnsureEximFile /etc/virtual/skip_av_domains
-  doEnsureEximFile /etc/virtual/skip_rbl_domains
+  ## Verify Exim File (from CB2: doEnsureEximFile())
+  verify_file() {
+    if [ "$1" != "" ]; then
+      if [ ! -e "${1}" ]; then
+        printf "Creating file: %s\n" "${1}"
+        ${TOUCH} "${1}"
+        ${CHOWN} "${EXIM_USER}:${EXIM_GROUP}" "${1}"
+        ${CHMOD} 600 "${1}"
+      fi
+    fi
+  }
+
+  verify_file /etc/virtual/bad_sender_hosts
+  verify_file /etc/virtual/bad_sender_hosts_ip
+  verify_file /etc/virtual/blacklist_domains
+  verify_file /etc/virtual/blacklist_senders
+  verify_file /etc/virtual/whitelist_domains
+  verify_file /etc/virtual/whitelist_hosts
+  verify_file /etc/virtual/whitelist_hosts_ip
+  verify_file /etc/virtual/whitelist_senders
+  verify_file /etc/virtual/use_rbl_domains
+  verify_file /etc/virtual/skip_av_domains
+  verify_file /etc/virtual/skip_rbl_domains
 
   if [ "${OPT_DOVECOT}" = "YES" ] && [ "${OPT_EXIMCONF_RELEASE}" = "2.1" ]; then
     cd ${PB_PATH} || exit
@@ -3827,7 +3862,7 @@ sql_install() {
 
   printf "Starting SQL database installation: %s\n" "${OPT_SQL_DB}"
 
-  set_service mysqld OFF
+  set_service "mysql-server" OFF
 
   case "${OPT_SQL_DB}" in
     "mariadb55")  pkgi ${PORT_MARIADB55}  ${PORT_MARIADB55_CLIENT}  ;;
@@ -3859,7 +3894,7 @@ sql_install() {
   ${SYSRC} mysql_optfile="/usr/local/etc/my.cnf"
 
   printf "Starting %s\n" "${OPT_SQL_DB}"
-  ${SERVICE} mysql-server start
+  ${SERVICE} "mysql-server" start
 
   ## Retrieve: $MYSQL_USER, $MYSQL_PASS, $MYSQL_HOST, $MYSQL_ACCESS_HOST
   get_sql_settings
@@ -3921,10 +3956,10 @@ sql_install() {
     fi
   fi
 
-  set_service mysqld ON
+  set_service "mysql-server" ON
 
   printf "Restarting %s\n" "${OPT_SQL_DB}"
-  ${SERVICE} mysql-server restart
+  ${SERVICE} "mysql-server" restart
 
   return
 }
@@ -3936,14 +3971,14 @@ sql_install() {
 
 fpmCheck() {
 
-  # local ARG="$1" ## PHP version (dual PHP mode)
-  local WEB_SERVER_CHANGED COUNT FPM_SOCK_CHMOD
+  # local ARG="$1"
+  local WEB_SERVER_CHANGED FPM_COUNT FPM_SOCK_CHMOD
 
   FPM_SOCK_CHMOD=700
 
   WEB_SERVER_CHANGED=0
 
-  COUNT="$(grep -m1 -c nginx "${PHP_FPM_CONF}")"
+  FPM_COUNT="$(grep -m1 -c nginx "${PHP_FPM_CONF}")"
 
   ## PB: Select appropriate web user depending on chosen web server
   if [ "${OPT_WEBSERVER}" = "apache" ] ||  [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
@@ -3961,11 +3996,11 @@ fpmCheck() {
   ${CHMOD} "${FPM_SOCK_CHMOD}" "${PHP_SOCKETS_PATH}"
 
   ## Nginx
-  if [ "${OPT_WEBSERVER}" = "nginx" ] && [ "${COUNT}" -eq 0 ]; then
+  if [ "${OPT_WEBSERVER}" = "nginx" ] && [ "${FPM_COUNT}" -eq 0 ]; then
     ${PERL} -pi -e 's/apache/nginx/' "${PHP_FPM_CONF}"
     WEB_SERVER_CHANGED=1
   elif [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-    if [ "${COUNT}" -gt 0 ]; then
+    if [ "${FPM_COUNT}" -gt 0 ]; then
       ${PERL} -pi -e 's/nginx/apache/' "${PHP_FPM_CONF}"
       WEB_SERVER_CHANGED=1
     fi
@@ -4006,22 +4041,12 @@ fpmChecks() {
     echo "PHP_FPM_CONF: ${PHP_FPM_CONF}"
   fi
 
-  # for php_shortrelease in $(echo ${PHP_SHORTRELEASE_SET}); do
-    # EVAL_CHECK_VAR=HAVE_FPM${OPT_PHP_VER}_CGI
-    # EVAL_COPY_VAR=PHP${OPT_PHP_VER}_FPM_CONF
-    # if [ "$(eval_var ${EVAL_CHECK_VAR})" = "YES" ] && [ -d ${PHP_SOCKETS_PATH} ]; then
-    #   cp -f $(eval_var ${EVAL_COPY_VAR}) ${PHP_FPM_CONF}
-    #   fpmCheck ${OPT_PHP_VER}
-    # fi
-  # done
-
-  ## EVAL_CHECK_VAR="HAVE_FPM${OPT_PHP_VERSION}_CGI"
-  # EVAL_CHECK_VAR="HAVE_FPM_CGI"
+  # EVAL_CHECK_VAR="HAVE_FPM${OPT_PHP_VER}_CGI"
   # $(eval_var "${EVAL_CHECK_VAR}") = "YES"
 
   # if [ "${OPT_PHP_MODE}" = "php-fpm" ] && [ -d "${PHP_SOCKETS_PATH}" ]; then
-    cp -f "${PB_CONFIG}/fpm/php-fpm.conf.${OPT_PHP_VER}" "${PHP_FPM_CONF}"
-    fpmCheck "${OPT_PHP_VER}"
+  cp -f "${PB_CONFIG}/fpm/conf/php-fpm.conf.${OPT_PHP_VER}" "${PHP_FPM_CONF}"
+  fpmCheck "${OPT_PHP_VER}"
   # fi
 
   if [ "${HAVE_FPM_CGI}" = "YES" ]; then
@@ -4445,8 +4470,8 @@ php_fpm_restart() {
 
   ## Check for graceful restarts?
 
-  if [ -x /usr/local/sbin/php-fpm ]; then
-    /usr/local/sbin/php-fpm --test
+  if [ -x "${PHP_FPM_BIN}" ]; then
+    ${PHP_FPM_BIN} --test
   fi
 
   if [ "$?" = "0" ]; then
@@ -4455,7 +4480,7 @@ php_fpm_restart() {
     printf "*** Warning: Aborting automatic PHP-FPM restart due to configuration verification failure.\n"
     printf "Please verify the PHP-FPM configuration file at: %s\n" "${PHP_FPM_CONF}"
     printf "You can verify the file by typing:\n"
-    printf "  %s --test\n\n" "/usr/local/sbin/php-fpm"
+    printf "  %s --test\n\n" "%s" "${PHP_FPM_BIN}"
     printf "You can restart PHP-FPM manually by typing:\n"
     printf "  service php-fpm restart\n"
   fi
@@ -4583,6 +4608,10 @@ phpmyadmin_install() {
   rm -f ${PMA_ALIAS_PATH} >/dev/null 2>&1
   ln -s ${PMA_PATH} ${PMA_ALIAS_PATH}
 
+  ## Symlink:
+  #ln -s ${PMA_PATH} "${WWW_DIR}/phpmyadmin"
+  ln -s ${PMA_PATH} "${WWW_DIR}/pma"
+
   ## Create logs directory:
   if [ ! -d ${PMA_PATH}/log ]; then
     ${MKDIR} -p "${PMA_PATH}/log"
@@ -4592,10 +4621,6 @@ phpmyadmin_install() {
   ${CHOWN} -R "${WEBAPPS_USER}:${WEBAPPS_GROUP}" ${PMA_PATH}
   ${CHOWN} -h "${WEBAPPS_USER}:${WEBAPPS_GROUP}" ${PMA_ALIAS_PATH}
   ${CHMOD} 755 ${PMA_PATH}
-
-  ## Symlink:
-  ln -s ${PMA_PATH} "${WWW_DIR}/phpmyadmin"
-  ln -s ${PMA_PATH} "${WWW_DIR}/pma"
 
   ## Disable/lockdown scripts directory (might not even exist):
   if [ -d "${PMA_PATH}/scripts" ]; then
@@ -4700,8 +4725,15 @@ apache_install() {
     ## Research: patch for users override
     # USERS=${APACHE_USER} GROUPS=${APACHE_GROUP}
 
+    ## Option hints from /usr/ports/Mk/bsd.apache.mk
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" rmconfig
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" \
+    SUEXEC_UIDMIN=100 \
+    SUEXEC_GIDMIN=100 \
+    SUEXEC_SAFEPATH="/usr/local/safe-bin" \
+    SUEXEC_DOCROOT="/" \
+    SUEXEC_LOGFILE="${LOGS}/httpd/httpd-suexec.log" \
+    SUEXEC_CALLER="${APACHE_USER}" \
     www_apache24_SET="${APACHE24_MAKE_SET}" \
     www_apache24_UNSET="${APACHE24_MAKE_UNSET}" \
     OPTIONS_SET="${GLOBAL_MAKE_SET}" \
@@ -4821,7 +4853,7 @@ apache_install() {
   fi
 
   if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then ## || [ ! -e "${APACHE_HTTPD}" ]
-    set_service httpd ON
+    set_service apache24 ON
   fi
 
   ${CHOWN} "${WEBAPPS_USER}:${APACHE_GROUP}" "${WWW_DIR}"
@@ -5074,7 +5106,7 @@ apache_install() {
 
   ## PB: Moved this out of COMPAT
   if [ -e "${APACHE_HTTPD}" ]; then
-    ln -s "${APACHE_HTTPD}" /usr/sbin/httpd
+    ln -sf "${APACHE_HTTPD}" /usr/sbin/httpd
   fi
 
   if [ "${COMPAT_APACHE24_SYMLINKS}" = "YES" ]; then
@@ -5082,7 +5114,7 @@ apache_install() {
 
     ## 2016-03-05: no longer needed?
     ${MKDIR} -p /etc/httpd
-    ln -s "${APACHE_PATH}" /etc/httpd/conf
+    ln -sf "${APACHE_PATH}" /etc/httpd/conf
 
     ## PB: Not needed?
     # ln -sf /var/www/build /etc/httpd/build
@@ -6278,8 +6310,7 @@ secure_php_ini() {
   local CURRENT_DISABLE_FUNCT NEW_DISABLE_FUNCT
 
   if [ "${PB_DEBUG}" = "YES" ]; then
-    echo "*** Debug: Debug mode enabled."
-    echo "*** Function: secure_php_ini()"
+    echo "*** Debug: Function: secure_php_ini()"
   fi
 
   if [ -e "${PHPINI_FILE}" ]; then
@@ -6594,9 +6625,7 @@ update_modsecurity_rules() {
 verify_webapps_php_ini() {
 
   if [ "${PB_DEBUG}" = "YES" ]; then
-    echo "*** Debug: Debug mode enabled."
-    echo "*** Function: verify_webapps_php_ini()"
-
+    echo "*** Debug: Function: verify_webapps_php_ini()"
     echo "PHP_CUSTOM_PHP_CONF_D_INI_PATH: ${PHP_CUSTOM_PHP_CONF_D_INI_PATH}"
     echo "PHP_INI_WEBAPPS: ${PHP_INI_WEBAPPS}"
   fi
@@ -6622,9 +6651,7 @@ verify_webapps_php_ini() {
       printf "[PATH=%s]\n" "${WWW_DIR}"
       printf "session.save_path=%s\n" "${WWW_TMP_DIR}"
       printf "upload_tmp_dir=%s\n" "${WWW_TMP_DIR}"
-      printf "disable_functions=exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,\
-      proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,\
-      posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname\n"
+      printf "disable_functions=exec,system,passthru,shell_exec,escapeshellarg,escapeshellcmd,proc_close,proc_open,dl,popen,show_source,posix_kill,posix_mkfifo,posix_getpwuid,posix_setpgid,posix_setsid,posix_setuid,posix_setgid,posix_seteuid,posix_setegid,posix_uname\n"
     } > "${PHP_INI_WEBAPPS}"
   fi
 
@@ -6685,31 +6712,7 @@ apache_host_conf() {
   ## PB: Not used? WEBAPPS_FCGID_DIR=/usr/local/www/fcgid
 
   if [ "${PB_DEBUG}" = "YES" ]; then
-    echo "*** Debug: Debug mode enabled."
-    echo "*** Function: apache_host_conf()"
-    echo "***"
-    echo "APACHE_HOSTNAME_CONF: ${APACHE_HOSTNAME_CONF}"
-    echo "APACHE_SUEXEC: ${APACHE_SUEXEC}"
-    echo "***"
-    echo "HAVE_FPM_CGI: ${HAVE_FPM_CGI}"
-    echo "HAVE_CLI: ${HAVE_CLI}"
-    echo "HAVE_FCGID: ${HAVE_FCGID}"
-    echo "HAVE_SUPHP_CGI: ${HAVE_SUPHP_CGI}"
-    echo "***"
-    echo "HAVE_FPM55_CGI: ${HAVE_FPM55_CGI}"
-    echo "HAVE_SUPHP55_CGI: ${HAVE_SUPHP55_CGI}"
-    echo "HAVE_FCGID55: ${HAVE_FCGID55}"
-    echo "HAVE_CLI55: ${HAVE_CLI55}"
-    echo "***"
-    echo "HAVE_FPM56_CGI: ${HAVE_FPM56_CGI}"
-    echo "HAVE_SUPHP56_CGI: ${HAVE_SUPHP56_CGI}"
-    echo "HAVE_FCGID56: ${HAVE_FCGID56}"
-    echo "HAVE_CLI56: ${HAVE_CLI56}"
-    echo "***"
-    echo "HAVE_FPM57_CGI: ${HAVE_FPM70_CGI}"
-    echo "HAVE_SUPHP70_CGI: ${HAVE_SUPHP70_CGI}"
-    echo "HAVE_FCGID70: ${HAVE_FCGID70}"
-    echo "HAVE_CLI70: ${HAVE_CLI70}"
+    echo "*** Debug: Function: apache_host_conf()"
   fi
 
   ## Custom Configurations
@@ -6759,6 +6762,10 @@ apache_host_conf() {
     ## PB: Note: Need CB2 Apache 2.4 patches or else this doesn't work.
     if [ -s "${APACHE_SUEXEC}" ]; then
       SUEXEC_PER_DIR="$(${APACHE_SUEXEC} -V 2>&1 | grep -c 'AP_PER_DIR')"
+    fi
+
+    if [ "${PB_DEBUG}" = "YES" ]; then
+      echo "SUEXEC_PER_DIR: ${SUEXEC_PER_DIR}"
     fi
 
     ## PHP: FastCGI: (technically fcgid)
@@ -6845,14 +6852,11 @@ do_rewrite_httpd_alias() {
   local HA LETSENCRYPT app app_path
 
   if [ "${PB_DEBUG}" = "YES" ]; then
-    echo "*** Debug: Debug mode enabled."
-    echo "*** Function: do_rewrite_httpd_alias()"
-    echo "***"
+    echo "*** Debug: Function: do_rewrite_httpd_alias()"
     echo "APACHE_EXTRAS: ${APACHE_EXTRAS}"
     echo "OPT_USE_HOSTNAME_FOR_ALIAS: ${OPT_USE_HOSTNAME_FOR_ALIAS}"
     echo "PB_CONFIG: ${PB_CONFIG}"
     echo "PB_CUSTOM: ${PB_CUSTOM}"
-
   fi
 
   ## Custom Configuration
@@ -7127,8 +7131,7 @@ create_httpd_nginx() {
 doApacheCheck() {
 
   if [ "${PB_DEBUG}" = "YES" ]; then
-    echo "*** Debug: Debug mode enabled."
-    echo "*** Function: doApacheCheck()"
+    echo "*** Debug: Function: doApacheCheck()"
   fi
 
   if [ ! -e "${APACHE_EXTRAS}/httpd-includes.conf" ]; then
@@ -7160,50 +7163,58 @@ rewrite_confs() {
   local HDC PHPV PHPMODULES WEBMAIL_LINK
 
   if [ ${PB_DEBUG} = "YES" ]; then
-    echo "*** Debug: Function: rewrite_confs()"
-    echo "OPT_WEBSERVER: ${OPT_WEBSERVER}"
-    echo "OPT_PHP_MODE: ${OPT_PHP_MODE}"
-    echo "OPT_PHP_VER: ${OPT_PHP_VER}"
-    echo "PB_CONFIG: ${PB_CONFIG}"
-    echo "PB_CONFIG: ${PB_CUSTOM}"
-    echo "***"
-    echo "APACHE_PATH: ${APACHE_PATH}"
-    echo "APACHE_CONF: ${APACHE_CONF}"
-    echo "APACHE_LIBS: ${APACHE_LIBS}"
-    echo "APACHE_EXTRAS: ${APACHE_EXTRAS}"
-    echo "APACHE_SSL_CRT: ${APACHE_SSL_CRT}"
-    echo "APACHE_SSL_KEY: ${APACHE_SSL_KEY}"
-    echo "APCUSTOMCONFDIR: ${APCUSTOMCONFDIR}"
-    echo "***"
-    echo "PERL: ${PERL}"
-    echo "DA_CONF: ${DA_CONF}"
-    echo "DA_CONF_TEMPLATE: ${DA_CONF_TEMPLATE}"
-    echo "DA_TASK_QUEUE: ${DA_TASK_QUEUE}"
-    echo "OPENSSL: ${OPENSSL}"
-    echo "NEWCONFIGS: ${NEWCONFIGS}"
-    echo "***"
-    echo "HAVE_FPM_CGI: ${HAVE_FPM_CGI}"
-    echo "HAVE_CLI: ${HAVE_CLI}"
-    echo "HAVE_FCGID: ${HAVE_FCGID}"
-    echo "HAVE_SUPHP_CGI: ${HAVE_SUPHP_CGI}"
-    echo "***"
-    echo "HAVE_FPM55_CGI: ${HAVE_FPM55_CGI}"
-    echo "HAVE_SUPHP55_CGI: ${HAVE_SUPHP55_CGI}"
-    echo "HAVE_FCGID55: ${HAVE_FCGID55}"
-    echo "HAVE_CLI55: ${HAVE_CLI55}"
-    echo "***"
-    echo "HAVE_FPM56_CGI: ${HAVE_FPM56_CGI}"
-    echo "HAVE_SUPHP56_CGI: ${HAVE_SUPHP56_CGI}"
-    echo "HAVE_FCGID56: ${HAVE_FCGID56}"
-    echo "HAVE_CLI56: ${HAVE_CLI56}"
-    printf "***"
+    printf "*** Debug: Function: rewrite_confs()\n"
+    printf "OPT_WEBSERVER: %s\t" "${OPT_WEBSERVER}"
+    printf "OPT_PHP_MODE: %s\t" "${OPT_PHP_MODE}"
+    printf "OPT_PHP_VER: %s\t" "${OPT_PHP_VER}"
+    printf "PB_CONFIG: %s\t" "${PB_CONFIG}"
+    printf "PB_CONFIG: %s\t" "${PB_CUSTOM}"
+    printf "***\n"
+    printf "APACHE_PATH: %s\n" "${APACHE_PATH}"
+    printf "APACHE_CONF: %s\n" "${APACHE_CONF}"
+    printf "APACHE_LIBS: %s\n" "${APACHE_LIBS}"
+    printf "APACHE_EXTRAS: %s\n" "${APACHE_EXTRAS}"
+    printf "APACHE_SSL_CRT: %s\n" "${APACHE_SSL_CRT}"
+    printf "APACHE_SSL_KEY: %s\n" "${APACHE_SSL_KEY}"
+    printf "APCUSTOMCONFDIR: %s\n" "${APCUSTOMCONFDIR}"
+    printf "***\n"
+    printf "PERL: %s\n" "${PERL}"
+    printf "DA_CONF: %s\n" "${DA_CONF}"
+    printf "DA_CONF_TEMPLATE: %s\n" "${DA_CONF_TEMPLATE}"
+    printf "DA_TASK_QUEUE: %s\n" "${DA_TASK_QUEUE}"
+    printf "OPENSSL: %s\n" "${OPENSSL}"
+    printf "NEWCONFIGS: %s\n" "${NEWCONFIGS}"
+    printf "***\n"
+    printf "HAVE_FPM_CGI: %s\t" "${HAVE_FPM_CGI}"
+    printf "HAVE_CLI: %s\t" "${HAVE_CLI}"
+    printf "HAVE_FCGID: %s\t" "${HAVE_FCGID}"
+    printf "HAVE_SUPHP_CGI: %s\t" "${HAVE_SUPHP_CGI}"
+    # printf "***\n"
+    # printf "HAVE_PHP1_FPM: %s\t" "${HAVE_PHP1_FPM}"
+    # printf "HAVE_PHP1_CLI: %s\t" "${HAVE_PHP1_CLI}"
+    # printf "HAVE_PHP1_FCGID: %s\t" "${HAVE_PHP1_FCGID}"
+    # printf "HAVE_PHP1_SUPHP: %s\t" "${HAVE_PHP1_SUPHP}"
+    printf "***\n"
+    printf "HAVE_FPM55_CGI: %s\t" "${HAVE_FPM55_CGI}"
+    printf "HAVE_SUPHP55_CGI: %s\t" "${HAVE_SUPHP55_CGI}"
+    printf "HAVE_FCGID55: %s\t" "${HAVE_FCGID55}"
+    printf "HAVE_CLI55: %s\t" "${HAVE_CLI55}"
+    printf "***\n"
+    printf "HAVE_FPM56_CGI: %s\t" "${HAVE_FPM56_CGI}"
+    printf "HAVE_SUPHP56_CGI: %s\t" "${HAVE_SUPHP56_CGI}"
+    printf "HAVE_FCGID56: %s\t" "${HAVE_FCGID56}"
+    printf "HAVE_CLI56: %s\t" "${HAVE_CLI56}"
+    printf "***\n"
     printf "HAVE_FPM70_CGI: %s\t" "${HAVE_FPM70_CGI}"
     printf "HAVE_SUPHP70_CGI: %s\t" "${HAVE_SUPHP70_CGI}"
     printf "HAVE_FCGID70: %s\t" "${HAVE_FCGID70}"
     printf "HAVE_CLI70: %s\t\n" "${HAVE_CLI70}"
     printf "***\n"
+
     # echo "PHPMODULES: ${PHPMODULES}"
   fi
+
+  cp ${PB_PATH}/directadmin/data/templates/custom/* "${DA_PATH}/data/templates/custom/"
 
   ## **************************************************
   ## Apache / Nginx+Apache
@@ -7397,6 +7408,10 @@ rewrite_confs() {
 
     WEBMAIL_LINK=$(get_webmail_link)
     ${PERL} -pi -e "s#Alias /webmail \"${WWW_DIR}/roundcube/\"#Alias /webmail \"${WWW_DIR}/${WEBMAIL_LINK}/\"#" "${APACHE_EXTRAS}/httpd-alias.conf"
+
+    ## test:
+    # SUEXEC_PER_DIR=1
+    # echo "$(eval_var ${SUEXEC_PER_DIR})"
 
     php_conf
     # doModLsapi 0
@@ -7689,7 +7704,7 @@ backup_http() {
   fi
 
   ## Turn off httpd service checking
-  set_service httpd OFF
+  set_service apache24 OFF
 
   return
 }
@@ -7719,7 +7734,7 @@ restore_http() {
   verify_server_ca
 
   ## Turn on httpd service checking
-  set_service httpd ON
+  set_service apache24 ON
 
   return
 }
@@ -8421,13 +8436,9 @@ validate_options() {
     eval "$(echo "HAVE_FCGID${php_shortrelease}=NO")"
     eval "$(echo "HAVE_SUPHP${php_shortrelease}_CGI=NO")"
     eval "$(echo "HAVE_CLI${php_shortrelease}=NO")"
-
-    ## PB: Not needed?
-    # eval $(echo "PHP${php_shortrelease}_CONFIGURE=configure/${APCONF}/configure.php${php_shortrelease}")
-    # if [ -e custom/${APCONF}/configure.php${php_shortrelease} ]; then
-    #   eval $(echo "PHP${php_shortrelease}_CONFIGURE=custom/${APCONF}/configure.php${php_shortrelease}")
-    # fi
   done
+
+  $(eval_var "${HAVE_CLI}")
 
   ## Standard 443 and 80 ports
   readonly PORT_80=$(getDA_Opt port_80 80)
@@ -8553,11 +8564,11 @@ validate_options() {
   fi
   if checkyesno_opt SUHOSIN; then
     readonly OPT_SUHOSIN="$(uc ${SUHOSIN})"
-    setOpt suhosin "${OPT_SUHOSIN}"
+    setOpt suhosin "${OPT_SUHOSIN}" no
   fi
   if checkyesno_opt SUHOSIN_UPLOADSCAN; then
     readonly OPT_SUHOSIN_UPLOADSCAN="$(uc ${SUHOSIN_UPLOADSCAN})"
-    setOpt suhosin_php_uploadscan "${OPT_SUHOSIN_UPLOADSCAN}"
+    setOpt suhosin_php_uploadscan "${OPT_SUHOSIN_UPLOADSCAN}" no
   fi
   if checkyesno_opt USE_HOSTNAME_FOR_ALIAS; then
     readonly OPT_USE_HOSTNAME_FOR_ALIAS="$(uc ${USE_HOSTNAME_FOR_ALIAS})"
@@ -8565,11 +8576,11 @@ validate_options() {
   fi
   if checkyesno_opt USERDIR_ACCESS; then
     readonly OPT_USERDIR_ACCESS="$(uc ${USERDIR_ACCESS})"
-    setOpt userdir_access "${OPT_USERDIR_ACCESS}"
+    setOpt userdir_access "${OPT_USERDIR_ACCESS}" no
   fi
   if checkyesno_opt WEBALIZER; then
     readonly OPT_WEBALIZER="$(uc ${WEBALIZER})"
-    setOpt webalizer "${OPT_WEBALIZER}"
+    setOpt webalizer "${OPT_WEBALIZER}" no
   fi
   if checkyesno_opt WEBAPPS_INBOX_PREFIX; then
     readonly OPT_WEBAPPS_INBOX_PREFIX="$(uc ${WEBAPPS_INBOX_PREFIX})"
@@ -8648,22 +8659,22 @@ validate_options() {
     *) printf "*** Error: Invalid PHP_VERSION value set in options.conf\n"; exit ;;
   esac
 
-  HAS_CLI=no
+  HAS_CLI=NO
   if [ "${OPT_PHP_MODE}" = "mod_php" ]; then
-    HAS_CLI=yes
+    HAS_CLI=YES
   fi
 
-  HAS_CGI=no
+  HAS_CGI=NO
   if [ "${OPT_PHP_MODE}" = "php-fpm" ]; then
-    HAS_CGI=yes
+    HAS_CGI=YES
   fi
 
   if [ "${OPT_PHP_MODE}" = "suphp" ]; then
-    HAS_CGI=yes
+    HAS_CGI=YES
   fi
 
   if [ "${OPT_PHP_MODE}" = "fastcgi" ]; then
-    HAS_CGI=yes
+    HAS_CGI=YES
   fi
 
   #### From CB2:
@@ -8677,8 +8688,8 @@ validate_options() {
     if [ -e ${PB_CUSTOM}/fpm/conf/php-fpm.conf.${php_shortrelease} ]; then
       eval `echo "PHP${php_shortrelease}_FPM_CONF=${PB_CUSTOM}/fpm/conf/php-fpm.conf.${php_shortrelease}"`
     fi
-    eval `echo "PHP_INI_FPM${php_shortrelease}=/usr/local/etc/php.ini"`
-    eval `echo "PHP_SBIN_FPM${php_shortrelease}=/usr/local/sbin/php-fpm"`
+    eval `echo "PHP_INI_FPM${php_shortrelease}=${PHP_INI}"`
+    eval `echo "PHP_SBIN_FPM${php_shortrelease}=${PHP_FPM_BIN}"`
 
     # Variables for PHP as suPHP
     EVAL_PHP_INI_SUPHP_VAR=PHP_SBIN_FPM${php_shortrelease}
@@ -8701,6 +8712,8 @@ validate_options() {
     eval `echo "PHP_EXT_SUPHP${php_shortrelease}=$(eval_var ${EVAL_PHP_EXT_SUPHP_VAR})"`
   done
 
+
+
   PHP_CUSTOM_PHP_CONF_D_INI_PATH="${PB_PATH}/custom/php.conf.d"
 
   ## PHP extensions file rewritten by DirectAdmin
@@ -8708,18 +8721,18 @@ validate_options() {
   ## PHP_INI=/usr/local/etc/php.ini
   PHP_BIN=/usr/local/bin/php
 
-  PHP1_INI_FILE=${PHP_INI}
-  PHP1_INI_EXT_FILE=${PHP_EXT}
-  if [ "${OPT_PHP1_MODE}" != "mod_php" ]; then
-    PHP1_RELEASE_INI_EVAL="PHP_INI_FPM${OPT_PHP_VER}"
-    PHP1_INI_FILE="$(eval_var ${PHP1_RELEASE_INI_EVAL})"
-    PHP1_RELEASE_INI_EXT_EVAL="PHP_EXT_FPM${OPT_PHP_VER}"
-    PHP1_INI_EXT_FILE="$(eval_var ${PHP1_RELEASE_INI_EXT_EVAL})"
+  PHP_INI_FILE=${PHP_INI}
+  PHP_INI_EXT_FILE=${PHP_EXT}
+  if [ "${OPT_PHP_MODE}" != "mod_php" ]; then
+    PHP_RELEASE_INI_EVAL="PHP_INI_FPM${OPT_PHP_VER}"
+    PHP_INI_FILE="$(eval_var ${PHP_RELEASE_INI_EVAL})"
+    PHP_RELEASE_INI_EXT_EVAL="PHP_EXT_FPM${OPT_PHP_VER}"
+    PHP_INI_EXT_FILE="$(eval_var ${PHP_RELEASE_INI_EXT_EVAL})"
   fi
 
-  PHP1_INI_EXT_FILE_OLD="$(echo ${PHP1_INI_EXT_FILE} | ${PERL} -p0 -e 's|10-directadmin.ini|directadmin.ini|')"
-  if [ -e "${PHP1_INI_EXT_FILE_OLD}" ] && [ ! -e "${PHP1_INI_EXT_FILE}" ]; then
-    mv -f "${PHP1_INI_EXT_FILE_OLD}" "${PHP1_INI_EXT_FILE}"
+  PHP_INI_EXT_FILE_OLD="$(echo ${PHP_INI_EXT_FILE} | ${PERL} -p0 -e 's|10-directadmin.ini|directadmin.ini|')"
+  if [ -e "${PHP_INI_EXT_FILE_OLD}" ] && [ ! -e "${PHP_INI_EXT_FILE}" ]; then
+    mv -f "${PHP_INI_EXT_FILE_OLD}" "${PHP_INI_EXT_FILE}"
   fi
   #### End: From CB2
 
@@ -8939,7 +8952,7 @@ get_versions() {
     if [ "${EXIM_CONF_VER}" != "${EXIMCONFV}" ]; then
       if [ "${VERSIONS}" = "0" ]; then
         printf "Updating exim.conf\n"
-        doEximConf
+        exim_conf
       elif [ "${VERSIONS}" = "1" ]; then
         printf "exim.conf %s to %s update is available.\n\n" "${EXIMCONFV}" "${EXIM_CONF_VER}"
       fi
