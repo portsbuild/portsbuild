@@ -1,5 +1,6 @@
 [global]
 error_log = log/php-fpm.log
+pid = run/php-fpm.pid
 
 ; syslog_facility is used to specify what type of program is logging the
 ; message. This lets syslogd specify that messages from different facilities
@@ -64,7 +65,7 @@ security.limit_extensions = .php .php5 .php56 .inc .phtml
 ;php_admin_value[error_log] = /var/log/fpm-php.www.log
 ;php_admin_flag[log_errors] = on
 ;php_admin_value[memory_limit] = 32M
-php_admin_value[open_basedir] = /tmp:/var/tmp:/usr/local/www:/usr/local/lib/php
+;php_admin_value[open_basedir] = /tmp:/var/tmp:/usr/local/www:/usr/local/lib/php
 
 ; Load all DA User configs
 include=/usr/local/directadmin/data/users/*/php/php-fpm56.conf
