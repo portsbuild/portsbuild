@@ -1,4 +1,5 @@
+options.conf
 update.tar.gz
 sftp-config.json
 @notes/
-notes/
+*.sublime-project
