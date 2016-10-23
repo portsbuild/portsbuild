@@ -12,8 +12,11 @@
 
 readonly DA_PATH=/usr/local/directadmin
 readonly DA_USERS_DIR=${DA_PATH}/data/users
+readonly BIND_USER=bind
+readonly BIND_GROUP=bind
+readonly CHOWN=/usr/sbin/chown
 
-TTL=14400
+readonly TTL=14400
 
 OS_MAJ=$(uname -r | cut -d. -f1) # 9, 10
 
@@ -45,38 +48,38 @@ for DA_USER in $(ls ${DA_USERS_DIR}); do
 
       ## Write to ${NAMED_DIR}/${DOMAIN}.db
       {
-        printf "\$TTL 14400\n"
+        printf "\$TTL %s\n" "${TTL}"
         printf "@         IN      SOA     %s.         hostmaster.%s. (\n" "${NS1}" "${DOMAIN}"
         printf "                                                          2010101901\n"
-        printf "                                                          14400\n"
+        printf "                                                          %s\n" "${TTL}"
         printf "                                                          3600\n"
         printf "                                                          1209600\n"
         printf "                                                          86400 )\n"
         printf "\n"
-        echo "%s.        14400   IN              NS      %s." "${DOMAIN}" "${NS1}"
-        echo "%s.        14400   IN              NS      %s." "${DOMAIN}" "${NS2}"
-        echo ""
-        echo "%s.        14400   IN              A       %s" "${DOMAIN}" "${IP}"
-        echo "ftp               14400   IN              A       %s" "${IP}"
-        echo "localhost         14400   IN              A       127.0.0.1"
-        echo "mail              14400   IN              A       %s" "${IP}"
-        echo "pop               14400   IN              A       %s" "${IP}"
-        echo "smtp              14400   IN              A       %s" "${IP}"
-        echo "www               14400   IN              A       %s" "${IP}"
+        printf "%s.        %s   IN              NS      %s.\n" "${DOMAIN}" "${TTL}" "${NS1}"
+        printf "%s.        %s   IN              NS      %s.\n" "${DOMAIN}" "${TTL}" "${NS2}"
         printf "\n"
-        printf "%s.        14400   IN              MX      10 mail\n" "${DOMAIN}"
-        echo "%s.        14400   IN              TXT     \"v=spf1 a mx ip4:%s -all\"" "${DOMAIN}" "${IP}"
+        printf "%s.        %s   IN              A       %s\n" "${DOMAIN}" "${TTL}" "${IP}"
+        printf "ftp               %s   IN              A       %s\n" "${TTL}" "${IP}"
+        printf "localhost         %s   IN              A       127.0.0.1\n" "${TTL}"
+        printf "mail              %s   IN              A       %s\n" "${TTL}" "${IP}"
+        printf "pop               %s   IN              A       %s\n" "${TTL}" "${IP}"
+        printf "smtp              %s   IN              A       %s\n" "${TTL}" "${IP}"
+        printf "www               %s   IN              A       %s\n" "${TTL}" "${IP}"
+        printf "\n"
+        printf "%s.        %s   IN              MX      10 mail\n" "${DOMAIN}" "${TTL}"
+        printf "%s.        %s   IN              TXT     \"v=spf1 a mx ip4:%s -all\"\n" "${DOMAIN}" "${TTL}" "${IP}"
         printf "\n"
       } > "${NAMED_DIR}/${DOMAIN}.db"
 
       ## PB: Todo: Replace with while loop
       for SUB in $(cat "${DA_USERS_DIR}/${DA_USER}/domains/${DOMAIN}.subdomains"); do
       {
-        echo "${SUB}              14400   IN              A       ${IP}" >> "${NAMED_DIR}/${DOMAIN}.db"
+        printf "%s              %s   IN              A       %s\n" "${SUB}" "${TTL}" "${IP}" >> "${NAMED_DIR}/${DOMAIN}.db"
       }
       done
 
-      chown bind:bind "${NAMED_DIR}/${DOMAIN}.db"
+      ${CHOWN} "${BIND_USER}:${BIND_GROUP}" "${NAMED_DIR}/${DOMAIN}.db"
 
       printf "  - database created.\n"
     fi
