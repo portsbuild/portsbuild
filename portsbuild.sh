@@ -49,7 +49,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20161021
+PB_BUILD_DATE=20161023
 IFS="$(printf '\n\t')"
 LANG=C
 
@@ -2520,6 +2520,25 @@ exim_install() {
 }
 
 ################################################################################
+## Rewrite named (DNS) database records for all domains
+################################################################################
+
+rewrite_namedb() {
+
+  if [ -e ${PB_PATH}/directadmin/scripts/fix_namedb.sh ]; then
+    ${CHMOD} 755 ${PB_PATH}/directadmin/scripts/fix_namedb.sh
+    ${PB_PATH}/directadmin/scripts/fix_namedb.sh
+  else
+    printf "*** Error: cannot find scripts/fix_namedb.sh to rewrite DNS records.\n"
+    exit 1
+  fi
+
+  ${SERVICE} named restart
+
+  return
+}
+
+################################################################################
 ## Exim Restart with configuration file verification
 ################################################################################
 
@@ -4728,19 +4747,21 @@ apache_install() {
     ## Option hints from /usr/ports/Mk/bsd.apache.mk
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" rmconfig
     ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${PORT_APACHE24}" \
-    SUEXEC_UIDMIN=100 \
-    SUEXEC_GIDMIN=100 \
-    SUEXEC_SAFE_PATH="/usr/local/bin:/usr/bin:/bin" \
-    SUEXEC_SAFE_DIRECTORY="/usr/local/safe-bin" \
-    SUEXEC_DOCROOT="/" \
-    SUEXEC_LOGFILE="${LOGS}/httpd/suexec.log"
-    SUEXEC_CALLER="${APACHE_USER}" \
     www_apache24_SET="${APACHE24_MAKE_SET}" \
     www_apache24_UNSET="${APACHE24_MAKE_UNSET}" \
     OPTIONS_SET="${GLOBAL_MAKE_SET}" \
     OPTIONS_UNSET="${GLOBAL_MAKE_UNSET}" \
+    SUEXEC_CALLER="${APACHE_USER}" \
+    SUEXEC_UIDMIN=100 \
+    SUEXEC_GIDMIN=100 \
+    SUEXEC_SAFEPATH="/usr/local/bin:/usr/bin:/bin" \
+    SUEXEC_SAFEDIR="/usr/local/safe-bin" \
+    SUEXEC_DOCROOT="/" \
+    SUEXEC_LOGFILE="${LOGS}/httpd/suexec.log" \
+    SUEXEC_USERDIR="public_html" \
     reinstall clean
   fi
+    # CONFIGURE_ARGS+="--with-suexec-safedir=/usr/local/safe-bin" \
 
   ## Update /boot/loader.conf
   ${SYSRC} -f /boot/loader.conf accf_http_load="YES"
@@ -9675,25 +9696,26 @@ validate_options
 ## ./portsbuild selection screen
 
 case "$1" in
-  "about") show_about ;;                  ## show about
-  "audit") show_audit ;;                  ## run "pkg audit"
-  "c"|"config") show_config "$@" ;;            ## show configured option values
-  "d"|"debug") show_debug ;;              ## show debugging info
-  "i"|"install"|"build") install_app "$@" ;;      ## install an application
-  "o"|"outdated") show_outdated ;;        ## show installed packages that are out of date
-  "r"|"rewrite") rewrite_app "$@" ;;      ## rewrite a configuration file (e.g. apache vhosts)
-  "s"|"setup") global_setup "$@" ;;       ## first time setup
-  # "show") show_show "$@" ;;             ## show something
-  "upd"|"update") pb_update ;;            ## update PB script
-  "upg"|"upgrade") upgrade "$@" ;;        ## let portsbuild upgrade an app/service (e.g. php via pkg)
-  "check"|"verify") verify ;;             ## verify system state
-  "version") show_version ;;              ## show portsbuild version
+  "about") show_about ;;                        ## show about
+  "audit") show_audit ;;                        ## run "pkg audit"
+  "c"|"config") show_config "$@" ;;             ## show configured option values
+  "d"|"debug") show_debug ;;                    ## show debugging info
+  "i"|"install"|"build") install_app "$@" ;;    ## install an application
+  "o"|"outdated") show_outdated ;;              ## show installed packages that are out of date
+  "r"|"rewrite") rewrite_app "$@" ;;            ## rewrite a configuration file (e.g. apache vhosts)
+  "s"|"setup") global_setup "$@" ;;             ## first time setup
+  # "show") show_show "$@" ;;                   ## show something
+  "upd"|"update") pb_update ;;                  ## update PB script
+  "upg"|"upgrade") upgrade "$@" ;;              ## let portsbuild upgrade an app/service (e.g. php via pkg)
+  "check"|"verify") verify ;;                   ## verify system state
+  "version") show_version ;;                    ## show portsbuild version
   "v"|"versions"|"installed") show_versions ;;  ## show app/service versions via pkg
-  "func") "$2" ;;                         ## direct function call
-  # "create_options") create_options ;;   ## create options.conf
-  # "set") set_option "$@" ;;             ## set value in options.conf
-  # check_options) check_options ;;       ## validate options.conf
-  "fix_ftp_accounts") fix_ftp_accounts "$@" ;; ## Fix FTP Accounts
+  "func") "$2" ;;                               ## direct function call
+  # "create_options") create_options ;;         ## create options.conf
+  # "set") set_option "$@" ;;                   ## set value in options.conf
+  # check_options) check_options ;;             ## validate options.conf
+  "fix_ftp_accounts") fix_ftp_accounts "$@" ;;  ## Fix FTP Accounts
+  "rewrite_namedb"|"rewrite_dns") rewrite_namedb ;;                   ## Fix named (DNS) database
   *) show_main_menu ;;
 esac
 
