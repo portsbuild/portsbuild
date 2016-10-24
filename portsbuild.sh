@@ -98,7 +98,7 @@ else
 fi
 
 readonly PB_PATH
-readonly PB_DEBUG="YES"
+readonly PB_DEBUG="NO"
 readonly PB_CONF="${PB_PATH}/options.conf"
 readonly PB_CONFIG="${PB_PATH}/configure"
 readonly PB_CUSTOM="${PB_PATH}/custom"
@@ -4191,6 +4191,22 @@ php_install() {
     fi
   fi
 
+# PHP_EXT_LIST_TEST=math/php${OPT_PHP_VER}-bcmath archivers/php${OPT_PHP_VER}-bz2 misc/php${OPT_PHP_VER}-calendar \
+# textproc/php${OPT_PHP_VER}-ctype ftp/php${OPT_PHP_VER}-curl textproc/php${OPT_PHP_VER}-dom graphics/php${OPT_PHP_VER}-exif \
+# sysutils/php${OPT_PHP_VER}-fileinfo security/php${OPT_PHP_VER}-filter ftp/php${OPT_PHP_VER}-ftp graphics/php${OPT_PHP_VER}-gd \
+# devel/php${OPT_PHP_VER}-gettext security/php${OPT_PHP_VER}-hash converters/php${OPT_PHP_VER}-iconv mail/php${OPT_PHP_VER}-imap \
+# devel/php${OPT_PHP_VER}-json converters/php${OPT_PHP_VER}-mbstring security/php${OPT_PHP_VER}-mcrypt \
+# databases/php${OPT_PHP_VER}-mysql databases/php${OPT_PHP_VER}-mysqli databases/php${OPT_PHP_VER}-odbc \
+# www/php${OPT_PHP_VER}-opcache security/php${OPT_PHP_VER}-openssl databases/php${OPT_PHP_VER}-pdo \
+# databases/php${OPT_PHP_VER}-pdo_mysql databases/php${OPT_PHP_VER}-pdo_sqlite archivers/php${OPT_PHP_VER}-phar \
+# sysutils/php${OPT_PHP_VER}-posix textproc/php${OPT_PHP_VER}-pspell devel/php${OPT_PHP_VER}-readline \
+# converters/php${OPT_PHP_VER}-recode www/php${OPT_PHP_VER}-session textproc/php${OPT_PHP_VER}-simplexml \
+# net-mgmt/php${OPT_PHP_VER}-snmp net/php${OPT_PHP_VER}-soap net/php${OPT_PHP_VER}-sockets \
+# databases/php${OPT_PHP_VER}-sqlite3 www/php${OPT_PHP_VER}-tidy devel/php${OPT_PHP_VER}-tokenizer \
+# textproc/php${OPT_PHP_VER}-wddx textproc/php${OPT_PHP_VER}-xml textproc/php${OPT_PHP_VER}-xmlreader \
+# net/php${OPT_PHP_VER}-xmlrpc textproc/php${OPT_PHP_VER}-xmlwriter textproc/php${OPT_PHP_VER}-xsl \
+# archivers/php${OPT_PHP_VER}-zip archivers/php${OPT_PHP_VER}-zlib
+
   ## PHP Version Selector
   case ${OPT_PHP_VER} in
     "55")
@@ -4280,12 +4296,12 @@ php_install() {
     ## Base PHP Installation (includes FPM, CGI, CLI modes)
     case ${OPT_PHP_MODE} in
       "php-fpm")
-          pkgi ${PORT_PHP} ${PHP_EXT_LIST}
+          pkgi ${PORT_PHP} "${PHP_EXT_LIST}"
           ;;
       "mod_php")
-          pkgi ${PORT_MOD_PHP} ${PHP_EXT_LIST} ;;
+          pkgi ${PORT_MOD_PHP} "${PHP_EXT_LIST}" ;;
       "suphp")
-          pkgi ${PORT_SUPHP} ${PHP_EXT_LIST} ;;
+          pkgi ${PORT_SUPHP} "${PHP_EXT_LIST}" ;;
       # fastcgi) pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
       # fcgid) pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
     esac
@@ -4337,7 +4353,7 @@ php_install() {
   fi
 
   if [ "${OPT_PHP_MODE}" = "php-fpm" ] && [ ! -d "${PHP_SOCKETS_PATH}" ]; then
-    printf "*** Notice: Creating directory: %s" "${PHP_SOCKETS_PATH}"
+    printf "*** Notice: Creating directory: %s\n" "${PHP_SOCKETS_PATH}"
     ${MKDIR} -p "${PHP_SOCKETS_PATH}"
   fi
 
@@ -4552,7 +4568,7 @@ php_fpm_restart() {
     ${SERVICE} "php-fpm" reload
   else
     printf "*** Warning: Aborting automatic PHP-FPM restart due to configuration verification failure.\n"
-    printf "Please verify the PHP-FPM configuration file at: %s\n" "${PHP_FPM_CONF}"
+    printf "The current PHP-FPM configuration file: %s\n" "${PHP_FPM_CONF}"
     printf "You can verify the file by typing:\n"
     printf "  %s --test\n\n" "${PHP_FPM_BIN}"
     printf "You can restart PHP-FPM manually by typing:\n"
@@ -4573,6 +4589,8 @@ php_upgrade() {
   pkgu "$(pkg query %o | grep "php${OPT_PHP_VER}")"
 
   # pkgq -i -x "%o %v" '(php)'
+
+  php_fpm_restart
 }
 
 ################################################################################
@@ -4929,9 +4947,10 @@ apache_install() {
     ${SYSRC} -q -x nginx_enable
   fi
 
-  if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then ## || [ ! -e "${APACHE_HTTPD}" ]
-    set_service apache24 ON
-  fi
+  ## Verify:
+  # if [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then ## || [ ! -e "${APACHE_HTTPD}" ]
+  #   set_service apache24 ON
+  # fi
 
   ${CHOWN} "${WEBAPPS_USER}:${APACHE_GROUP}" "${WWW_DIR}"
   ${CHMOD} 551 "${WWW_DIR}"
@@ -7766,7 +7785,7 @@ verify_server_ca() {
 
 backup_http() {
 
-  printf "Backing up Apache's SSL certificate and key, and turning off DirectAdmin's httpd status check.\n"
+  printf "Backing up Apache's SSL certificate and key, and tur/usr/local/directadmin/data/users/ning off DirectAdmin's httpd status check.\n"
 
   if [ -e "${APACHE_SSL_CRT}" ]; then
     cp -fp "${APACHE_SSL_CRT}" "${APACHE_SSL_CRT}.backup"
@@ -7780,8 +7799,8 @@ backup_http() {
     cp -fp "${APACHE_CONF}" "${APACHE_CONF}.backup"
   fi
 
-  ## Turn off httpd service checking
-  set_service apache24 OFF
+  ## Verify: Turn off httpd service checking
+  # set_service apache24 OFF
 
   return
 }
@@ -7810,8 +7829,8 @@ restore_http() {
 
   verify_server_ca
 
-  ## Turn on httpd service checking
-  set_service apache24 ON
+  ## Verify: Turn on httpd service checking
+  # set_service apache24 ON
 
   return
 }
