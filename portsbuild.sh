@@ -136,6 +136,7 @@ readonly EXIM_GROUP='mail'        ## mail
 readonly LOGS=/var/log
 readonly ENV=/usr/bin/env
 readonly CHOWN=/usr/sbin/chown
+readonly CHGRP=/usr/bin/chgrp
 readonly CHMOD=/bin/chmod
 readonly CP=/bin/cp
 readonly COLUMN=/usr/bin/column
@@ -1301,6 +1302,8 @@ global_setup() {
     ${SYSRC} -f /etc/sysctl.conf net.inet6.ip6.v6only=0
     ${SYSCTL} net.inet6.ip6.v6only=0
 
+    ## update_hosts
+
     ## Verify if /etc/hosts has the localhost entry
     VERIFY_HOSTS=$(grep 127.0.0.1 /etc/hosts | grep -c localhost)
     if [ "${VERIFY_HOSTS}" -eq 0 ]; then
@@ -1319,7 +1322,7 @@ global_setup() {
 
     ## Ethernet Device checking goes here.
     ## Skipping/avoiding this step as it's not that reliable of a process,
-    ## especially if you have multiple interfaces.
+    ## especially if you have multiple interfaces configured in /etc/rc.conf.
 
     ## Make sure sshd is enabled
     printf "Enabling sshd in /etc/rc.conf\n"
@@ -1360,6 +1363,7 @@ global_setup() {
       if [ ! -e "${PB_CUSTOM}/build/options.conf" ]; then
         ${WGET} -O "${CB_CONF}" "${PB_MIRROR}/custombuild/options.conf"
       else
+        printf "Copying custombuild/options.conf.sample file.\n"
         cp "${PB_CUSTOM}/build/options.conf" "${CB_CONF}"
       fi
     fi
@@ -1410,8 +1414,10 @@ global_setup() {
       fi
     fi
 
-    setVal lan_ip "${LAN_IP}" "${DA_CONF}"
-    setVal lan_ip "${LAN_IP}" "${DA_CONF_TEMPLATE}"
+    if [ -z ${LAN_IP} ]; then
+      setVal lan_ip "${LAN_IP}" "${DA_CONF}"
+      setVal lan_ip "${LAN_IP}" "${DA_CONF_TEMPLATE}"
+    fi
 
     printf "Starting DirectAdmin\n"
     ${SERVICE} directadmin start
@@ -1445,9 +1451,9 @@ global_setup() {
 ## Modifies /etc/rc.conf, /boot/loader.conf, /etc/periodic.conf, etc.
 ################################################################################
 
-update_rc() {
+update_rcd() {
 
-  ## Todo: refactor with "${SERVICE_NAME}_enable"
+  ## Todo: refactor with eval "${SERVICE_NAME}_enable"
   ## Todo: implement case()
 
   if [ -e "${RCD}/directadmin" ]; then
@@ -4028,9 +4034,11 @@ fpmCheck() {
   ## Socket directory permissions
   if [ -d "${PHP_SOCKETS_PATH}" ]; then
     if [ "${OPT_WEBSERVER}" = "nginx" ]; then
-      ${CHOWN} -R ${NGINX_USER}:${NGINX_GROUP} "${PHP_SOCKETS_PATH}"
+      # ${CHOWN} -R "${NGINX_USER}:${NGINX_GROUP}" "${PHP_SOCKETS_PATH}"
+      ${CHGRP} -R "${NGINX_GROUP}" "${PHP_SOCKETS_PATH}"
     elif [ "${OPT_WEBSERVER}" = "apache" ] || [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
-      ${CHOWN} -R ${APACHE_USER}:${APACHE_GROUP} "${PHP_SOCKETS_PATH}"
+      # ${CHOWN} -R "${APACHE_USER}:${APACHE_GROUP}" "${PHP_SOCKETS_PATH}"
+      ${CHGRP} -R "${APACHE_GROUP}" "${PHP_SOCKETS_PATH}"
     fi
   fi
 
@@ -4144,7 +4152,7 @@ php_install() {
   local PHPMODULES COUNT_SUPHP COUNT_MODSEC COUNT_HTSCANNER
   local PHP_EXT_LIST PORT_PHP PORT_PHP_EXT PORT_MOD_PHP
   local PHP_MAKE_SET PHP_MAKE_UNSET PHP_EXT_MAKE_SET PHP_EXT_MAKE_UNSET
-  local PHP_MOD_MAKE_SET PHP_MOD_MAKE_UNSET
+  local PHP_MOD_MAKE_SET PHP_MOD_MAKE_UNSET PHP_EXT_DIR
 
   ## Install Web Server(s) first
 
@@ -4335,6 +4343,53 @@ php_install() {
 
   # ${MAKE} -DNO_DIALOG -C "${PORT_PHP_EXT}" reinstall clean
 
+  if [ -e /usr/local/etc/php.conf ]; then
+    PHP_EXT_DIR="$(grep PHP_EXT_DIR= /usr/local/etc/php.conf | grep -m1 PHP_EXT_DIR | cut -d= -f2 | tr -d '"')"
+  else
+    printf "*** Error: cannot continue due to missing file: /usr/local/etc/php.conf\n"
+    exit 1
+  fi
+
+  if [ "${COMPAT_PHP_SYMLINKS}" == "YES" ]; then
+    printf "*** Notice: DirectAdmin + PHP Compatibility mode enabled.\n"
+
+    ## Create CB2/DA directories for compat:
+    # ${MKDIR} -p /usr/local/php$OPT_PHP_VER/{bin,etc,include,lib/php,php,sbin,var/log,var/run}
+    ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}"
+    ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/bin"
+    ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/etc"
+    ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/include"
+    ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/lib"
+    ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/php"
+    ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/sbin"
+    ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/var/log/"
+    ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/var/run"
+    ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/lib/php/"
+
+    ## ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/lib/php.conf.d/"
+    ## ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/sockets"
+
+    ## Symlinks
+    ln -s /usr/local/bin/php "/usr/local/php${OPT_PHP_VER}/bin/php"
+    ln -s /usr/local/bin/php-cgi "/usr/local/php${OPT_PHP_VER}/bin/php-cgi"
+    ln -s /usr/local/bin/php-config "/usr/local/php${OPT_PHP_VER}/bin/php-config"
+    ln -s /usr/local/bin/phpize "/usr/local/php${OPT_PHP_VER}/bin/phpize"
+    ln -s /usr/local/sbin/php-fpm "/usr/local/php${OPT_PHP_VER}/sbin/php-fpm"
+
+    ln -s /var/log/php-fpm.log "/usr/local/php${OPT_PHP_VER}/var/log/php-fpm.log"
+
+    ln -s /usr/local/etc/php "/usr/local/php${OPT_PHP_VER}/lib/php.conf.d"
+    ln -s /usr/local/etc/php.ini "/usr/local/php${OPT_PHP_VER}/lib/php.ini"
+    ln -s /usr/local/etc/php-fpm.conf "/usr/local/php${OPT_PHP_VER}/etc/php-fpm.conf"
+    ln -s /usr/local/include/php "/usr/local/php${OPT_PHP_VER}/include/php"
+    ln -s /var/run/php/sockets "/usr/local/php${OPT_PHP_VER}/sockets"
+
+    ## Fetch build date value from: /usr/local/etc/php.conf $PHP_EXT_DIR
+    ln -s "/usr/local/lib/php/${PHP_EXT_DIR}" "/usr/local/php${OPT_PHP_VER}/lib/php/extensions"
+    ln -s /usr/local/lib/php/build "/usr/local/php${OPT_PHP_VER}/lib/php/build"
+  fi
+
+
   if [ "${OPT_PHP_IONCUBE}" = "YES" ]; then
     printf "*** Notice: Installing IonCube loaders.\n"
     pkgi ${PORT_IONCUBE}
@@ -4499,7 +4554,7 @@ php_fpm_restart() {
     printf "*** Warning: Aborting automatic PHP-FPM restart due to configuration verification failure.\n"
     printf "Please verify the PHP-FPM configuration file at: %s\n" "${PHP_FPM_CONF}"
     printf "You can verify the file by typing:\n"
-    printf "  %s --test\n\n" "%s" "${PHP_FPM_BIN}"
+    printf "  %s --test\n\n" "${PHP_FPM_BIN}"
     printf "You can restart PHP-FPM manually by typing:\n"
     printf "  service php-fpm restart\n"
   fi
@@ -4725,7 +4780,7 @@ apache_install() {
       printf "Copying Apache 2.4 suexec patches to %s\n" "${WWW_APACHE24_PATCHDIR}"
       cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-modules_generators_mod__suexec.c" "${WWW_APACHE24_PATCHDIR}"
       cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-support_suexec.c" "${WWW_APACHE24_PATCHDIR}"
-      cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-configure.in2" "${WWW_APACHE24_PATCHDIR}"
+      cp -f "${PB_PATCHES}/${PORT_APACHE24}/patch-configure.in" "${WWW_APACHE24_PATCHDIR}"
 
       ## Todo: Missing configure.in parameters?
       # printf "Patching Apache 2.4 to allow SuexecUserGroup in a Directory context.\n"
@@ -8401,11 +8456,13 @@ checkyesno() {
 
 check_options_file() {
 
-  if [ ! -f options.conf ]; then
-    printf "*** Notice: PortsBuild's options.conf file is missing. Downloading a fresh copy now.\n"
-    getFile options.conf "${PB_PATH}/options.conf"
+  # cp options.conf.sample options.conf
 
-    if [ ! -f options.conf ]; then
+  if [ ! -f ${PB_CONF} ]; then
+    printf "*** Notice: PortsBuild's options.conf file is missing. Downloading a fresh copy now.\n"
+    getFile options.conf "${PB_CONF}"
+
+    if [ ! -f "${PB_CONF}" ]; then
       printf "*** Error: options.conf is still missing. Can't continue.\n"
       exit 1
     fi
@@ -9715,7 +9772,9 @@ case "$1" in
   # "set") set_option "$@" ;;                   ## set value in options.conf
   # check_options) check_options ;;             ## validate options.conf
   "fix_ftp_accounts") fix_ftp_accounts "$@" ;;  ## Fix FTP Accounts
-  "rewrite_namedb"|"rewrite_dns") rewrite_namedb ;;                   ## Fix named (DNS) database
+  "fix_startup") update_rcd ;;
+  "rewrite_confs") rewrite_confs ;;             ## Rewrite web server configuration files
+  "rewrite_namedb"|"rewrite_dns") rewrite_namedb ;; ## Fix named (DNS) database
   *) show_main_menu ;;
 esac
 
