@@ -49,7 +49,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20161023
+PB_BUILD_DATE=20161122
 IFS="$(printf '\n\t')"
 LANG=C
 
@@ -2486,7 +2486,8 @@ exim_install() {
   ${SYSRC} -f /etc/periodic.conf daily_status_include_submit_mailq="NO"
   ${SYSRC} -f /etc/periodic.conf daily_clean_hoststat_enable="NO"
 
-  ${SERVICE} exim start
+  ## ${SERVICE} exim start
+  exim_restart
 
   # printf "Updating mq_exim_bin paths in DirectAdmin template + configuration files\n"
   setVal mq_exim_bin ${EXIM_BIN} ${DA_CONF_TEMPLATE}
@@ -2635,9 +2636,9 @@ verify_exim_keep_env(){
     ## CB2: for newer exim.conf files with exim.variables.conf:
     ## CB2: remove variables from the default that don't work with older versions of exim.
     if [ "$(version_cmp ${EXIMV} 4.86.2 'exim ver for keep_environment')" -lt 0 ]; then
-      echo "Exim ${EXIMV} is older than 4.86.2. Removing variable keep_environment.";
-      ${PERL} -pi -e 's/^keep_environment=.*$\n//' /etc/exim.variables.conf.default
-      ${PERL} -pi -e 's/^keep_environment=.*$\n//' /etc/exim.variables.conf
+      echo "Exim ${EXIMV} is older than 4.86.2. Removing variable keep_environment."
+      ${PERL} -pi -e 's/^keep_environment=.*$\n//' "${EXIM_PATH}/exim.variables.conf.default"
+      ${PERL} -pi -e 's/^keep_environment=.*$\n//' "${EXIM_PATH}/exim.variables.conf"
     fi
   else
     ## CB2:
@@ -2651,10 +2652,10 @@ verify_exim_keep_env(){
       echo "Exim ${EXIMV} is at least 4.86.2.";
       COUNT_KEEP_ENV=$(grep -c 'keep_environment' ${EXIM_CONF})
       if [ "${COUNT_KEEP_ENV}" -gt 0 ]; then
-        echo "Uncommenting variable keep_environment in /etc/exim.conf.";
+        printf "Uncommenting variable keep_environment in %s.\n" ${EXIM_CONF}
         ${PERL} -pi -e 's/^#keep_environment=/keep_environment=/' ${EXIM_CONF}
       else
-        echo "Adding variable keep_environment to /etc/exim.conf.";
+        printf "Adding variable keep_environment to %s.\n" ${EXIM_CONF}
         ${PERL} -pi -e 's/^perl_startup/keep_environment=PWD\nperl_startup/' ${EXIM_CONF}
       fi
     fi
