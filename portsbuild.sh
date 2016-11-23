@@ -2575,8 +2575,8 @@ exim_restart() {
 ################################################################################
 
 exim_upgrade() {
-  printf "Upgradinng Exim\n"
-  pkgu ${PORT_EXIM}
+  printf "*** Notice: Upgrading Exim\n"
+  pkgu "${PORT_EXIM}"
   exim_restart
   return
 }
@@ -2587,7 +2587,7 @@ exim_upgrade() {
 
 exim_uninstall() {
 
-  printf "Uninstalling Exim\n"
+  printf "*** Notice: Uninstalling Exim\n"
 
   ${SERVICE} exim stop
 
@@ -2615,7 +2615,6 @@ exim_uninstall() {
 
 exim_version() {
   ${EXIM_BIN} -bV | grep -m1 'built' | head -n1 | awk '{ print $3 }'
-
   return
 }
 
@@ -2706,12 +2705,12 @@ exim_conf() {
 
   local EXIMV EXIM_CONF_MERGED EXIM_CONF_DEFAULT EXIM_CONF_CUSTOM
 
-  if [ "${OPT_EXIMCONF}" != "YES" ]; then
-    printf "*** Error: You cannot update Exim configuration files because you do not have it set in options.conf.\n"
+  if [ "${OPT_EXIM_CONF_UPDATE}" != "YES" ]; then
+    printf "*** Error: You cannot update Exim configuration files because you do not have EXIM_CONF_UPDATE set in options.conf.\n"
     exit 1
   fi
 
-  ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.conf.cb20" http://${DOWNLOADSERVER_OPT}/services/SpamBlocker/${EXIM_CONF_VER}/exim.conf-SpamBlockerTechnology-v${EXIM_CONF_VER}.txt
+  ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.conf.cb20" http://${PB_MIRROR}/services/SpamBlocker/${EXIM_CONF_VER}/exim.conf-SpamBlockerTechnology-v${EXIM_CONF_VER}.txt
 
   ## CB2: Don't overwrite exim.conf if wget failed (empty exim.conf file)
   if [ -s "${EXIM_PATH}/exim.conf.cb20" ]; then
@@ -2726,8 +2725,8 @@ exim_conf() {
 
   ## CB2: Download additional files for exim.conf
   if [ "${OPT_EXIMCONF_RELEASE}" != "2.1" ] && [ "${OPT_EXIMCONF_RELEASE}" != "4.2" ]; then
-    ${WGET} ${WGET_CONNECT_OPTIONS} -O ${EXIM_PATH}/exim.strings.conf.cb20 http://${DOWNLOADSERVER_OPT}/services/SpamBlocker/${EXIM_CONF_VER}/exim.strings.conf
-    ${WGET} ${WGET_CONNECT_OPTIONS} -O ${EXIM_PATH}/exim.variables.conf.cb20 http://${DOWNLOADSERVER_OPT}/services/SpamBlocker/${EXIM_CONF_VER}/exim.variables.conf.default
+    ${WGET} ${WGET_CONNECT_OPTIONS} -O ${EXIM_PATH}/exim.strings.conf.cb20 http://${PB_MIRROR}/services/SpamBlocker/${EXIM_CONF_VER}/exim.strings.conf
+    ${WGET} ${WGET_CONNECT_OPTIONS} -O ${EXIM_PATH}/exim.variables.conf.cb20 http://${PB_MIRROR}/services/SpamBlocker/${EXIM_CONF_VER}/exim.variables.conf.default
 
     EXIM_CONF_MERGED="${EXIM_PATH}/exim.variables.conf.merged"
     EXIM_CONF_DEFAULT="${EXIM_PATH}/exim.variables.conf.default"
@@ -2903,7 +2902,7 @@ exim_conf() {
   if [ "${OPT_SPAMASSASSIN}" = "YES" ]; then
     ${PERL} -pi -e 's|#.include_if_exists ${EXIM_PATH}/exim.spamassassin.conf|.include_if_exists ${EXIM_PATH}/exim.spamassassin.conf|' ${EXIM_CONF}
     if [ ! -s "${EXIM_PATH}/exim.spamassassin.conf" ]; then
-      ${WGET} ${WGET_CONNECT_OPTIONS} -O $"{EXIM_PATH}/exim.spamassassin.conf" http://${DOWNLOADSERVER_OPT}/services/exim.spamassassin.conf
+      ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.spamassassin.conf" "http://${PB_MIRROR}/services/exim.spamassassin.conf"
     fi
   else
     rm -f "${EXIM_PATH}/exim.spamassassin.conf"
@@ -2915,10 +2914,10 @@ exim_conf() {
     ${PERL} -pi -e 's|#.include_if_exists ${EXIM_PATH}/exim.clamav.conf|.include_if_exists ${EXIM_PATH}/exim.clamav.conf|' ${EXIM_CONF}
     if [ "${OPT_CLAMAV_EXIM}" = "YES" ]; then
       if [ ! -s "${EXIM_PATH}/exim.clamav.load.conf" ]; then
-        ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.clamav.load.conf" http://${DOWNLOADSERVER_OPT}/services/exim.clamav.load.conf
+        ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.clamav.load.conf" http://${PB_MIRROR}/services/exim.clamav.load.conf
       fi
       if [ ! -s "${EXIM_PATH}/exim.clamav.conf" ]; then
-        ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.clamav.conf" http://${DOWNLOADSERVER_OPT}/services/exim.clamav.conf
+        ${WGET} ${WGET_CONNECT_OPTIONS} -O "${EXIM_PATH}/exim.clamav.conf" http://${PB_MIRROR}/services/exim.clamav.conf
       fi
     fi
   else
@@ -5522,6 +5521,7 @@ majordomo_uninstall() {
 fix_ftp_accounts() {
 
   local FTP_SHADOW UUID UGID FTP_COUNT PF
+  local IFS=' '
 
   shift
 
@@ -5534,7 +5534,7 @@ fix_ftp_accounts() {
     exit 1
   fi
 
-  for u in $(ls ${DA_PATH}/data/users); do {
+  for u in ${DA_PATH}/data/users ; do {
     if [ ! -d "${u}" ]; then
       continue
     fi
@@ -8583,6 +8583,10 @@ validate_options() {
     readonly OPT_EXIM="$(uc ${EXIM})"
     setOpt exim "${OPT_EXIM}"
   fi
+  if checkyesno_opt EXIM_CONF_UPDATE; then
+    readonly OPT_EXIM_CONF_UPDATE="$(uc ${EXIM_CONF_UPDATE})"
+    setOpt exim_conf "${OPT_EXIM_CONF_UPDATE}"
+  fi
   if checkyesno_opt HTSCANNER; then
     readonly OPT_HTSCANNER="$(uc ${HTSCANNER})"
     setOpt htscanner "${OPT_HTSCANNER}"
@@ -9047,7 +9051,7 @@ get_versions() {
   fi
 
   ## Exim.conf
-  if [ "${OPT_EXIMCONF}" = "YES" ] && [ "${EXIM_CONF_VER}" != "0" ]; then
+  if [ "${OPT_EXIM_CONF_UPDATE}" = "YES" ] && [ "${EXIM_CONF_VER}" != "0" ]; then
     EXIMCONFV=$(exim_conf_version)
     if [ "${VERSIONS}" = "1" ]; then
       printf "Latest version of exim.conf: %s\n" "${EXIM_CONF_VER}"
@@ -9611,7 +9615,6 @@ show_install_menu() {
 ################################################################################
 
 show_logo() {
-
   printf "\n"
   printf "                ___\\\/_\n"
   printf "               /  /\/\\\  \n"
@@ -9628,7 +9631,6 @@ show_logo() {
 ################################################################################
 
 show_version() {
-
   printf "  PortsBuild version %s build %s\n" "${PB_VER}" "${PB_BUILD_DATE}"
   return
 }
@@ -9638,7 +9640,6 @@ show_version() {
 ################################################################################
 
 show_versions() {
-
   printf "\n"
   printf "List of installed packages and their versions:\n\n"
   ## alternative way: awk '{printf("%15s %10s\n", $1, $2)}'
@@ -9663,7 +9664,6 @@ show_versions() {
 ################################################################################
 
 show_outdated() {
-
   printf "\n"
   printf "List of installed packages that are out of date:\n\n"
   ( printf "Package Outdated\n" ; \
@@ -9687,7 +9687,6 @@ show_outdated() {
 ################################################################################
 
 show_audit() {
-
   printf "\n"
   printf "List of installed packages that are vulnerable:\n\n"
   ${PKG} audit
@@ -9701,7 +9700,6 @@ show_audit() {
 ################################################################################
 
 show_about() {
-
   show_logo
   show_version
   printf "\n  Visit portsbuild.org or github.com/portsbuild/portsbuild\n\n"
@@ -9720,7 +9718,6 @@ show_main_menu() { show_logo; show_version; show_menu; }
 ################################################################################
 
 show_menu() {
-
   printf "\n"
   printf "  Usage:\n"
   printf "\t%s command [options] [arguments]\n\n" "$0"
@@ -9800,6 +9797,7 @@ case "$1" in
   "fix_startup") update_rcd ;;
   "rewrite_confs") rewrite_confs ;;             ## Rewrite web server configuration files
   "rewrite_namedb"|"rewrite_dns") rewrite_namedb ;; ## Fix named (DNS) database
+  "exim_conf"|"eximconf") exim_conf ;;          ## Generate exim.conf
   *) show_main_menu ;;
 esac
 
