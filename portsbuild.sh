@@ -2407,7 +2407,9 @@ exim_install() {
     whitelist_hosts_ip \
     whitelist_senders \
     skip_av_domains \
-    skip_rbl_domains"
+    skip_rbl_domains \
+    blacklist_smtp_usernames \
+    blacklist_script_usernames"
 
   for file in ${virtual_files}; do
     if [ ! -e "${VIRTUAL_PATH}/${file}" ]; then
@@ -2836,7 +2838,7 @@ exim_conf() {
   fi
 
   ## Verify Exim File (from CB2: doEnsureEximFile())
-  verify_file() {
+  exim_verify_file() {
     if [ "$1" != "" ]; then
       if [ ! -e "${1}" ]; then
         printf "Creating file: %s\n" "${1}"
@@ -2847,24 +2849,27 @@ exim_conf() {
     fi
   }
 
-  verify_file /etc/virtual/bad_sender_hosts
-  verify_file /etc/virtual/bad_sender_hosts_ip
-  verify_file /etc/virtual/blacklist_domains
-  verify_file /etc/virtual/blacklist_senders
-  verify_file /etc/virtual/whitelist_domains
-  verify_file /etc/virtual/whitelist_hosts
-  verify_file /etc/virtual/whitelist_hosts_ip
-  verify_file /etc/virtual/whitelist_senders
-  verify_file /etc/virtual/use_rbl_domains
-  verify_file /etc/virtual/skip_av_domains
-  verify_file /etc/virtual/skip_rbl_domains
+  exim_verify_file /etc/virtual/bad_sender_hosts
+  exim_verify_file /etc/virtual/bad_sender_hosts_ip
+  exim_verify_file /etc/virtual/blacklist_domains
+  exim_verify_file /etc/virtual/blacklist_senders
+  exim_verify_file /etc/virtual/whitelist_domains
+  exim_verify_file /etc/virtual/whitelist_hosts
+  exim_verify_file /etc/virtual/whitelist_hosts_ip
+  exim_verify_file /etc/virtual/whitelist_senders
+  exim_verify_file /etc/virtual/use_rbl_domains
+  exim_verify_file /etc/virtual/skip_av_domains
+  exim_verify_file /etc/virtual/skip_rbl_domains
+  exim_verify_file /etc/virtual/blacklist_smtp_usernames
+  exim_verify_file /etc/virtual/blacklist_script_usernames
 
-  if [ "${OPT_DOVECOT}" = "YES" ] && [ "${OPT_EXIMCONF_RELEASE}" = "2.1" ]; then
-    cd ${PB_PATH} || exit
-    if [ -e exim.conf.dovecot.patch ]; then
-      ${PATCH} -d/ -p0 < exim.conf.dovecot.patch
-    fi
-  fi
+  ## PB: Old version of exim.conf
+  # if [ "${OPT_DOVECOT}" = "YES" ] && [ "${OPT_EXIMCONF_RELEASE}" = "2.1" ]; then
+  #   cd ${PB_PATH} || exit
+  #   if [ -e exim.conf.dovecot.patch ]; then
+  #     ${PATCH} -d/ -p0 < exim.conf.dovecot.patch
+  #   fi
+  # fi
 
   if [ "${OPT_PIGEONHOLE}" = "YES" ]; then
     cd ${PB_PATH} || exit
@@ -7662,19 +7667,19 @@ rewrite_vhosts() {
   printf '' > "${APACHE_EXTRAS}/directadmin-vhosts.conf"
 
   if [ "${OPT_WEBSERVER}" = "nginx" ]; then
-    for i in $(ls ${DA_PATH}/data/users/*/nginx.conf); do
+    for i in ${DA_PATH}/data/users/*/nginx.conf ; do
       echo "include $i;" >> "${APACHE_EXTRAS}/directadmin-vhosts.conf"
     done
   elif [ "${OPT_WEBSERVER}" = "apache" ]; then
-    for i in $(ls ${DA_PATH}/data/users/*/httpd.conf); do
+    for i in ${DA_PATH}/data/users/*/httpd.conf ; do
       echo "Include $i" >> "${APACHE_EXTRAS}/directadmin-vhosts.conf"
     done
   elif [ "${OPT_WEBSERVER}" = "nginx_apache" ]; then
     printf '' > "${NGINX_PATH}/directadmin-vhosts.conf"
-    for i in $(ls ${DA_PATH}/data/users/*/nginx.conf); do
+    for i in ${DA_PATH}/data/users/*/nginx.conf ; do
       echo "include $i;" >> "${NGINX_PATH}/directadmin-vhosts.conf"
     done
-    for i in $(ls ${DA_PATH}/data/users/*/httpd.conf); do
+    for i in ${DA_PATH}/data/users/*/httpd.conf ; do
       echo "Include $i" >> "${APACHE_EXTRAS}/directadmin-vhosts.conf"
     done
   else
