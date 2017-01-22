@@ -3196,7 +3196,7 @@ easyspamfighter_install() {
       printf "Easy Spam Fighter is now enabled.\n"
     else
       printf "*** Error: Unable to find esf.tar.gz for extraction. Aborting.\n"
-      exit 1
+      # exit 1
     fi
   else
     printf "*** Error: Exim is not installed. Cannot continue as the binary was not found.\n"
