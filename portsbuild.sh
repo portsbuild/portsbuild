@@ -49,7 +49,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.1"
-PB_BUILD_DATE=20161122
+PB_BUILD_DATE=20170104
 IFS="$(printf '\n\t')"
 LANG=C
 
@@ -59,9 +59,9 @@ if [ "$(/usr/bin/id -u)" != "0" ]; then
 fi
 
 readonly OS=$(uname)
-readonly OS_VER=$(uname -r | cut -d- -f1) # 9.3, 10.1, 10.2, 10.3
+readonly OS_VER=$(uname -r | cut -d- -f1) # 9.3, 10.1, 10.2, 10.3, 11.0
 readonly OS_B64=$(uname -m | grep -c 64)  # 0, 1
-readonly OS_MAJ=$(uname -r | cut -d. -f1) # 9, 10
+readonly OS_MAJ=$(uname -r | cut -d. -f1) # 9, 10, 11
 readonly OS_HOST=$(hostname)
 
 if [ "${OS}" = "FreeBSD" ]; then
