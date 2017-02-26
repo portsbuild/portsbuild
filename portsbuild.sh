@@ -21,7 +21,7 @@
 #  Requirements:
 #  - DirectAdmin license
 #  - FreeBSD 9.3 or 10.3+ (amd64 only)
-#  - chmod +x portsbuild.sh
+#  - chmod 700 portsbuild.sh
 #  - Patience.
 #
 #  New Installations:
@@ -106,6 +106,8 @@ readonly PB_PATCHES="${PB_PATH}/patches"
 readonly PB_SETUP=/root/portsbuild.txt
 
 ## PortsBuild Remote File Repository
+readonly PB_GITHUB="https://github.com/portsbuild/portsbuild"
+readonly PB_GITRAW="https://raw.githubusercontent.com/portsbuild/portsbuild/master"
 readonly PB_MIRROR="http://s3.amazonaws.com/portsbuild/files"
 
 ################################################################################
@@ -218,7 +220,7 @@ readonly NGINX_SSL_CA="${NGINX_PATH}/ssl/server.ca"
 ## Needed?
 # readonly NGINX_VHOSTS=${NGINX_PATH}/vhosts
 # NGINX_VHOSTS_CONF=${NGINX_PATH}/directadmin-vhosts.conf
-# NGINX_LOGS=/var/log/nginx/domains
+# NGINX_LOGS=${LOGS}/nginx/domains
 # NGINX_IPS_CONF=${NGINX_PATH}/directadmin-ips.conf
 
 readonly WWW_DIR=/usr/local/www         ## Ports uses "${WWW_DIR}"
