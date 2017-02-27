@@ -443,16 +443,15 @@ readonly PORT_FASTCGI='www/mod_fastcgi'
 readonly PORT_FCGID='www/mod_fcgid'
 
 ## Ports: PHP
-readonly PORT_PHP55='lang/php55'
-readonly PORT_PHP55_EXT='lang/php55-extensions'
 readonly PORT_PHP56='lang/php56'
 readonly PORT_PHP56_EXT='lang/php56-extensions'
 readonly PORT_PHP70='lang/php70'
 readonly PORT_PHP70_EXT='lang/php70-extensions'
-readonly PORT_MOD_PHP55='www/mod_php55'
+readonly PORT_PHP71='lang/php71'
+readonly PORT_PHP71_EXT='lang/php71-extensions'
 readonly PORT_MOD_PHP56='www/mod_php56'
 readonly PORT_MOD_PHP70='www/mod_php70'
-readonly PORT_MOD_PHP70='www/mod_php71'
+readonly PORT_MOD_PHP71='www/mod_php71'
 readonly PORT_SUPHP='www/suphp'
 
 ## PHP 5.6 Extensions
@@ -574,18 +573,9 @@ NGINX_MAKE_SET=""
 NGINX_MAKE_UNSET=""
 
 ## Prefixes for multi-PHP installations:
-readonly PHP55_PREFIX='/usr/local/php55'
 readonly PHP56_PREFIX='/usr/local/php56'
 readonly PHP70_PREFIX='/usr/local/php70'
 readonly PHP71_PREFIX='/usr/local/php71'
-
-# PHP55_MAKE_SET="" # MAILHEAD
-# PHP55_MAKE_UNSET=""
-# PHP55_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP \
-# GD GETTEXT HASH ICONV IMAP JSON MBSTRING MCRYPT MYSQL MYSQLI OPCACHE OPENSSL PDF \
-# PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP \
-# SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
-# PHP55_EXT_MAKE_UNSET=""
 
 PHP56_MAKE_SET="" # MAILHEAD
 PHP56_MAKE_UNSET=""
@@ -611,8 +601,6 @@ PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOA
 SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
 PHP71_EXT_MAKE_UNSET=""
 
-MOD_PHP55_MAKE_SET="" # MAILHEAD  AP2FILTER
-MOD_PHP55_MAKE_UNSET=""
 MOD_PHP56_MAKE_SET="" # MAILHEAD
 MOD_PHP56_MAKE_UNSET=""
 MOD_PHP70_MAKE_SET=""
@@ -4228,32 +4216,6 @@ php_install() {
 
   ## PHP Version Selector
   case ${OPT_PHP_VER} in
-    "55")
-        PORT_PHP="${PORT_PHP55}"
-        PORT_PHP_EXT="${PORT_PHP55_EXT}"
-        PORT_MOD_PHP="${PORT_MOD_PHP55}"
-        PHP_MAKE_SET="${PHP55_MAKE_SET}"
-        PHP_MAKE_UNSET="${PHP55_MAKE_UNSET}"
-        PHP_EXT_MAKE_SET="${PHP55_EXT_MAKE_SET}"
-        PHP_EXT_MAKE_UNSET="${PHP55_EXT_MAKE_UNSET}"
-        PHP_MOD_MAKE_SET="${MOD_PHP55_MAKE_SET}"
-        PHP_MOD_MAKE_UNSET="${MOD_PHP55_MAKE_UNSET}"
-        PHP_EXT_LIST="math/php55-bcmath archivers/php55-bz2 misc/php55-calendar \
-        textproc/php55-ctype ftp/php55-curl textproc/php55-dom graphics/php55-exif \
-        sysutils/php55-fileinfo security/php55-filter ftp/php55-ftp graphics/php55-gd \
-        devel/php55-gettext security/php55-hash converters/php55-iconv mail/php55-imap \
-        devel/php55-json converters/php55-mbstring security/php55-mcrypt \
-        databases/php55-mysql databases/php55-mysqli databases/php55-odbc \
-        www/php55-opcache security/php55-openssl databases/php55-pdo \
-        databases/php55-pdo_mysql databases/php55-pdo_sqlite archivers/php55-phar \
-        sysutils/php55-posix textproc/php55-pspell devel/php55-readline \
-        converters/php55-recode www/php55-session textproc/php55-simplexml \
-        net/php55-soap net/php55-sockets \
-        databases/php55-sqlite3 www/php55-tidy devel/php55-tokenizer \
-        textproc/php55-wddx textproc/php55-xml textproc/php55-xmlreader \
-        net/php55-xmlrpc textproc/php55-xmlwriter textproc/php55-xsl \
-        archivers/php55-zip archivers/php55-zlib"
-        ;; # net-mgmt/php55-snmp
     "56")
         PORT_PHP="${PORT_PHP56}"
         PORT_PHP_EXT="${PORT_PHP56_EXT}"
@@ -4291,20 +4253,47 @@ php_install() {
         PHP_EXT_MAKE_UNSET="${PHP70_EXT_MAKE_UNSET}"
         PHP_MOD_MAKE_SET="${MOD_PHP70_MAKE_SET}"
         PHP_MOD_MAKE_UNSET="${MOD_PHP70_MAKE_UNSET}"
-        PHP_EXT_LIST="math/php70-bcmath archivers/php70-bz2 misc/php70-calendar \
-                textproc/php70-ctype ftp/php70-curl textproc/php70-dom graphics/php70-exif \
-                sysutils/php70-fileinfo security/php70-filter ftp/php70-ftp graphics/php70-gd \
-                devel/php70-gettext security/php70-hash converters/php70-iconv mail/php70-imap \
-                devel/php70-json converters/php70-mbstring security/php70-mcrypt \
-                databases/php70-mysqli databases/php70-odbc www/php70-opcache \
-                security/php70-openssl databases/php70-pdo databases/php70-pdo_mysql \
-                databases/php70-pdo_sqlite archivers/php70-phar sysutils/php70-posix \
-                textproc/php70-pspell devel/php70-readline converters/php70-recode \
-                www/php70-session textproc/php70-simplexml \
-                net/php70-soap net/php70-sockets databases/php70-sqlite3 www/php70-tidy \
-                devel/php70-tokenizer textproc/php70-wddx textproc/php70-xml \
-                textproc/php70-xmlreader net/php70-xmlrpc textproc/php70-xmlwriter \
-                textproc/php70-xsl archivers/php70-zip archivers/php70-zlib"
+        PHP_EXT_LIST="${PHP70_EXT_LIST}"
+        # PHP_EXT_LIST="math/php70-bcmath archivers/php70-bz2 misc/php70-calendar \
+        #         textproc/php70-ctype ftp/php70-curl textproc/php70-dom graphics/php70-exif \
+        #         sysutils/php70-fileinfo security/php70-filter ftp/php70-ftp graphics/php70-gd \
+        #         devel/php70-gettext security/php70-hash converters/php70-iconv mail/php70-imap \
+        #         devel/php70-json converters/php70-mbstring security/php70-mcrypt \
+        #         databases/php70-mysqli databases/php70-odbc www/php70-opcache \
+        #         security/php70-openssl databases/php70-pdo databases/php70-pdo_mysql \
+        #         databases/php70-pdo_sqlite archivers/php70-phar sysutils/php70-posix \
+        #         textproc/php70-pspell devel/php70-readline converters/php70-recode \
+        #         www/php70-session textproc/php70-simplexml \
+        #         net/php70-soap net/php70-sockets databases/php70-sqlite3 www/php70-tidy \
+        #         devel/php70-tokenizer textproc/php70-wddx textproc/php70-xml \
+        #         textproc/php70-xmlreader net/php70-xmlrpc textproc/php70-xmlwriter \
+        #         textproc/php70-xsl archivers/php70-zip archivers/php70-zlib"
+        ;; # net-mgmt/php70-snmp
+      "71")
+        PORT_PHP="${PORT_PHP71}"
+        PORT_PHP_EXT="${PORT_PHP71_EXT}"
+        PORT_MOD_PHP="${PORT_MOD_PHP71}"
+        PHP_MAKE_SET="${PHP71_MAKE_SET}"
+        PHP_MAKE_UNSET="${PHP71_MAKE_UNSET}"
+        PHP_EXT_MAKE_SET="${PHP71_EXT_MAKE_SET}"
+        PHP_EXT_MAKE_UNSET="${PHP71_EXT_MAKE_UNSET}"
+        PHP_MOD_MAKE_SET="${MOD_PHP71_MAKE_SET}"
+        PHP_MOD_MAKE_UNSET="${MOD_PHP71_MAKE_UNSET}"
+        PHP_EXT_LIST="${PHP71_EXT_LIST}"
+        # PHP_EXT_LIST="math/php70-bcmath archivers/php70-bz2 misc/php70-calendar \
+        #         textproc/php70-ctype ftp/php70-curl textproc/php70-dom graphics/php70-exif \
+        #         sysutils/php70-fileinfo security/php70-filter ftp/php70-ftp graphics/php70-gd \
+        #         devel/php70-gettext security/php70-hash converters/php70-iconv mail/php70-imap \
+        #         devel/php70-json converters/php70-mbstring security/php70-mcrypt \
+        #         databases/php70-mysqli databases/php70-odbc www/php70-opcache \
+        #         security/php70-openssl databases/php70-pdo databases/php70-pdo_mysql \
+        #         databases/php70-pdo_sqlite archivers/php70-phar sysutils/php70-posix \
+        #         textproc/php70-pspell devel/php70-readline converters/php70-recode \
+        #         www/php70-session textproc/php70-simplexml \
+        #         net/php70-soap net/php70-sockets databases/php70-sqlite3 www/php70-tidy \
+        #         devel/php70-tokenizer textproc/php70-wddx textproc/php70-xml \
+        #         textproc/php70-xmlreader net/php70-xmlrpc textproc/php70-xmlwriter \
+        #         textproc/php70-xsl archivers/php70-zip archivers/php70-zlib"
         ;; # net-mgmt/php70-snmp
     *) printf "*** Error: php_install(): Wrong PHP version selected. (Script error)\n"; exit ;;
   esac
@@ -6844,7 +6833,7 @@ apache_host_conf() {
 
       ## PHP: FPM:
       if [ "${OPT_PHP_MODE}" = "php-fpm" ]; then
-        printf "  <FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)\$\">\n"
+        printf "  <FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php71|php6|phtml|phps)\$\">\n"
         ## PB: Single PHP installation for now:
         ## echo "    AddHandler \"proxy:unix:/usr/local/php${OPT_PHP_VER}/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php${OPT_PHP_VER} .phtml"
         printf "    AddHandler \"proxy:unix:/var/run/php/sockets/webapps.sock|fcgi://localhost\" .inc .php .php5 .php%s .phtml\n" "${OPT_PHP_VER}"
@@ -6892,7 +6881,7 @@ apache_host_conf() {
         if [ "${SUEXEC_PER_DIR}" -gt 0 ]; then
           printf "  SuexecUserGroup %s %s\n" "${WEBAPPS_USER}" "${WEBAPPS_GROUP}"
         fi
-        printf "    <FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)\$\">\n" "${OPT_PHP_VER}"
+        printf "    <FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php71|php6|phtml|phps)\$\">\n" "${OPT_PHP_VER}"
         printf "      Options +ExecCGI\n"
         printf "      AddHandler fcgid-script .php\n"
         printf "    </FilesMatch>\n"
@@ -7311,11 +7300,6 @@ rewrite_confs() {
     # printf "HAVE_PHP1_FCGID: %s\t" "${HAVE_PHP1_FCGID}"
     # printf "HAVE_PHP1_SUPHP: %s\t" "${HAVE_PHP1_SUPHP}"
     printf "***\n"
-    printf "HAVE_FPM55_CGI: %s\t" "${HAVE_FPM55_CGI}"
-    printf "HAVE_SUPHP55_CGI: %s\t" "${HAVE_SUPHP55_CGI}"
-    printf "HAVE_FCGID55: %s\t" "${HAVE_FCGID55}"
-    printf "HAVE_CLI55: %s\t" "${HAVE_CLI55}"
-    printf "***\n"
     printf "HAVE_FPM56_CGI: %s\t" "${HAVE_FPM56_CGI}"
     printf "HAVE_SUPHP56_CGI: %s\t" "${HAVE_SUPHP56_CGI}"
     printf "HAVE_FCGID56: %s\t" "${HAVE_FCGID56}"
@@ -7325,6 +7309,11 @@ rewrite_confs() {
     printf "HAVE_SUPHP70_CGI: %s\t" "${HAVE_SUPHP70_CGI}"
     printf "HAVE_FCGID70: %s\t" "${HAVE_FCGID70}"
     printf "HAVE_CLI70: %s\t\n" "${HAVE_CLI70}"
+    printf "***\n"
+    printf "HAVE_FPM71_CGI: %s\t" "${HAVE_FPM71_CGI}"
+    printf "HAVE_SUPHP71_CGI: %s\t" "${HAVE_SUPHP71_CGI}"
+    printf "HAVE_FCGID71: %s\t" "${HAVE_FCGID71}"
+    printf "HAVE_CLI71: %s\t\n" "${HAVE_CLI71}"
     printf "***\n"
 
     # echo "PHPMODULES: ${PHPMODULES}"
@@ -8165,7 +8154,7 @@ php_conf() {
       ## Generate httpd-php-handlers.conf
       printf "" > "${PHP_HANDLERS_CONF}"
       {
-        printf "<FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)\$\">\n"
+        printf "<FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php71|php6|phtml|phps)\$\">\n"
         if [ "${OPT_PHP_MODE}" = "mod_php" ]; then
           printf "AddHandler application/x-httpd-php .inc .php .php5 .php%s .phtml\n" "${OPT_PHP_VER}"
         fi
@@ -8242,7 +8231,7 @@ php_conf() {
       printf "Writing data to %s\n" "${SUPHP_AP2_CONF}"
       {
         printf "<IfModule mod_suphp.c>\n"
-        printf "  <FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php6|phtml|phps)\$\">\n"
+        printf "  <FilesMatch \"\.(inc|php|php3|php4|php44|php5|php52|php53|php54|php55|php56|php70|php71|php6|phtml|phps)\$\">\n"
         if [ "${OPT_PHP_MODE}" = "suphp" ]; then
           printf "    AddHandler x-httpd-php%s .inc .php .php3 .php4 .php5 .php%s .phtml\n" "${OPT_PHP_VER}" "${OPT_PHP_VER}"
         fi
@@ -9298,7 +9287,7 @@ install_app() {
     "mariadb"|"mysql") sql_install ;;
     "modsecurity"|"modsec"|"mod_security") modsecurity_install ;;
     "nginx") nginx_install ;;
-    "php"|"ftm"|"php55"|"php56"|"php70") php_install ;;
+    "php"|"ftm"|"php55"|"php56"|"php70"|"php71") php_install ;;
     "phpmyadmin"|"pma") phpmyadmin_install ;;
     "proftpd"|"proftp") proftpd_install ;;
     "pureftpd"|"pureftp") pureftpd_install ;;
@@ -9659,7 +9648,7 @@ show_versions() {
   ## alternative way: awk '{printf("%15s %10s\n", $1, $2)}'
   ( printf "Package Version Origin\n" ; \
    pkgq -i -x "%n %v %o" '(www/apache24|www/nginx|security/clamav
-   |lang/php54|lang/php55|lang/php56|lang/php70|ftp/curl|mail/exim
+   |lang/php56|lang/php70|lang/php71|ftp/curl|mail/exim
    |mail/dovecot2|lang/perl5|mail/roundcube|mail/spamassassin
    |ftp/wget|security/suhosin|www/suphp|databases/phpmyadmin
    |databases/mariadb55-server|databases/mariadb55-client
@@ -9682,7 +9671,7 @@ show_outdated() {
   printf "List of installed packages that are out of date:\n\n"
   ( printf "Package Outdated\n" ; \
    ${PKG} version -l '<' -x '(www/apache24|www/nginx|security/clamav
-   |lang/php54|lang/php55|lang/php56|lang/php70|ftp/curl|mail/exim
+   |lang/php56|lang/php70|lang/php71|ftp/curl|mail/exim
    |mail/dovecot2|lang/perl5|mail/roundcube|mail/spamassassin
    |ftp/wget|security/suhosin|www/suphp|databases/phpmyadmin
    |databases/mariadb55-server|databases/mariadb55-client
