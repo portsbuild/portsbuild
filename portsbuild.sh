@@ -20,7 +20,7 @@
 #
 #  Requirements:
 #  - DirectAdmin license
-#  - FreeBSD 9.3 or 10.3+ (amd64 only)
+#  - FreeBSD 9.3, 10.3 or 11.0+ (amd64 only)
 #  - chmod 700 portsbuild.sh
 #  - Patience.
 #
@@ -48,8 +48,8 @@
 
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
-PB_VER="0.1.1"
-PB_BUILD_DATE=20170104
+PB_VER="0.1.2"
+PB_BUILD_DATE=20170226
 IFS="$(printf '\n\t')"
 LANG=C
 
@@ -237,12 +237,12 @@ readonly ROUNDCUBE_CONF="${ROUNDCUBE_PATH}/config/config.inc.php"
 readonly PHP_ETC=/usr/local/etc/php
 readonly PHP_INI=/usr/local/etc/php.ini
 readonly PHP_INI_WEBAPPS="${PHP_ETC}/50-webapps.ini"
-readonly PHP_INI_EXTENSIONS="${PHP_ETC}/extensions.ini"
+# readonly PHP_INI_EXTENSIONS="${PHP_ETC}/extensions.ini"
 readonly PHP_INI_OPCACHE="${PHP_ETC}/opcache.ini"
 readonly PHP_INI_DIRECTADMIN="${PHP_ETC}/10-directadmin.ini"
 readonly PHP_FPM_CONF="/usr/local/etc/php-fpm.conf"
 readonly PHP_SOCKETS_PATH=/var/run/php/sockets
-readonly PHP_RELEASE_SET="5.5 5.6 7.0"
+readonly PHP_RELEASE_SET="5.6 7.0 7.1"
 readonly PHP_SHORTRELEASE_SET="$(echo "${PHP_RELEASE_SET}" | tr -d '.')"
 readonly PHP_FPM_BIN=/usr/local/sbin/php-fpm
 readonly SUPHP_CONF_FILE=/usr/local/etc/suphp.conf
@@ -276,6 +276,8 @@ readonly PMA_PATH="${WWW_DIR}/phpMyAdmin"
 readonly PMA_CONFIG="${PMA_PATH}/config.inc.php"
 
 ## MySQL/MariaDB
+# readonly MYSQL_RELEASE_SET="5.5 5.6 5.7"
+# readonly MARIADB_RELEASE_SET="5.5 10.0 10.1"
 readonly MYSQL_CNF=/usr/local/etc/my.cnf
 readonly MYSQL=/usr/local/bin/mysql
 readonly MYSQLADMIN=/usr/local/bin/mysqladmin
@@ -313,7 +315,11 @@ readonly PUREFTPD_UPLOADSCAN_BIN=/usr/local/bin/pureftpd_uploadscan.sh
 ################################################################################
 
 DA_ADMIN_EMAIL="${DA_ADMIN_USER}@${SERVER_DOMAIN}"
-DA_SERVICES_PKG="services_freebsd91_64.tar.gz"
+
+case "${OS_MAJ}" in
+  9|10) DA_SERVICES_PKG="services_freebsd91_64.tar.gz" ;;
+  11) DA_SERVICES_PKG="services_freebsd110_64.tar.gz" ;;
+esac
 
 : "${MIN_PASS_LENGTH:=12}"          ## Min Random Password Length
 : "${MAX_PASS_LENGTH:=16}"          ## Max Random Password Length
@@ -429,10 +435,13 @@ readonly PORT_BIND='dns/bind99'
 readonly PORT_GCC6='lang/gcc6-aux'
 readonly PORT_NCURSES='devel/ncurses'
 
+readonly PORT_COMPATS="misc/compat4x misc/compat5x misc/compat6x misc/compat7x misc/compat8x"
 readonly PORT_DEPS="${PORT_GMAKE} ${PORT_PERL} ${PORT_WGET} ${PORT_BISON} \
 ${PORT_FLEX} ${PORT_GD} ${PORT_SASL2} ${PORT_CMAKE} ${PORT_PYTHON} \
-${PORT_AUTOCONF} ${PORT_LIBTOOL} ${PORT_LIBARCHIVE} ${PORT_MAILX} ${PORT_CA_ROOT_NSS}"
-readonly PORT_DEPS_100="${PORT_DEPS} ${PORT_BIND}"
+${PORT_AUTOCONF} ${PORT_LIBTOOL} ${PORT_LIBARCHIVE} ${PORT_MAILX} ${PORT_CA_ROOT_NSS} \
+${PORT_COMPATS}"
+readonly PORT_DEPS_100="${PORT_DEPS} ${PORT_BIND} misc/compat9x"
+readonly PORT_DEPS_110="${PORT_DEPS_100} misc/compat10x"
 
 ## Ports: Web Servers
 readonly PORT_APACHE24='www/apache24'
@@ -443,74 +452,12 @@ readonly PORT_FASTCGI='www/mod_fastcgi'
 readonly PORT_FCGID='www/mod_fcgid'
 
 ## Ports: PHP
-readonly PORT_PHP56='lang/php56'
-readonly PORT_PHP56_EXT='lang/php56-extensions'
-readonly PORT_PHP70='lang/php70'
-readonly PORT_PHP70_EXT='lang/php70-extensions'
-readonly PORT_PHP71='lang/php71'
-readonly PORT_PHP71_EXT='lang/php71-extensions'
-readonly PORT_MOD_PHP56='www/mod_php56'
-readonly PORT_MOD_PHP70='www/mod_php70'
-readonly PORT_MOD_PHP71='www/mod_php71'
 readonly PORT_SUPHP='www/suphp'
-
-## PHP 5.6 Extensions
-readonly PORT_ARCHIVERS_PHP56_BZ2='archivers/php56-bz2'
-readonly PORT_ARCHIVERS_PHP56_PHAR='archivers/php56-phar'
-readonly PORT_ARCHIVERS_PHP56_ZIP='archivers/php56-zip'
-readonly PORT_ARCHIVERS_PHP56_ZLIB='archivers/php56-zlib'
-readonly PORT_CONVERTERS_PHP56_ICONV='converters/php56-iconv'
-readonly PORT_CONVERTERS_PHP56_MBSTRING='converters/php56-mbstring'
-readonly PORT_CONVERTERS_PHP56_RECODE='converters/php56-recode'
-readonly PORT_DATABASES_PHP56_MYSQL='databases/php56-mysql'
-readonly PORT_DATABASES_PHP56_MYSQLI='databases/php56-mysqli'
-readonly PORT_DATABASES_PHP56_ODBC='databases/php56-odbc'
-readonly PORT_DATABASES_PHP56_PDO='databases/php56-pdo'
-readonly PORT_DATABASES_PHP56_PDO_MYSQL='databases/php56-pdo_mysql'
-readonly PORT_DATABASES_PHP56_PDO_SQLITE='databases/php56-pdo_sqlite'
-readonly PORT_DATABASES_PHP56_SQLITE3='databases/php56-sqlite3'
-readonly PORT_DEVEL_PHP56_GETTEXT='devel/php56-gettext'
-readonly PORT_DEVEL_PHP56_JSON='devel/php56-json'
-readonly PORT_DEVEL_PHP56_READLINE='devel/php56-readline'
-readonly PORT_DEVEL_PHP56_TOKENIZER='devel/php56-tokenizer'
-readonly PORT_FTP_PHP56_CURL='ftp/php56-curl'
-readonly PORT_FTP_PHP56_FTP='ftp/php56-ftp'
-readonly PORT_GRAPHICS_PHP56_EXIF='graphics/php56-exif'
-readonly PORT_GRAPHICS_PHP56_GD='graphics/php56-gd'
-readonly PORT_MAIL_PHP56_IMAP='mail/php56-imap'
-readonly PORT_MATH_PHP56_BCMATH='math/php56-bcmath'
-readonly PORT_MISC_PHP56_CALENDAR='misc/php56-calendar'
-readonly PORT_NET_MGMT_PHP56_SNMP='net-mgmt/php56-snmp'
-readonly PORT_NET_PHP56_SOAP='net/php56-soap'
-readonly PORT_NET_PHP56_SOCKETS='net/php56-sockets'
-readonly PORT_NET_PHP56_XMLRPC='net/php56-xmlrpc'
-readonly PORT_SECURITY_PHP56_FILTER='security/php56-filter'
-readonly PORT_SECURITY_PHP56_HASH='security/php56-hash'
-readonly PORT_SECURITY_PHP56_MCRYPT='security/php56-mcrypt'
-readonly PORT_SECURITY_PHP56_OPENSSL='security/php56-openssl'
-readonly PORT_SYSUTILS_PHP56_FILEINFO='sysutils/php56-fileinfo'
-readonly PORT_SYSUTILS_PHP56_POSIX='sysutils/php56-posix'
-readonly PORT_TEXTPROC_PHP56_CTYPE='textproc/php56-ctype'
-readonly PORT_TEXTPROC_PHP56_DOM='textproc/php56-dom'
-readonly PORT_TEXTPROC_PHP56_PSPELL='textproc/php56-pspell'
-readonly PORT_TEXTPROC_PHP56_SIMPLEXML='textproc/php56-simplexml'
-readonly PORT_TEXTPROC_PHP56_WDDX='textproc/php56-wddx'
-readonly PORT_TEXTPROC_PHP56_XML='textproc/php56-xml'
-readonly PORT_TEXTPROC_PHP56_XMLREADER='textproc/php56-xmlreader'
-readonly PORT_TEXTPROC_PHP56_XMLWRITER='textproc/php56-xmlwriter'
-readonly PORT_TEXTPROC_PHP56_XSL='textproc/php56-xsl'
-readonly PORT_WWW_PHP56_OPCACHE='www/php56-opcache'
-readonly PORT_WWW_PHP56_SESSION='www/php56-session'
-readonly PORT_WWW_PHP56_TIDY='www/php56-tidy'
-
-readonly PHP56_EXT_LIST="${PORT_ARCHIVERS_PHP56_BZ2} ${PORT_ARCHIVERS_PHP56_PHAR} ${PORT_ARCHIVERS_PHP56_ZIP} ${PORT_ARCHIVERS_PHP56_ZLIB} ${PORT_CONVERTERS_PHP56_ICONV} ${PORT_CONVERTERS_PHP56_MBSTRING} ${PORT_CONVERTERS_PHP56_RECODE} ${PORT_DATABASES_PHP56_MYSQL} ${PORT_DATABASES_PHP56_MYSQLI} ${PORT_DATABASES_PHP56_ODBC} ${PORT_DATABASES_PHP56_PDO} ${PORT_DATABASES_PHP56_PDO_MYSQL} ${PORT_DATABASES_PHP56_PDO_SQLITE} ${PORT_DATABASES_PHP56_SQLITE3} ${PORT_DEVEL_PHP56_GETTEXT} ${PORT_DEVEL_PHP56_JSON} ${PORT_DEVEL_PHP56_READLINE} ${PORT_DEVEL_PHP56_TOKENIZER} ${PORT_FTP_PHP56_CURL} ${PORT_FTP_PHP56_FTP} ${PORT_GRAPHICS_PHP56_EXIF} ${PORT_GRAPHICS_PHP56_GD} ${PORT_MAIL_PHP56_IMAP} ${PORT_MATH_PHP56_BCMATH} ${PORT_MISC_PHP56_CALENDAR} ${PORT_NET_MGMT_PHP56_SNMP} ${PORT_NET_PHP56_SOAP} ${PORT_NET_PHP56_SOCKETS} ${PORT_NET_PHP56_XMLRPC} ${PORT_SECURITY_PHP56_FILTER} ${PORT_SECURITY_PHP56_HASH} ${PORT_SECURITY_PHP56_MCRYPT} ${PORT_SECURITY_PHP56_OPENSSL} ${PORT_SYSUTILS_PHP56_FILEINFO} ${PORT_SYSUTILS_PHP56_POSIX} ${PORT_TEXTPROC_PHP56_CTYPE} ${PORT_TEXTPROC_PHP56_DOM} ${PORT_TEXTPROC_PHP56_PSPELL} ${PORT_TEXTPROC_PHP56_SIMPLEXML} ${PORT_TEXTPROC_PHP56_WDDX} ${PORT_TEXTPROC_PHP56_XML} ${PORT_TEXTPROC_PHP56_XMLREADER} ${PORT_TEXTPROC_PHP56_XMLWRITER} ${PORT_TEXTPROC_PHP56_XSL} ${PORT_WWW_PHP56_OPCACHE} ${PORT_WWW_PHP56_SESSION} ${PORT_WWW_PHP56_TIDY}"
-
 readonly PORT_PHPMYADMIN='databases/phpmyadmin'
 readonly PORT_IONCUBE='devel/ioncube'
 readonly PORT_SUHOSIN='security/suhosin'
 readonly PORT_HTSCANNER='devel/pecl-htscanner'
 readonly PORT_MOD_SECURITY='www/mod_security'
-# readonly PORT_PCRE='devel/pcre'
 
 ## Ports: Mail & Related Services
 readonly PORT_EXIM='mail/exim'
@@ -549,6 +496,7 @@ readonly PORT_MARIADB101_CLIENT='databases/mariadb101-client'
 readonly PORT_AWSTATS='www/awstats'
 readonly PORT_WEBALIZER='www/webalizer'
 
+# readonly PORT_PCRE='devel/pcre'
 # to remove: readonly PORT_LETSENCRYPT='security/letsencrypt.sh'
 
 ################################################################################
@@ -573,40 +521,39 @@ NGINX_MAKE_SET=""
 NGINX_MAKE_UNSET=""
 
 ## Prefixes for multi-PHP installations:
-readonly PHP56_PREFIX='/usr/local/php56'
-readonly PHP70_PREFIX='/usr/local/php70'
-readonly PHP71_PREFIX='/usr/local/php71'
+# readonly PHP56_PREFIX='/usr/local/php56'
+# readonly PHP70_PREFIX='/usr/local/php70'
+# readonly PHP71_PREFIX='/usr/local/php71'
 
-PHP56_MAKE_SET="" # MAILHEAD
-PHP56_MAKE_UNSET=""
-PHP56_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP \
+DEFAULT_PHP_MAKE_SET=""
+DEFAULT_PHP_MAKE_UNSET=""
+DEFAULT_PHP_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP \
 GD GETTEXT HASH ICONV IMAP JSON MBSTRING MCRYPT MYSQL MYSQLI OPCACHE OPENSSL PDF \
 PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP \
 SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
-PHP56_EXT_MAKE_UNSET=""
+DEFAULT_PHP_EXT_MAKE_UNSET=""
 
-PHP70_MAKE_SET=""
-PHP70_MAKE_UNSET=""
-PHP70_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP \
-GD GETTEXT HASH ICONV IMAP INTL JSON MBSTRING MCRYPT MYSQLI OPCACHE OPENSSL PDF \
-PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP \
-SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
-PHP70_EXT_MAKE_UNSET=""
+PHP56_MAKE_SET="${DEFAULT_PHP_MAKE_SET}" # MAILHEAD
+PHP56_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
+PHP56_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
+PHP56_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
 
-PHP71_MAKE_SET=""
-PHP71_MAKE_UNSET=""
-PHP71_EXT_MAKE_SET="BCMATH BZ2 CALENDAR CTYPE CURL DOM EXIF FILEINFO FILTER FTP \
-GD GETTEXT HASH ICONV IMAP INTL JSON MBSTRING MCRYPT MYSQLI OPCACHE OPENSSL PDF \
-PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOAP \
-SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
-PHP71_EXT_MAKE_UNSET=""
+PHP70_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
+PHP70_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
+PHP70_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
+PHP70_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
 
-MOD_PHP56_MAKE_SET="" # MAILHEAD
-MOD_PHP56_MAKE_UNSET=""
-MOD_PHP70_MAKE_SET=""
-MOD_PHP70_MAKE_UNSET=""
-MOD_PHP71_MAKE_SET=""
-MOD_PHP71_MAKE_UNSET=""
+PHP71_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
+PHP71_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
+PHP71_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
+PHP71_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
+
+PHP56_MOD_MAKE_SET="" # MAILHEAD
+PHP56_MOD_MAKE_UNSET=""
+PHP70_MOD_MAKE_SET=""
+PHP70_MOD_MAKE_UNSET=""
+PHP71_MOD_MAKE_SET=""
+PHP71_MOD_MAKE_UNSET=""
 
 ROUNDCUBE_MAKE_SET="" # SSL
 ROUNDCUBE_MAKE_UNSET=""
@@ -978,7 +925,7 @@ ports_update() {
 ## pkg shortcuts
 ################################################################################
 
-pkgi() { ${PKG} install -y "$@"; }
+pkgi() { ${PKG} -d install -f -y "$@"; }
 pkgu() { ${PKG} upgrade -f -y "$@"; }
 pkgd() { ${PKG} delete -f "$@"; }
 pkgq() { ${PKG} query "$@"; }
@@ -1019,12 +966,12 @@ synth_status() { ${SYNTH} status; }
 ################################################################################
 
 ## Clean stale ports (deprecate soon)
-clean_stale_ports() { printf "Cleaning stale ports\n"; ${PORTMASTER} -s ; }
+clean_stale_ports() { printf "Cleaning stale ports\n"; ${PORTMASTER} -s; }
 
 ## Reinstall all ports "in place" (deprecate soon)
 ## Consider -R flag
 ## Todo: migrate this process to synth
-reinstall_all_ports() { ${PORTMASTER} -a -f -d ; }
+reinstall_all_ports() { ${PORTMASTER} -a -f -d; }
 
 ################################################################################
 ## apache shortcuts
@@ -1245,11 +1192,11 @@ global_setup() {
 
     ## Install Dependencies
     printf "Installing initial required dependencies and compatibility libraries (misc/compats)\n"
-    if [ "${OS_MAJ}" -eq 10 ]; then
-      pkgi "${PORT_DEPS_100}" misc/compat4x misc/compat5x misc/compat6x misc/compat7x misc/compat8x misc/compat9x
-    elif [ "${OS_MAJ}" -eq 9 ]; then
-      pkgi "${PORT_DEPS}" misc/compat4x misc/compat5x misc/compat6x misc/compat7x misc/compat8x
-    fi
+    case "${OS_MAJ}" in
+      9) pkgi "${PORT_DEPS}" ;;
+      10) pkgi "${PORT_DEPS_100}" ;;
+      11) pkgi "${PORT_DEPS_110}" ;;
+    esac
 
     ## Check for /etc/rc.conf
     if [ ! -e /etc/rc.conf ]; then
@@ -1672,28 +1619,30 @@ bind_setup() {
 
   printf "Setting up named (BIND)\n"
 
-  if [ "${OS_MAJ}" -eq 10 ]; then
-    ## FreeBSD 10.x: /usr/local/etc/namedb/
-    NAMED_BIN=/usr/local/sbin/named
-    NAMEDB_PATH=/usr/local/etc/namedb
-    RNDC_BIN=/usr/local/sbin/rndc-confgen
-    NAMED_CONF="${NAMEDB_PATH}/named.conf"
-    RNDC_KEY="${NAMEDB_PATH}/rndc.key"
+  case "${OS_MAJ}" in
+    9) ## FreeBSD 9.3: /etc/namedb/
+      NAMED_BIN=/usr/sbin/named
+      NAMEDB_PATH=/etc/namedb
+      RNDC_BIN=/sbin/rndc-confgen
+      NAMED_CONF="${NAMEDB_PATH}/named.conf"
+      RNDC_KEY="${NAMEDB_PATH}/rndc.key"
+      ;;
+    10|11) ## FreeBSD 10/11+: /usr/local/etc/namedb/
+      NAMED_BIN=/usr/local/sbin/named
+      NAMEDB_PATH=/usr/local/etc/namedb
+      RNDC_BIN=/usr/local/sbin/rndc-confgen
+      NAMED_CONF="${NAMEDB_PATH}/named.conf"
+      RNDC_KEY="${NAMEDB_PATH}/rndc.key"
 
-    if [ "${COMPAT_NAMED_SYMLINKS}" = "YES" ]; then
-      ## PB: Needed as of 2016-05-10 or else DA complains:
-      ln -s /usr/local/sbin/named-checkzone /usr/sbin/named-checkzone
-    fi
-  elif [ "${OS_MAJ}" -eq 9 ]; then
-    ## FreeBSD 9.3: /etc/namedb/
-    NAMED_BIN=/usr/sbin/named
-    NAMEDB_PATH=/etc/namedb
-    RNDC_BIN=/sbin/rndc-confgen
-    NAMED_CONF="${NAMEDB_PATH}/named.conf"
-    RNDC_KEY="${NAMEDB_PATH}/rndc.key"
-  else
-    err 1 "*** Error: Script error at bind_setup()"
-  fi
+      if [ "${COMPAT_NAMED_SYMLINKS}" = "YES" ]; then
+        ## PB: Needed as of 2016-05-10 or else DA complains:
+        ln -s /usr/local/sbin/named-checkzone /usr/sbin/named-checkzone
+      fi
+      ;;
+    *) ## Script problem
+      err 1 "*** Error: Script error at bind_setup()"
+      ;;
+  esac
 
   if [ ! -e "${NAMED_BIN}" ]; then
     printf "*** Error: Cannot find the named binary at %s\n" "${NAMED_BIN}"
@@ -4198,122 +4147,45 @@ php_install() {
     fi
   fi
 
-# PHP_EXT_LIST_TEST=math/php${OPT_PHP_VER}-bcmath archivers/php${OPT_PHP_VER}-bz2 misc/php${OPT_PHP_VER}-calendar \
-# textproc/php${OPT_PHP_VER}-ctype ftp/php${OPT_PHP_VER}-curl textproc/php${OPT_PHP_VER}-dom graphics/php${OPT_PHP_VER}-exif \
-# sysutils/php${OPT_PHP_VER}-fileinfo security/php${OPT_PHP_VER}-filter ftp/php${OPT_PHP_VER}-ftp graphics/php${OPT_PHP_VER}-gd \
-# devel/php${OPT_PHP_VER}-gettext security/php${OPT_PHP_VER}-hash converters/php${OPT_PHP_VER}-iconv mail/php${OPT_PHP_VER}-imap \
-# devel/php${OPT_PHP_VER}-json converters/php${OPT_PHP_VER}-mbstring security/php${OPT_PHP_VER}-mcrypt \
-# databases/php${OPT_PHP_VER}-mysql databases/php${OPT_PHP_VER}-mysqli databases/php${OPT_PHP_VER}-odbc \
-# www/php${OPT_PHP_VER}-opcache security/php${OPT_PHP_VER}-openssl databases/php${OPT_PHP_VER}-pdo \
-# databases/php${OPT_PHP_VER}-pdo_mysql databases/php${OPT_PHP_VER}-pdo_sqlite archivers/php${OPT_PHP_VER}-phar \
-# sysutils/php${OPT_PHP_VER}-posix textproc/php${OPT_PHP_VER}-pspell devel/php${OPT_PHP_VER}-readline \
-# converters/php${OPT_PHP_VER}-recode www/php${OPT_PHP_VER}-session textproc/php${OPT_PHP_VER}-simplexml \
-# net-mgmt/php${OPT_PHP_VER}-snmp net/php${OPT_PHP_VER}-soap net/php${OPT_PHP_VER}-sockets \
-# databases/php${OPT_PHP_VER}-sqlite3 www/php${OPT_PHP_VER}-tidy devel/php${OPT_PHP_VER}-tokenizer \
-# textproc/php${OPT_PHP_VER}-wddx textproc/php${OPT_PHP_VER}-xml textproc/php${OPT_PHP_VER}-xmlreader \
-# net/php${OPT_PHP_VER}-xmlrpc textproc/php${OPT_PHP_VER}-xmlwriter textproc/php${OPT_PHP_VER}-xsl \
-# archivers/php${OPT_PHP_VER}-zip archivers/php${OPT_PHP_VER}-zlib
-
-  ## PHP Version Selector
-  case ${OPT_PHP_VER} in
-    "56")
-        PORT_PHP="${PORT_PHP56}"
-        PORT_PHP_EXT="${PORT_PHP56_EXT}"
-        PORT_MOD_PHP="${PORT_MOD_PHP56}"
-        PHP_MAKE_SET="${PHP56_MAKE_SET}"
-        PHP_MAKE_UNSET="${PHP56_MAKE_UNSET}"
-        PHP_EXT_MAKE_SET="${PHP56_EXT_MAKE_SET}"
-        PHP_EXT_MAKE_UNSET="${PHP56_EXT_MAKE_UNSET}"
-        PHP_MOD_MAKE_SET="${MOD_PHP56_MAKE_SET}"
-        PHP_MOD_MAKE_UNSET="${MOD_PHP56_MAKE_UNSET}"
-        PHP_EXT_LIST="${PHP56_EXT_LIST}"
-        # PHP_EXT_LIST=math/php56-bcmath archivers/php56-bz2 misc/php56-calendar \
-        # textproc/php56-ctype ftp/php56-curl textproc/php56-dom graphics/php56-exif \
-        # sysutils/php56-fileinfo security/php56-filter ftp/php56-ftp graphics/php56-gd \
-        # devel/php56-gettext security/php56-hash converters/php56-iconv mail/php56-imap \
-        # devel/php56-json converters/php56-mbstring security/php56-mcrypt \
-        # databases/php56-mysql databases/php56-mysqli databases/php56-odbc \
-        # www/php56-opcache security/php56-openssl databases/php56-pdo \
-        # databases/php56-pdo_mysql databases/php56-pdo_sqlite archivers/php56-phar \
-        # sysutils/php56-posix textproc/php56-pspell devel/php56-readline \
-        # converters/php56-recode www/php56-session textproc/php56-simplexml \
-        # net-mgmt/php56-snmp net/php56-soap net/php56-sockets \
-        # databases/php56-sqlite3 www/php56-tidy devel/php56-tokenizer \
-        # textproc/php56-wddx textproc/php56-xml textproc/php56-xmlreader \
-        # net/php56-xmlrpc textproc/php56-xmlwriter textproc/php56-xsl \
-        # archivers/php56-zip archivers/php56-zlib
-        ;;
-    "70")
-        PORT_PHP="${PORT_PHP70}"
-        PORT_PHP_EXT="${PORT_PHP70_EXT}"
-        PORT_MOD_PHP="${PORT_MOD_PHP70}"
-        PHP_MAKE_SET="${PHP70_MAKE_SET}"
-        PHP_MAKE_UNSET="${PHP70_MAKE_UNSET}"
-        PHP_EXT_MAKE_SET="${PHP70_EXT_MAKE_SET}"
-        PHP_EXT_MAKE_UNSET="${PHP70_EXT_MAKE_UNSET}"
-        PHP_MOD_MAKE_SET="${MOD_PHP70_MAKE_SET}"
-        PHP_MOD_MAKE_UNSET="${MOD_PHP70_MAKE_UNSET}"
-        PHP_EXT_LIST="${PHP70_EXT_LIST}"
-        # PHP_EXT_LIST="math/php70-bcmath archivers/php70-bz2 misc/php70-calendar \
-        #         textproc/php70-ctype ftp/php70-curl textproc/php70-dom graphics/php70-exif \
-        #         sysutils/php70-fileinfo security/php70-filter ftp/php70-ftp graphics/php70-gd \
-        #         devel/php70-gettext security/php70-hash converters/php70-iconv mail/php70-imap \
-        #         devel/php70-json converters/php70-mbstring security/php70-mcrypt \
-        #         databases/php70-mysqli databases/php70-odbc www/php70-opcache \
-        #         security/php70-openssl databases/php70-pdo databases/php70-pdo_mysql \
-        #         databases/php70-pdo_sqlite archivers/php70-phar sysutils/php70-posix \
-        #         textproc/php70-pspell devel/php70-readline converters/php70-recode \
-        #         www/php70-session textproc/php70-simplexml \
-        #         net/php70-soap net/php70-sockets databases/php70-sqlite3 www/php70-tidy \
-        #         devel/php70-tokenizer textproc/php70-wddx textproc/php70-xml \
-        #         textproc/php70-xmlreader net/php70-xmlrpc textproc/php70-xmlwriter \
-        #         textproc/php70-xsl archivers/php70-zip archivers/php70-zlib"
-        ;; # net-mgmt/php70-snmp
-      "71")
-        PORT_PHP="${PORT_PHP71}"
-        PORT_PHP_EXT="${PORT_PHP71_EXT}"
-        PORT_MOD_PHP="${PORT_MOD_PHP71}"
-        PHP_MAKE_SET="${PHP71_MAKE_SET}"
-        PHP_MAKE_UNSET="${PHP71_MAKE_UNSET}"
-        PHP_EXT_MAKE_SET="${PHP71_EXT_MAKE_SET}"
-        PHP_EXT_MAKE_UNSET="${PHP71_EXT_MAKE_UNSET}"
-        PHP_MOD_MAKE_SET="${MOD_PHP71_MAKE_SET}"
-        PHP_MOD_MAKE_UNSET="${MOD_PHP71_MAKE_UNSET}"
-        PHP_EXT_LIST="${PHP71_EXT_LIST}"
-        # PHP_EXT_LIST="math/php70-bcmath archivers/php70-bz2 misc/php70-calendar \
-        #         textproc/php70-ctype ftp/php70-curl textproc/php70-dom graphics/php70-exif \
-        #         sysutils/php70-fileinfo security/php70-filter ftp/php70-ftp graphics/php70-gd \
-        #         devel/php70-gettext security/php70-hash converters/php70-iconv mail/php70-imap \
-        #         devel/php70-json converters/php70-mbstring security/php70-mcrypt \
-        #         databases/php70-mysqli databases/php70-odbc www/php70-opcache \
-        #         security/php70-openssl databases/php70-pdo databases/php70-pdo_mysql \
-        #         databases/php70-pdo_sqlite archivers/php70-phar sysutils/php70-posix \
-        #         textproc/php70-pspell devel/php70-readline converters/php70-recode \
-        #         www/php70-session textproc/php70-simplexml \
-        #         net/php70-soap net/php70-sockets databases/php70-sqlite3 www/php70-tidy \
-        #         devel/php70-tokenizer textproc/php70-wddx textproc/php70-xml \
-        #         textproc/php70-xmlreader net/php70-xmlrpc textproc/php70-xmlwriter \
-        #         textproc/php70-xsl archivers/php70-zip archivers/php70-zlib"
-        ;; # net-mgmt/php70-snmp
-    *) printf "*** Error: php_install(): Wrong PHP version selected. (Script error)\n"; exit ;;
-  esac
-
   printf "*** Notice: Starting PHP installation\n"
 
   if [ -z "${PHP_MAKE_SET}" ] && [ -z "${PHP_MAKE_UNSET}" ]; then
     ## Base PHP Installation (includes FPM, CGI, CLI modes)
     case ${OPT_PHP_MODE} in
-      "php-fpm")
-          pkgi ${PORT_PHP} "${PHP_EXT_LIST}"
-          ;;
-      "mod_php")
-          pkgi ${PORT_MOD_PHP} "${PHP_EXT_LIST}" ;;
-      "suphp")
-          pkgi ${PORT_SUPHP} "${PHP_EXT_LIST}" ;;
+      "php-fpm") pkgi ${PORT_PHP} ${PHP_EXT_LIST} ;;
+      "mod_php") pkgi ${PORT_MOD_PHP} ${PHP_EXT_LIST} ;;
+      "suphp") pkgi ${PORT_SUPHP} ${PHP_EXT_LIST} ;;
       # fastcgi) pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
       # fcgid) pkgi "${PORT_PHP}" "${PHP_EXT_LIST}" ;;
     esac
   else
+    case ${OPT_PHP_VER} in
+    "56")
+      PHP_MAKE_SET="${PHP56_MAKE_SET}"
+      PHP_MAKE_UNSET="${PHP56_MAKE_UNSET}"
+      PHP_EXT_MAKE_SET="${PHP56_EXT_MAKE_SET}"
+      PHP_EXT_MAKE_UNSET="${PHP56_EXT_MAKE_UNSET}"
+      PHP_MOD_MAKE_SET="${PHP56_MOD_MAKE_SET}"
+      PHP_MOD_MAKE_UNSET="${PHP56_MOD_MAKE_UNSET}"
+      ;;
+    "70")
+      PHP_MAKE_SET="${PHP70_MAKE_SET}"
+      PHP_MAKE_UNSET="${PHP70_MAKE_UNSET}"
+      PHP_EXT_MAKE_SET="${PHP70_EXT_MAKE_SET}"
+      PHP_EXT_MAKE_UNSET="${PHP70_EXT_MAKE_UNSET}"
+      PHP_MOD_MAKE_SET="${PHP70_MOD_MAKE_SET}"
+      PHP_MOD_MAKE_UNSET="${PHP70_MOD_MAKE_UNSET}"
+      ;;
+    "71")
+      PHP_MAKE_SET="${PHP71_MAKE_SET}"
+      PHP_MAKE_UNSET="${PHP71_MAKE_UNSET}"
+      PHP_EXT_MAKE_SET="${PHP71_EXT_MAKE_SET}"
+      PHP_EXT_MAKE_UNSET="${PHP71_EXT_MAKE_UNSET}"
+      PHP_MOD_MAKE_SET="${PHP71_MOD_MAKE_SET}"
+      PHP_MOD_MAKE_UNSET="${PHP71_MOD_MAKE_UNSET}"
+      ;;
+    esac
+
     case ${OPT_PHP_MODE} in
       "php-fpm")
           ## Base PHP Installation (includes FPM, CGI, CLI modes)
@@ -4394,23 +4266,23 @@ php_install() {
     ## ${MKDIR} -p "/usr/local/php${OPT_PHP_VER}/sockets"
 
     ## Symlinks
-    ln -s /usr/local/bin/php "/usr/local/php${OPT_PHP_VER}/bin/php"
-    ln -s /usr/local/bin/php-cgi "/usr/local/php${OPT_PHP_VER}/bin/php-cgi"
-    ln -s /usr/local/bin/php-config "/usr/local/php${OPT_PHP_VER}/bin/php-config"
-    ln -s /usr/local/bin/phpize "/usr/local/php${OPT_PHP_VER}/bin/phpize"
-    ln -s /usr/local/sbin/php-fpm "/usr/local/php${OPT_PHP_VER}/sbin/php-fpm"
+    ln -fsv /usr/local/bin/php "/usr/local/php${OPT_PHP_VER}/bin/php"
+    ln -fsv /usr/local/bin/php-cgi "/usr/local/php${OPT_PHP_VER}/bin/php-cgi"
+    ln -fsv /usr/local/bin/php-config "/usr/local/php${OPT_PHP_VER}/bin/php-config"
+    ln -fsv /usr/local/bin/phpize "/usr/local/php${OPT_PHP_VER}/bin/phpize"
+    ln -fsv /usr/local/sbin/php-fpm "/usr/local/php${OPT_PHP_VER}/sbin/php-fpm"
 
-    ln -s /var/log/php-fpm.log "/usr/local/php${OPT_PHP_VER}/var/log/php-fpm.log"
+    ln -fsv /var/log/php-fpm.log "/usr/local/php${OPT_PHP_VER}/var/log/php-fpm.log"
 
-    ln -s /usr/local/etc/php "/usr/local/php${OPT_PHP_VER}/lib/php.conf.d"
-    ln -s /usr/local/etc/php.ini "/usr/local/php${OPT_PHP_VER}/lib/php.ini"
-    ln -s /usr/local/etc/php-fpm.conf "/usr/local/php${OPT_PHP_VER}/etc/php-fpm.conf"
-    ln -s /usr/local/include/php "/usr/local/php${OPT_PHP_VER}/include/php"
-    ln -s /var/run/php/sockets "/usr/local/php${OPT_PHP_VER}/sockets"
+    ln -Ffsv /usr/local/etc/php/ "/usr/local/php${OPT_PHP_VER}/lib/php.conf.d"
+    ln -fsv /usr/local/etc/php.ini "/usr/local/php${OPT_PHP_VER}/lib/php.ini"
+    ln -fsv /usr/local/etc/php-fpm.conf "/usr/local/php${OPT_PHP_VER}/etc/php-fpm.conf"
+    ln -Ffsv /usr/local/include/php/ "/usr/local/php${OPT_PHP_VER}/include/php"
+    ln -Ffsv /var/run/php/sockets/ "/usr/local/php${OPT_PHP_VER}/sockets"
 
     ## Fetch build date value from: /usr/local/etc/php.conf $PHP_EXT_DIR
-    ln -s "/usr/local/lib/php/${PHP_EXT_DIR}" "/usr/local/php${OPT_PHP_VER}/lib/php/extensions"
-    ln -s /usr/local/lib/php/build "/usr/local/php${OPT_PHP_VER}/lib/php/build"
+    ln -Ffsv "/usr/local/lib/php/${PHP_EXT_DIR}/" "/usr/local/php${OPT_PHP_VER}/lib/php/extensions"
+    ln -Ffsv /usr/local/lib/php/build/ "/usr/local/php${OPT_PHP_VER}/lib/php/build"
   fi
 
 
@@ -8500,6 +8372,21 @@ check_options_file() {
 }
 
 ################################################################################
+## OS-specific validations
+################################################################################
+
+validate_os() {
+
+  case "${OS_MAJ}" in
+    9) pkgi "${PORT_DEPS}" ;;
+    10) pkgi "${PORT_DEPS_100}" ;;
+    11) pkgi "${PORT_DEPS_110}" ;;
+  esac
+
+  return
+}
+
+################################################################################
 ## Validate Options
 ## Parse Defaults and User Options, then pass computed values to PB
 ################################################################################
@@ -8700,13 +8587,87 @@ validate_options() {
 
   ## Port/Package Options
   case ${PHP_VERSION} in
-    "5.5"|"5.6"|"7.0")
+    "5.6"|"7.0"|"7.1")
       OPT_PHP_VERSION="${PHP_VERSION}"
       OPT_PHP_VER=$(echo ${PHP_VERSION} | tr -d '.')
       setOpt php1_release "${PHP_VERSION}"
       setOpt php2_release "no"
       setOpt php2_mode "php-fpm"
-      eval $(echo "PHP_VER=${OPT_PHP_VER}")
+
+      eval "$(echo "PHP_VER=${OPT_PHP_VER}")"
+
+      readonly PORT_PHP="lang/php${OPT_PHP_VER}"
+      readonly PORT_PHP_EXT="lang/php${OPT_PHP_VER}-extensions"
+      readonly PORT_MOD_PHP="www/mod_php${OPT_PHP_VER}"
+
+      readonly PORT_ARCHIVERS_PHP_BZ2="archivers/php${OPT_PHP_VER}-bz2"
+      readonly PORT_ARCHIVERS_PHP_PHAR="archivers/php${OPT_PHP_VER}-phar"
+      readonly PORT_ARCHIVERS_PHP_ZIP="archivers/php${OPT_PHP_VER}-zip"
+      readonly PORT_ARCHIVERS_PHP_ZLIB="archivers/php${OPT_PHP_VER}-zlib"
+      readonly PORT_CONVERTERS_PHP_ICONV="converters/php${OPT_PHP_VER}-iconv"
+      readonly PORT_CONVERTERS_PHP_MBSTRING="converters/php${OPT_PHP_VER}-mbstring"
+      readonly PORT_CONVERTERS_PHP_RECODE="converters/php${OPT_PHP_VER}-recode"
+      readonly PORT_DATABASES_PHP_MYSQL="databases/php${OPT_PHP_VER}-mysql"
+      readonly PORT_DATABASES_PHP_MYSQLI="databases/php${OPT_PHP_VER}-mysqli"
+      readonly PORT_DATABASES_PHP_ODBC="databases/php${OPT_PHP_VER}-odbc"
+      readonly PORT_DATABASES_PHP_PDO="databases/php${OPT_PHP_VER}-pdo"
+      readonly PORT_DATABASES_PHP_PDO_MYSQL="databases/php${OPT_PHP_VER}-pdo_mysql"
+      readonly PORT_DATABASES_PHP_PDO_SQLITE="databases/php${OPT_PHP_VER}-pdo_sqlite"
+      readonly PORT_DATABASES_PHP_SQLITE3="databases/php${OPT_PHP_VER}-sqlite3"
+      readonly PORT_DEVEL_PHP_GETTEXT="devel/php${OPT_PHP_VER}-gettext"
+      readonly PORT_DEVEL_PHP_JSON="devel/php${OPT_PHP_VER}-json"
+      readonly PORT_DEVEL_PHP_READLINE="devel/php${OPT_PHP_VER}-readline"
+      readonly PORT_DEVEL_PHP_TOKENIZER="devel/php${OPT_PHP_VER}-tokenizer"
+      readonly PORT_FTP_PHP_CURL="ftp/php${OPT_PHP_VER}-curl"
+      readonly PORT_FTP_PHP_FTP="ftp/php${OPT_PHP_VER}-ftp"
+      readonly PORT_GRAPHICS_PHP_EXIF="graphics/php${OPT_PHP_VER}-exif"
+      readonly PORT_GRAPHICS_PHP_GD="graphics/php${OPT_PHP_VER}-gd"
+      readonly PORT_MAIL_PHP_IMAP="mail/php${OPT_PHP_VER}-imap"
+      readonly PORT_MATH_PHP_BCMATH="math/php${OPT_PHP_VER}-bcmath"
+      readonly PORT_MISC_PHP_CALENDAR="misc/php${OPT_PHP_VER}-calendar"
+      readonly PORT_NET_MGMT_PHP_SNMP="net-mgmt/php${OPT_PHP_VER}-snmp"
+      readonly PORT_NET_PHP_SOAP="net/php${OPT_PHP_VER}-soap"
+      readonly PORT_NET_PHP_SOCKETS="net/php${OPT_PHP_VER}-sockets"
+      readonly PORT_NET_PHP_XMLRPC="net/php${OPT_PHP_VER}-xmlrpc"
+      readonly PORT_SECURITY_PHP_FILTER="security/php${OPT_PHP_VER}-filter"
+      readonly PORT_SECURITY_PHP_HASH="security/php${OPT_PHP_VER}-hash"
+      readonly PORT_SECURITY_PHP_MCRYPT="security/php${OPT_PHP_VER}-mcrypt"
+      readonly PORT_SECURITY_PHP_OPENSSL="security/php${OPT_PHP_VER}-openssl"
+      readonly PORT_SYSUTILS_PHP_FILEINFO="sysutils/php${OPT_PHP_VER}-fileinfo"
+      readonly PORT_SYSUTILS_PHP_POSIX="sysutils/php${OPT_PHP_VER}-posix"
+      readonly PORT_TEXTPROC_PHP_CTYPE="textproc/php${OPT_PHP_VER}-ctype"
+      readonly PORT_TEXTPROC_PHP_DOM="textproc/php${OPT_PHP_VER}-dom"
+      readonly PORT_TEXTPROC_PHP_PSPELL="textproc/php${OPT_PHP_VER}-pspell"
+      readonly PORT_TEXTPROC_PHP_SIMPLEXML="textproc/php${OPT_PHP_VER}-simplexml"
+      readonly PORT_TEXTPROC_PHP_WDDX="textproc/php${OPT_PHP_VER}-wddx"
+      readonly PORT_TEXTPROC_PHP_XML="textproc/php${OPT_PHP_VER}-xml"
+      readonly PORT_TEXTPROC_PHP_XMLREADER="textproc/php${OPT_PHP_VER}-xmlreader"
+      readonly PORT_TEXTPROC_PHP_XMLWRITER="textproc/php${OPT_PHP_VER}-xmlwriter"
+      readonly PORT_TEXTPROC_PHP_XSL="textproc/php${OPT_PHP_VER}-xsl"
+      readonly PORT_WWW_PHP_OPCACHE="www/php${OPT_PHP_VER}-opcache"
+      readonly PORT_WWW_PHP_SESSION="www/php${OPT_PHP_VER}-session"
+      readonly PORT_WWW_PHP_TIDY="www/php${OPT_PHP_VER}-tidy"
+
+      ## PHP Extensions
+      readonly PHP_EXT_LIST="${PORT_ARCHIVERS_PHP_BZ2} ${PORT_ARCHIVERS_PHP_PHAR} \
+      ${PORT_ARCHIVERS_PHP_ZIP} ${PORT_ARCHIVERS_PHP_ZLIB} ${PORT_CONVERTERS_PHP_ICONV} \
+      ${PORT_CONVERTERS_PHP_MBSTRING} ${PORT_CONVERTERS_PHP_RECODE} ${PORT_DATABASES_PHP_MYSQL} \
+      ${PORT_DATABASES_PHP_MYSQLI} ${PORT_DATABASES_PHP_ODBC} ${PORT_DATABASES_PHP_PDO} \
+      ${PORT_DATABASES_PHP_PDO_MYSQL} ${PORT_DATABASES_PHP_PDO_SQLITE} \
+      ${PORT_DATABASES_PHP_SQLITE3} ${PORT_DEVEL_PHP_GETTEXT} ${PORT_DEVEL_PHP_JSON} \
+      ${PORT_DEVEL_PHP_READLINE} ${PORT_DEVEL_PHP_TOKENIZER} ${PORT_FTP_PHP_CURL} \
+      ${PORT_FTP_PHP_FTP} ${PORT_GRAPHICS_PHP_EXIF} ${PORT_GRAPHICS_PHP_GD} ${PORT_MAIL_PHP_IMAP} \
+      ${PORT_MATH_PHP_BCMATH} ${PORT_MISC_PHP_CALENDAR} ${PORT_NET_MGMT_PHP_SNMP} \
+      ${PORT_NET_PHP_SOAP} ${PORT_NET_PHP_SOCKETS} ${PORT_NET_PHP_XMLRPC} \
+      ${PORT_SECURITY_PHP_FILTER} ${PORT_SECURITY_PHP_HASH} ${PORT_SECURITY_PHP_MCRYPT} \
+      ${PORT_SECURITY_PHP_OPENSSL} ${PORT_SYSUTILS_PHP_FILEINFO} ${PORT_SYSUTILS_PHP_POSIX} \
+      ${PORT_TEXTPROC_PHP_CTYPE} ${PORT_TEXTPROC_PHP_DOM} ${PORT_TEXTPROC_PHP_PSPELL} \
+      ${PORT_TEXTPROC_PHP_SIMPLEXML} ${PORT_TEXTPROC_PHP_WDDX} ${PORT_TEXTPROC_PHP_XML} \
+      ${PORT_TEXTPROC_PHP_XMLREADER} ${PORT_TEXTPROC_PHP_XMLWRITER} ${PORT_TEXTPROC_PHP_XSL} \
+      ${PORT_WWW_PHP_OPCACHE} ${PORT_WWW_PHP_SESSION} ${PORT_WWW_PHP_TIDY}"
+
+      readonly PHP_PREFIX="/usr/local/php${OPT_PHP_VER}"
+
       case $(lc ${PHP_MODE}) in
         "fpm"|"phpfpm"|"php-fpm"|"php_fpm")
           readonly OPT_PHP_MODE="php-fpm"
@@ -8721,21 +8682,21 @@ validate_options() {
           readonly OPT_PHP_MODE="suphp"
           readonly OPT_PHP_RELEASE="YES"
           readonly HAVE_SUPHP_CGI="YES"
-          eval $(echo "HAVE_SUPHP${OPT_PHP_VER}_CGI=YES")
+          eval "$(echo "HAVE_SUPHP${OPT_PHP_VER}_CGI=YES")"
           setOpt php1_mode suphp
           ;;
         "modphp"|"mod_php"|"mod"|"mod-php")
           readonly OPT_PHP_MODE="mod_php"
           readonly OPT_PHP_RELEASE="YES"
           readonly HAVE_CLI="YES"
-          eval $(echo "HAVE_CLI${OPT_PHP_VER}=YES")
+          eval "$(echo "HAVE_CLI${OPT_PHP_VER}=YES")"
           setOpt php1_mode mod_php
           ;;
         "fastcgi"|"fcgi")
           readonly OPT_PHP_MODE="fastcgi"
           readonly OPT_PHP_RELEASE="YES"
           readonly HAVE_FCGID="YES"
-          eval $(echo "HAVE_FCGID${OPT_PHP_VER}=YES")
+          eval "$(echo "HAVE_FCGID${OPT_PHP_VER}=YES")"
           setOpt php1_mode fastcgi
           ;;
         *) printf "*** Error: Invalid PHP_MODE value set in options.conf\n"; exit;;
@@ -9170,7 +9131,7 @@ update_da_conf() {
   setVal brute_force_squirrelmail_log "${WWW_DIR}/squirrelmail/data/squirrelmail_access_log" "${DA_CONF}"
 
   if [ "${OS_MAJ}" -eq 10 ] || [ "${OS_MAJ}" -eq 11 ]; then
-    ## FreeBSD 10.x: /usr/local/etc/namedb/
+    ## FreeBSD 10/11: /usr/local/etc/namedb/
     NAMED_BIN=/usr/local/sbin/named
     NAMEDB_PATH=/usr/local/etc/namedb
     RNDC_BIN=/usr/local/sbin/rndc-confgen
@@ -9255,11 +9216,9 @@ update_da_conf() {
 }
 
 ################################################################################
-##
 ## Install Application
 ## $2 = name of service
 ## e.g. install_app exim
-##
 ################################################################################
 
 install_app() {
@@ -9287,7 +9246,7 @@ install_app() {
     "mariadb"|"mysql") sql_install ;;
     "modsecurity"|"modsec"|"mod_security") modsecurity_install ;;
     "nginx") nginx_install ;;
-    "php"|"ftm"|"php55"|"php56"|"php70"|"php71") php_install ;;
+    "php"|"ftm"|"php56"|"php70"|"php71") php_install ;;
     "phpmyadmin"|"pma") phpmyadmin_install ;;
     "proftpd"|"proftp") proftpd_install ;;
     "pureftpd"|"pureftp") pureftpd_install ;;

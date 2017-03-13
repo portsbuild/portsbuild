@@ -6,10 +6,11 @@
 # ./letsencrypt.sh <domain> <key-size>
 
 ## 2016-05-12: PortsBuild version
+## 2017-02-26: Upgraded to version 1.06
 ## Todo:
 
 DA_PATH=/usr/local/directadmin
-TASKQ=${DA_PATH}/data/task.queue
+TASKQ="${DA_PATH}/data/task.queue"
 PERL=/usr/local/bin/perl
 CURL=/usr/local/bin/curl
 OPENSSL=/usr/bin/openssl
@@ -38,9 +39,32 @@ if [ ! -s ${DA_PATH}/directadmin ]; then
   exit 1
 fi
 
-API="https://acme-v01.api.letsencrypt.org"
-LICENSE="https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf"
+# Staging/development
+# API_URI="acme-staging.api.letsencrypt.org"
+API_URI="acme-v01.api.letsencrypt.org"
+API="https://${API_URI}"
+LICENSE="https://letsencrypt.org/documents/LE-SA-v1.1.1-August-1-2016.pdf"
 CHALLENGETYPE="http-01"
+LICENSE_KEY_MIN_DATE=1470383674
+
+CURL=/usr/local/bin/curl
+if [ ! -x ${CURL} ]; then
+    CURL=/usr/bin/curl
+fi
+
+CURL_OPTIONS="--connect-timeout 15 -k"
+
+TIMESTAMP=`date +%s`
+
+LETSENCRYPT_OPTION=$(${DA_PATH}/directadmin c | grep '^letsencrypt=' | cut -d= -f2)
+ACCESS_GROUP_OPTION=$(${DA_PATH}/directadmin c | grep '^secure_access_group=' | cut -d= -f2)
+
+FILE_CHOWN="diradmin:diradmin"
+FILE_CHMOD="640"
+if [ "${ACCESS_GROUP_OPTION}" != "" ]; then
+  FILE_CHOWN="diradmin:${ACCESS_GROUP_OPTION}"
+fi
+
 
 # Encode data using base64 with URL-safe chars
 base64_encode() {

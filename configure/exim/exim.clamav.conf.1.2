@@ -1,8 +1,0 @@
-#1.2
-deny
-  message = This message contains a virus or other harmful content ($malware_name)
-  malware = */defer_ok/tmo=10s
-  log_message = Message from $sender_host_address denied - virus of harmful content ($malware_name)
-
-warn
-  message = X-Antivirus-Scanner: Clean mail though you should still use an Antivirus
