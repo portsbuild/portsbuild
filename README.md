@@ -8,6 +8,8 @@ Automation and integration is achieved by using simple shell scripts, along with
 
 A distribution & copyright license has not been chosen yet at this time (although leaning towards BSD License).
 
+Note: This project is not dead. I'm planning to resume once I finish up work-related projects. :) I'm happy to see that DirectAdmin released a 11.x-compatible beta binary earlier this year!
+
 ### Supported Operating Systems
 * FreeBSD 11.0 x64 (primary focus)
 * FreeBSD 10.3 x64 (working)
@@ -18,22 +20,23 @@ A distribution & copyright license has not been chosen yet at this time (althoug
 Service 		| Versions      | Status
 --------------- | ------------- | -------
 Apache          | 2.4.x         | Supported
-PHP(-FPM)       | 5.5/5.6/7.0   | Supported
-MariaDB         | 5.5/10.0/10.1 | Supported
+PHP(-FPM)       | 5.5/5.6/7/7.1 | Supported
+MariaDB         | 5.5/10/10.1   | Supported
 MySQL           | 5.5/5.6/5.7   | Supported
 Dovecot         | 2.2.x         | Supported
 Exim            | 4.8x          | Supported
-SpamBlocker     | 4.3.x         | Supported
+SpamBlocker     | latest        | Supported
 ClamAV          | 0.9x          | Supported
 SpamAssassin    | 3.4           | Supported
-RoundCube       | 1.1.x         | Supported
-phpMyAdmin      | 4.5.x         | Supported
+RoundCube       | latest        | Supported
+phpMyAdmin      | latest        | Supported
 proftpd         | 1.3.5a        | Supported
 pure-FTPd       | 1.0.42        | Supported
 Majordomo       | 1.94.5        | Supported (via DA source copy)
-nginx           | 1.8.x         | In progress (www/nginx)
+nginx           | 1.12.x        | In progress (www/nginx)
 suphp           |               | In progress (www/suphp)
 fastcgi         |               | In progress (www/mod_fastcgi)
+letsencrypt     | latest        | In progress (from DA/CB)
 IPFW            |               | Untested (firewall scripts)
 AwStats         |               | Untested (www/awstats)
 Webalizer       |               | Untested (www/webalizer)
@@ -52,7 +55,7 @@ PortsBuild will NOT support:
 
 ### Currently known issues and limitations
 * BIND (named) does not restart after adding a domain on 9.3 due to startup script location in /etc/rc.d/ instead of /usr/local/etc/rc.d/ (DirectAdmin limitation)
-* PHP-FPM does not restart after adding a user due to startup script being called "php-fpm" instead of "php-fpmXX" (XX= 55, 56, 70, etc.) (DirectAdmin limitation)
+* PHP-FPM does not restart after adding a user due to startup script being called "php-fpm" instead of "php-fpmXX" (XX= 55, 56, 70, 71, etc.) (DirectAdmin limitation)
 * Only one instance of PHP can be installed through ports/packages (afaik). An alternative approach will be to compile the second PHP instance manually via a tarball (credit for this idea goes to wattie). This will be implemented into PortsBuild once testing is complete.
 
 ### Changes from DA/CB defaults

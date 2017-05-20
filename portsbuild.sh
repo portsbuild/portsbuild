@@ -49,7 +49,7 @@
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
 PB_VER="0.1.2"
-PB_BUILD_DATE=20170226
+PB_BUILD_DATE=20170520
 IFS="$(printf '\n\t')"
 LANG=C
 
@@ -328,7 +328,7 @@ esac
 : "${DA_INSECURE:=0}"               ## DA Insecure Mode
 : "${LAN_IP=""}"                    ## Server's LAN IP
 
-: "${PHP_VERSION:="5.6"}"          ## PHP #1 Version
+: "${PHP_VERSION:="7.1"}"          ## PHP #1 Version
 : "${PHP_MODE:="php-fpm"}"         ## PHP #1 Mode
 
 : "${EXIM_RECIPIENTS_MAX:=150}"       ## Exim Max Recipients
