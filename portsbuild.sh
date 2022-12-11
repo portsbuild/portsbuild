@@ -10,8 +10,8 @@
 #
 #  CustomBuild2 thread: http://forum.directadmin.com/showthread.php?t=44743
 #
-#  DirectAdmin Homepage : http://www.directadmin.com
-#  DirectAdmin Forums   : http://forums.directadmin.com
+#  DirectAdmin Homepage : https://www.directadmin.com
+#  DirectAdmin Forums   : https://forums.directadmin.com
 #
 #  PortsBuild WWW       : https://www.portsbuild.org (coming soon)
 #  PortsBuild GitHub    : https://github.com/portsbuild/portsbuild
@@ -20,7 +20,7 @@
 #
 #  Requirements:
 #  - DirectAdmin license
-#  - FreeBSD 9.3, 10.3 or 11.0+ (amd64 only)
+#  - FreeBSD 12/13.1+ (amd64 only)
 #  - chmod 700 portsbuild.sh
 #  - Patience.
 #
@@ -59,17 +59,16 @@ if [ "$(/usr/bin/id -u)" != "0" ]; then
 fi
 
 readonly OS=$(uname)
-readonly OS_VER=$(uname -r | cut -d- -f1) # 9.3, 10.1, 10.2, 10.3, 11.0
+readonly OS_VER=$(uname -r | cut -d- -f1) # 12.1, 13.0, 13.1
 readonly OS_B64=$(uname -m | grep -c 64)  # 0, 1
-readonly OS_MAJ=$(uname -r | cut -d. -f1) # 9, 10, 11
+readonly OS_MAJ=$(uname -r | cut -d. -f1) # 12, 13, 14
 readonly OS_HOST=$(hostname)
 
 if [ "${OS}" = "FreeBSD" ]; then
   if [ "${OS_B64}" -eq 1 ]; then
-    if [ "${OS_MAJ}" != "11" ] && [ "${OS_MAJ}" != "10" ] &&
-        [ "${OS_VER}" != "9.3" ]; then
+  if [ "${OS_MAJ}" != "13" ] && [ "${OS_MAJ}" != "12" ]; then
       printf "Warning: Unsupported FreeBSD operating system detected.\n"
-      printf "PortsBuild has been tested to work with FreeBSD versions 9.3, 10.x and 11.x amd64 (x64) only.\n"
+      printf "PortsBuild has been tested to work with FreeBSD versions 12.2, 13.1 amd64 (x64) only.\n"
       printf "You can press CTRL+C within 5 seconds to quit the PortsBuild script now,\n"
       printf "or proceed at your own risk.\n"
       sleep 5
@@ -242,7 +241,7 @@ readonly PHP_INI_OPCACHE="${PHP_ETC}/opcache.ini"
 readonly PHP_INI_DIRECTADMIN="${PHP_ETC}/10-directadmin.ini"
 readonly PHP_FPM_CONF="/usr/local/etc/php-fpm.conf"
 readonly PHP_SOCKETS_PATH=/var/run/php/sockets
-readonly PHP_RELEASE_SET="5.6 7.0 7.1"
+readonly PHP_RELEASE_SET="7.4 8.0 8.1 8.2"
 readonly PHP_SHORTRELEASE_SET="$(echo "${PHP_RELEASE_SET}" | tr -d '.')"
 readonly PHP_FPM_BIN=/usr/local/sbin/php-fpm
 readonly SUPHP_CONF_FILE=/usr/local/etc/suphp.conf
@@ -316,9 +315,13 @@ readonly PUREFTPD_UPLOADSCAN_BIN=/usr/local/bin/pureftpd_uploadscan.sh
 
 DA_ADMIN_EMAIL="${DA_ADMIN_USER}@${SERVER_DOMAIN}"
 
+## todo: retrieve commit hash via dig
 case "${OS_MAJ}" in
-  9|10) DA_SERVICES_PKG="services_freebsd91_64.tar.gz" ;;
-  11) DA_SERVICES_PKG="services_freebsd110_64.tar.gz" ;;
+  # 9|10) DA_SERVICES_PKG="services_freebsd91_64.tar.gz" ;;
+  # 11) DA_SERVICES_PKG="services_freebsd110_64.tar.gz" ;;
+  12) ;;
+  13) ;;
+  14) ;;
 esac
 
 : "${MIN_PASS_LENGTH:=12}"          ## Min Random Password Length
@@ -328,7 +331,7 @@ esac
 : "${DA_INSECURE:=0}"               ## DA Insecure Mode
 : "${LAN_IP=""}"                    ## Server's LAN IP
 
-: "${PHP_VERSION:="7.1"}"          ## PHP #1 Version
+: "${PHP_VERSION:="8.2"}"          ## PHP #1 Version
 : "${PHP_MODE:="php-fpm"}"         ## PHP #1 Mode
 
 : "${EXIM_RECIPIENTS_MAX:=150}"       ## Exim Max Recipients
@@ -410,7 +413,7 @@ readonly PORTS_BASE=/usr/ports
 ## Ports: Dependencies
 readonly PORT_PORTMASTER='ports-mgmt/portmaster'
 readonly PORT_SYNTH='ports-mgmt/synth'
-readonly PORT_PERL='lang/perl5.24'
+readonly PORT_PERL='lang/perl5.32'
 readonly PORT_AUTOCONF='devel/autoconf'
 readonly PORT_AUTOMAKE='devel/automake'
 readonly PORT_BISON='devel/bison'
@@ -442,6 +445,11 @@ ${PORT_AUTOCONF} ${PORT_LIBTOOL} ${PORT_LIBARCHIVE} ${PORT_MAILX} ${PORT_CA_ROOT
 ${PORT_COMPATS}"
 readonly PORT_DEPS_100="${PORT_DEPS} ${PORT_BIND} misc/compat9x"
 readonly PORT_DEPS_110="${PORT_DEPS_100} misc/compat10x"
+readonly PORT_DEPS_120="${PORT_DEPS_110} misc/compat11x"
+readonly PORT_DEPS_130="${PORT_DEPS_120} misc/compat12x"
+readonly PORT_DEPS_140="${PORT_DEPS_130} misc/compat13x"
+
+readonly LINUX_COMPAT_C7='emulators/linux_base-c7'
 
 ## Ports: Web Servers
 readonly PORT_APACHE24='www/apache24'
@@ -477,20 +485,25 @@ readonly PORT_PROFTPD='ftp/proftpd'
 readonly PORT_PROFTPD_CLAMAV='security/proftpd-mod_clamav'
 
 ## Ports: Database Servers
+### MariaDB
+readonly PORT_MARIADB103='databases/mariadb103-server'
+readonly PORT_MARIADB104='databases/mariadb104-server'
+readonly PORT_MARIADB105='databases/mariadb105-server'
+readonly PORT_MARIADB106='databases/mariadb106-server'
+readonly PORT_MARIADB103_CLIENT='databases/mariadb103-client'
+readonly PORT_MARIADB104_CLIENT='databases/mariadb104-client'
+readonly PORT_MARIADB105_CLIENT='databases/mariadb105-client'
+readonly PORT_MARIADB106_CLIENT='databases/mariadb106-client'
+
+### MySQL
 readonly PORT_MYSQL55='databases/mysql55-server'
 readonly PORT_MYSQL56='databases/mysql56-server'
 readonly PORT_MYSQL57='databases/mysql57-server'
-readonly PORT_MARIADB55='databases/mariadb55-server'
-readonly PORT_MARIADB100='databases/mariadb100-server'
-readonly PORT_MARIADB101='databases/mariadb101-server'
-
-## Ports: Database Clients
+readonly PORT_MYSQL80='databases/mysql80-server'
 readonly PORT_MYSQL55_CLIENT='databases/mysql55-client'
 readonly PORT_MYSQL56_CLIENT='databases/mysql56-client'
 readonly PORT_MYSQL57_CLIENT='databases/mysql57-client'
-readonly PORT_MARIADB55_CLIENT='databases/mariadb55-client'
-readonly PORT_MARIADB100_CLIENT='databases/mariadb100-client'
-readonly PORT_MARIADB101_CLIENT='databases/mariadb101-client'
+readonly PORT_MYSQL80_CLIENT='databases/mysql80-client'
 
 ## Ports: Web Stats
 readonly PORT_AWSTATS='www/awstats'
@@ -533,20 +546,25 @@ PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOA
 SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
 DEFAULT_PHP_EXT_MAKE_UNSET=""
 
-PHP56_MAKE_SET="${DEFAULT_PHP_MAKE_SET}" # MAILHEAD
-PHP56_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
-PHP56_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
-PHP56_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
+#PHP56_MAKE_SET="${DEFAULT_PHP_MAKE_SET}" # MAILHEAD
+#PHP56_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
+#PHP56_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
+#PHP56_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
 
-PHP70_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
-PHP70_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
-PHP70_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
-PHP70_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
+#PHP70_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
+#PHP70_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
+#PHP70_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
+#PHP70_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
 
-PHP71_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
-PHP71_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
-PHP71_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
-PHP71_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
+#PHP71_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
+#PHP71_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
+#PHP71_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
+#PHP71_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
+
+PHP74_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
+PHP74_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
+PHP74_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
+PHP74_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
 
 PHP56_MOD_MAKE_SET="" # MAILHEAD
 PHP56_MOD_MAKE_UNSET=""
@@ -1190,12 +1208,14 @@ global_setup() {
 
     ports_update
 
+    pkgi "${LINUX_COMPAT_C7}"
+
     ## Install Dependencies
     printf "Installing initial required dependencies and compatibility libraries (misc/compats)\n"
     case "${OS_MAJ}" in
-      9) pkgi "${PORT_DEPS}" ;;
-      10) pkgi "${PORT_DEPS_100}" ;;
-      11) pkgi "${PORT_DEPS_110}" ;;
+      12) pkgi "${PORT_DEPS_110}" ;;
+      13) pkgi "${PORT_DEPS_120}" ;;
+      14) pkgi "${PORT_DEPS_130}" ;;
     esac
 
     ## Check for /etc/rc.conf
@@ -3846,12 +3866,14 @@ sql_install() {
   set_service "mysql-server" OFF
 
   case "${OPT_SQL_DB}" in
-    "mariadb55")  pkgi ${PORT_MARIADB55}  ${PORT_MARIADB55_CLIENT}  ;;
-    "mariadb100") pkgi ${PORT_MARIADB100} ${PORT_MARIADB100_CLIENT} ;;
-    "mariadb101") pkgi ${PORT_MARIADB101} ${PORT_MARIADB101_CLIENT} ;;
+    "mariadb103") pkgi ${PORT_MARIADB103} ${PORT_MARIADB103_CLIENT} ;;
+    "mariadb104") pkgi ${PORT_MARIADB104} ${PORT_MARIADB104_CLIENT} ;;
+    "mariadb105") pkgi ${PORT_MARIADB105} ${PORT_MARIADB105_CLIENT} ;;
+    "mariadb106") pkgi ${PORT_MARIADB106} ${PORT_MARIADB106_CLIENT} ;;
     "mysql55")    pkgi ${PORT_MYSQL55}    ${PORT_MYSQL55_CLIENT}    ;;
     "mysql56")    pkgi ${PORT_MYSQL56}    ${PORT_MYSQL56_CLIENT}    ;;
     "mysql57")    pkgi ${PORT_MYSQL57}    ${PORT_MYSQL57_CLIENT}    ;;
+    "mysql80")    pkgi ${PORT_MYSQL80}    ${PORT_MYSQL80_CLIENT}    ;;
     *) printf "*** Error: Script error at sql_install()\n"; exit    ;;
   esac
 
