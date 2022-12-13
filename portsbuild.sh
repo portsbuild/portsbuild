@@ -48,8 +48,8 @@
 
 ## Fun fact #1: root's shell is actually /bin/tcsh
 
-PB_VER="0.1.2"
-PB_BUILD_DATE=20170520
+PB_VER="0.2.0"
+PB_BUILD_DATE=20221212
 IFS="$(printf '\n\t')"
 LANG=C
 
@@ -324,6 +324,8 @@ case "${OS_MAJ}" in
   14) ;;
 esac
 
+## Environmental variables
+
 : "${MIN_PASS_LENGTH:=12}"          ## Min Random Password Length
 : "${MAX_PASS_LENGTH:=16}"          ## Max Random Password Length
 : "${NEWSYSLOG_DAYS:=10}"           ## Number of days to keep logs before rotating
@@ -339,6 +341,16 @@ esac
 : "${SQL_DATA_PATH:=/var/db/mysql}"   ## SQL DB files path (DA default: /home/mysql)
 : "${MYSQL_HOST:=localhost}"          ## SQL default hostname
 : "${DEFAULT_MY_CNF:="my-huge.cnf"}"  ## Default my.cnf file to use
+
+## 2022-12-12: environmental variables
+#DA_CHANNEL # Download channel: alpha, beta, current, stable
+#DA_COMMIT # Exact DA build to install, will use latest from update channel if empty
+#DA_OS_SLUG # Build targeting specific platform: linux_amd64, debian10_amd64, rhel8_amd64, ...
+#DA_EMAIL # Default email address
+#DA_HOSTNAME # Hostname to use for installation
+#DA_ETH_DEV # Network device
+#DA_NS1 # pre-defined ns1
+#DA_NS2 #  pre-defined ns2
 
 ## Custom SSL Certificates
 CUSTOM_SSL_KEY='/usr/local/etc/ssl/server.key'
@@ -534,9 +546,9 @@ NGINX_MAKE_SET=""
 NGINX_MAKE_UNSET=""
 
 ## Prefixes for multi-PHP installations:
-# readonly PHP56_PREFIX='/usr/local/php56'
-# readonly PHP70_PREFIX='/usr/local/php70'
-# readonly PHP71_PREFIX='/usr/local/php71'
+# readonly PHP74_PREFIX='/usr/local/php74'
+# readonly PHP80_PREFIX='/usr/local/php74'
+# readonly PHP82_PREFIX='/usr/local/php74'
 
 DEFAULT_PHP_MAKE_SET=""
 DEFAULT_PHP_MAKE_UNSET=""
@@ -546,25 +558,20 @@ PDO PDO_MYSQL PDO_SQLITE PHAR POSIX PSPELL READLINE RECODE SESSION SIMPLEXML SOA
 SOCKETS SQLITE3 TOKENIZER WDDX XML XMLREADER XMLRPC XMLWRITER XSL ZIP ZLIB"
 DEFAULT_PHP_EXT_MAKE_UNSET=""
 
-#PHP56_MAKE_SET="${DEFAULT_PHP_MAKE_SET}" # MAILHEAD
-#PHP56_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
-#PHP56_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
-#PHP56_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
-
-#PHP70_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
-#PHP70_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
-#PHP70_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
-#PHP70_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
-
-#PHP71_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
-#PHP71_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
-#PHP71_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
-#PHP71_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
-
 PHP74_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
 PHP74_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
 PHP74_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
 PHP74_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
+
+PHP80_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
+PHP80_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
+PHP80_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
+PHP80_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
+
+PHP82_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
+PHP82_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
+PHP82_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
+PHP82_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
 
 PHP56_MOD_MAKE_SET="" # MAILHEAD
 PHP56_MOD_MAKE_UNSET=""
@@ -1208,7 +1215,8 @@ global_setup() {
 
     ports_update
 
-    pkgi "${LINUX_COMPAT_C7}"
+    ## todo: 2022-12-12: for running the Linux binary
+    # pkgi "${LINUX_COMPAT_C7}"
 
     ## Install Dependencies
     printf "Installing initial required dependencies and compatibility libraries (misc/compats)\n"
@@ -1359,6 +1367,18 @@ global_setup() {
     ## This is where directadmin.conf gets created for the first time (copy of the template)
     printf "Running ./directadmin i\n"
     ${DA_BIN} i
+
+    ## todo: 2022-12-12: new install:
+    #${DA_PATH}/directadmin install   \
+    #"--adminname=${ADMIN_USER}"      \
+    #"--adminpass=${ADMIN_PASS}"      \
+    #"--update-channel=${DA_CHANNEL}" \
+    #"--email=${EMAIL}"               \
+    #"--hostname=${HOST}"             \
+    #"--network-dev=${DA_ETH_DEV}"    \
+    #"--ns1=${NS1}"                   \
+    #"--ns2=${NS2}"                   \
+    #|| exit 1
 
     ## Set DirectAdmin Permissions
     printf "Running ./directadmin p\n"
@@ -1716,7 +1736,7 @@ bind_setup() {
 
 ################################################################################
 ## DirectAdmin Installation
-## Replaces scripts/install.sh
+## Replaces scripts/install.sh & scripts/setup.sh
 ################################################################################
 
 directadmin_install() {
@@ -1795,6 +1815,7 @@ directadmin_install() {
   fi
 
   ## Get DirectAdmin binary
+  ## todo: 2022-12-12: deprecated, to remove
   if [ ! -e "${DA_PATH}/update.tar.gz" ]; then
     if [ "${DA_LAN}" -eq 0 ]; then
       ${WGET} --no-check-certificate -S -O "${DA_PATH}/update.tar.gz" "--bind-address=${DA_SERVER_IP}" \
@@ -1968,12 +1989,13 @@ directadmin_install() {
   ## PB: Verify: Create backup.conf (wasn't created?)
   # ${CHOWN} -f diradmin:diradmin ${DA_PATH}/data/users/admin/backup.conf
 
-  ## 2016-06-24: Necessary? Don't we need PermitRootLogin yes added?
+  ## 2016-06-24: Necessary? Don't we need 'PermitRootLogin yes' added?
+  ## 2022-12-12: Removing root user, it's not necessary
   SSHROOT=$(grep -c 'AllowUsers root' ${SSHD_CONFIG})
   if [ "${SSHROOT}" = 0 ]; then
-    printf "*** Notice: Adding the 'root' user to the sshd configuration's AllowUsers list.\n"
+    # printf "*** Notice: Adding the 'root' user to the sshd configuration's AllowUsers list.\n"
+    # printf "AllowUsers root\n"
     {
-      printf "AllowUsers root\n"
       printf "AllowUsers %s\n" "${DA_ADMIN_USER}"
       printf "AllowUsers %s\n" "$(logname)"
       ## printf "AllowUsers %s\n" "${YOUR_OTHER_ADMIN_ACCOUNT}""
@@ -1989,6 +2011,7 @@ directadmin_install() {
   fi
 
   ## Download DirectAdmin License file
+  ## todo: 2022-12-12: deprecated:
   if [ ! -e "${DA_LICENSE}" ]; then
     ${WGET} "${HTTP}://www.directadmin.com/cgi-bin/licenseupdate?lid=${DA_LICENSE_ID}&uid=${DA_USER_ID}${DA_EXTRA_VALUE}" -O "${DA_LICENSE}" "${BIND_ADDRESS}"
 
@@ -8378,12 +8401,14 @@ checkyesno() {
 
 check_options_file() {
 
-  # cp options.conf.sample options.conf
-
   if [ ! -f ${PB_CONF} ]; then
-    printf "*** Notice: PortsBuild's options.conf file is missing. Downloading a fresh copy now.\n"
-    getFile options.conf "${PB_CONF}"
+    cp "${PB_CONF}.sample" ${PB_CONF}
 
+    if [ ! -f "${PB_CONF}" ]; then
+      printf "*** Notice: PortsBuild's options.conf file is missing. Downloading a fresh copy now.\n"
+      getFile options.conf "${PB_CONF}"
+    fi
+      
     if [ ! -f "${PB_CONF}" ]; then
       printf "*** Error: options.conf is still missing. Can't continue.\n"
       exit 1
@@ -8400,9 +8425,12 @@ check_options_file() {
 validate_os() {
 
   case "${OS_MAJ}" in
-    9) pkgi "${PORT_DEPS}" ;;
-    10) pkgi "${PORT_DEPS_100}" ;;
+    # 9) pkgi "${PORT_DEPS}" ;;
+    # 10) pkgi "${PORT_DEPS_100}" ;;
     11) pkgi "${PORT_DEPS_110}" ;;
+    12) pkgi "${PORT_DEPS_120}" ;;
+    13) pkgi "${PORT_DEPS_130}" ;;
+    14) pkgi "${PORT_DEPS_130}" ;;
   esac
 
   return

@@ -1,0 +1,201 @@
+## PortsBuild Options
+##
+## Feel free to modify this file to your needs.
+
+## --------------------------------------------------
+## General Settings and Optional Software
+## --------------------------------------------------
+
+## Create a symlink to PortsBuild in /usr/local/bin as "pb"
+PB_SYMLINK=NO
+
+## Recommended: Install ports=mgmt/portmaster for port management (yes/no)
+INSTALL_PORTMASTER=YES
+
+## Recommended: Install devel/ccache for faster port rebuilds (yes/no)
+INSTALL_CCACHE=YES
+
+## Recommended: Install (and use) ports-mgmt/synth for quicker & smarter port rebuilds (yes/no)
+## Considered the successor to portmaster & portupgrade, as it solves quite a few issues with the former tools.
+## Think of it as a "light" version of Poudriere without complicating matters.
+## More information can be found at: https://github.com/jrmarino/synth
+## FYI: you can have both portmaster and synth installed together.
+INSTALL_SYNTH=YES
+
+## Use latest FreeBSD package repo
+LATEST_PKG_REPO=YES
+
+## --------------------------------------------------
+## DirectAdmin & Local Server Settings
+## --------------------------------------------------
+
+## You can enter most of these settings now or leave them blank for the one-time CLI installation method
+
+## User (Client) & License ID
+DA_USER_ID=
+DA_LICENSE_ID=
+
+## Server's (external) IP (e.g. 1.2.3.4) and appropriate network mask (e.g. 255.255.255.224)
+DA_SERVER_IP=
+DA_SERVER_IP_MASK=
+
+## Server's Fully Qualified Domain Name (e.g. myserver.example.com)
+SERVER_FQDN=
+
+## Your email address, e.g. admin@example.com
+## If you leave this blank, PB will default to admin@<$server_fqdn>
+DA_ADMIN_EMAIL=
+
+## Important: Enter your primary Ethernet device's name here, where your primary external IP will bind to.
+## e.g. em0, bg0, rl0, vmx0, vmx3f0, etc.
+ETHERNET_DEV=
+
+## Min and Max password lengths when used by random_pass() (default is 12 & 16)
+MIN_PASS_LENGTH=12
+MAX_PASS_LENGTH=16
+
+## Rule #1 of Fight Club:
+DA_LAN=0
+LAN_IP=
+
+## --------------------------------------------------
+## Named (Bind)
+## --------------------------------------------------
+
+## Install BIND, unless you plan on running an external DNS server
+NAMED=YES
+
+## --------------------------------------------------
+## PHP Settings
+## --------------------------------------------------
+
+## PHP running mode and version
+PHP_MODE="php-fpm"     ## PHP-FPM/SUPHP/MODPHP/FASTCGI, or NO to disable
+PHP_VERSION="8.2"      ## 7.4/8.0/8.1/8.2
+
+## Install PHP OpCache (via php*-opcache)
+PHP_OPCACHE=YES
+
+## Install IonCube Loader
+PHP_IONCUBE=YES
+
+## Timezone information (See: http://php.net/manual/en/timezones.php)
+PHP_INI_TIMEZONE="America/Toronto"
+
+## php.ini type: 'production', 'development', 'custom'
+## Place your custom php.ini in custom/<php_mode>/php.ini
+PHP_INI_TYPE=production
+
+## PHP 5.6 only: Adds mail.add_x_header option in php.ini
+PHP_INI_XMAILHEADER=YES
+
+## Install PHP Suhosin
+SUHOSIN=NO
+
+## --------------------------------------------------
+## MySQL/MariaDB Settings
+## --------------------------------------------------
+
+## SQL Database Server: set 'mysql' or 'mariadb' + version number appended
+## or set to "NO" to disable installation (if planning to run an external SQL server).
+SQL_DB=mariadb103   ## mariadb{103|104|105|106} or mysql{56|57|80}
+
+## SQL database files path
+## Note: the default path used & set by DirectAdmin/CB2 is commonly "/home/mysql"
+## while the default used by FreeBSD & ports/pkgs is /var/db/mysql
+SQL_DATA_PATH=/var/db/mysql
+
+## SQL DB my.cnf type: small, medium, large, huge, innodb-heavy-4G
+## If using a custom my.cnf, place your file in custom/mysql/my.cnf
+## and set the value below to "custom"
+DEFAULT_MY_CNF="my-huge.cnf"
+
+## --------------------------------------------------
+## Web Server Settings
+## --------------------------------------------------
+
+## Currently only supporting Apache 2.4 as the web server
+## Support for Nginx and Nginx+Apache are coming later on.
+
+WEBSERVER=apache            ## apache/nginx/nginx_apache
+APACHE_MPM=event            ## Apache MPM: 'event', 'prefork', 'worker' or 'auto'
+HARDEN_SYMLINKS_PATCH=YES   ## Patches Apache 2.4 port
+SECURE_HTACCESS=NO          ## Not implemented
+
+USERDIR_ACCESS=NO          ## UserDir Access (allow /~username)
+
+MODSECURITY=NO              ## Untested
+MODSECURITY_RULESET=COMODO
+
+LETSENCRYPT=NO              ## Untested
+
+USE_HOSTNAME_FOR_ALIAS=NO   ## Use Hostname for Alias (FastCGI only)
+REDIRECT_HOST_HTTPS=NO
+REDIRECT_HOST=""
+
+HTSCANNER=NO                ## Not implemented
+
+## --------------------------------------------------
+## Web Applications Settings
+## --------------------------------------------------
+
+PHPMYADMIN=YES
+ROUNDCUBE=YES
+
+WEBAPPS_INBOX_PREFIX=YES
+SPAM_INBOX_PREFIX=YES
+
+## Not implemented:
+# ROUNDCUBE_CUSTOM_CONFIG=
+
+## --------------------------------------------------
+## FTP Settings
+## --------------------------------------------------
+
+## FTP Daemon: 'pureftpd' or 'proftpd'
+FTPD=pureftpd
+
+## --------------------------------------------------
+## ClamAV-related Settings
+## --------------------------------------------------
+
+CLAMAV=YES
+CLAMAV_WITH_EXIM=YES
+
+PROFTPD_UPLOADSCAN=NO     ## requires FTPD=proftpd (via mod_clamav)
+PUREFTPD_UPLOADSCAN=NO    ## requires FTPD=pureftpd
+SUHOSIN_UPLOADSCAN=NO     ## requires SUHOSIN=YES
+
+## --------------------------------------------------
+## Mail Settings
+## --------------------------------------------------
+
+DOVECOT=YES
+DOVECOT_CONF_UPDATE=YES     ## Not implemented: Auto-update dovecot.conf
+
+EXIM=YES
+EXIM_CONF_UPDATE=YES        ## Not implemented: Auto-update exim.conf
+
+SPAMASSASSIN=YES
+SPAMASSASSIN_UTILITIES=YES  ## Useful scripts for managing SpamAssassin rules.
+BLOCKCRACKING=YES           ## Untested: BlockCracking (BC)
+EASY_SPAM_FIGHTER=YES       ## Untested: Easy Spam Fighter (ESF)
+PIGEONHOLE=NO               ## Not implemented
+
+DISABLE_SENDMAIL=YES        ## Will auto-disable if EXIM=YES
+
+MAJORDOMO=YES               ## DirectAdmin requirement
+MAILMAN=NO                  ## Not implemented
+
+LIMIT_DEFAULT=1000          ## SMTP limit per DA account
+LIMIT_USER=350              ## Limit per authenticated user
+LIMIT_UNKNOWN=0             ## Limit for unknown users
+
+## --------------------------------------------------
+## Web Stats Settings
+## --------------------------------------------------
+
+AWSTATS=NO                  ## Untested
+WEBALIZER=NO                ## Untested
+
+### End of options.conf
