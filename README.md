@@ -6,8 +6,6 @@ PortsBuild is an alternative to [DirectAdmin](https://www.directadmin.com)'s Cus
 Automation and integration is achieved by using simple shell scripts, along with the recommended practices of managing a FreeBSD system according to the [FreeBSD Handbook](https://www.freebsd.org/handbook).
 PortsBuild will use a combination of ports (using [synth](https://github.com/jrmarino/synth) and portmaster) and packages (via `pkg`) while configuration options are maintained in either `/etc/make.conf` or `/var/db/ports/*/options` to install the necessary services on a FreeBSD system.
 
-License will be GPL or MIT.
-
 ### Supported Operating Systems
 * FreeBSD 13.1 x64
 * FreeBSD 12.2 x64
