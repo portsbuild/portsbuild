@@ -2,19 +2,11 @@
 # ******************************************************************************
 # >>> PortsBuild
 #
-#  Alternative to DirectAdmin's CustomBuild for FreeBSD systems using ports and packages
-#
+#  Alternative to DirectAdmin's CustomBuild for FreeBSD systems using ports and packages.
 #  Scripted by mmx aka -sg aka sarog aka Saro.
+#  Based on the work of CustomBuild 2.x, written by JBMC and Martynas Bendorius (smtalk).
 #
-#  Based on the work of CustomBuild 2.x, written by DirectAdmin and Martynas Bendorius (smtalk).
-#
-#  CustomBuild2 thread: http://forum.directadmin.com/showthread.php?t=44743
-#
-#  DirectAdmin Homepage : https://www.directadmin.com
-#  DirectAdmin Forums   : https://forums.directadmin.com
-#
-#  PortsBuild WWW       : https://www.portsbuild.org (coming soon)
-#  PortsBuild GitHub    : https://github.com/portsbuild/portsbuild
+#  https://github.com/portsbuild/portsbuild
 #
 # ******************************************************************************
 #
@@ -22,6 +14,7 @@
 #  - DirectAdmin license
 #  - FreeBSD 12/13.1+ (amd64 only)
 #  - chmod 700 portsbuild.sh
+#  - ./portsbuild.sh
 #  - Patience.
 #
 #  New Installations:
@@ -34,15 +27,7 @@
 #  - Rewrite: ./portsbuild.sh rewrite <configuration>
 #  - Verify : ./portsbuild.sh verify
 #
-#  TODO: Changelog/History: see CHANGELOG for more details
-#
-# ******************************************************************************
-#
-#  ** Need help? Visit the DirectAdmin Forums and look for the PB thread *URL here*
-#
 #  ** Found a bug? Please submit an issue: https://github.com/portsbuild/portsbuild/issues
-#
-#  ** Want to contribute or improve PortsBuild? Please fork and submit a pull request. :)
 #
 ################################################################################
 
@@ -59,16 +44,16 @@ if [ "$(/usr/bin/id -u)" != "0" ]; then
 fi
 
 readonly OS=$(uname)
-readonly OS_VER=$(uname -r | cut -d- -f1) # 12.1, 13.0, 13.1
+readonly OS_VER=$(uname -r | cut -d- -f1) # 12.1, 13.0, 13.1, etc.
 readonly OS_B64=$(uname -m | grep -c 64)  # 0, 1
-readonly OS_MAJ=$(uname -r | cut -d. -f1) # 12, 13, 14
+readonly OS_MAJ=$(uname -r | cut -d. -f1) # 11, 12, 13, 14
 readonly OS_HOST=$(hostname)
 
 if [ "${OS}" = "FreeBSD" ]; then
   if [ "${OS_B64}" -eq 1 ]; then
-  if [ "${OS_MAJ}" != "13" ] && [ "${OS_MAJ}" != "12" ]; then
+    if [ "${OS_MAJ}" -lt 11 ]; then
       printf "Warning: Unsupported FreeBSD operating system detected.\n"
-      printf "PortsBuild has been tested to work with FreeBSD versions 12.2, 13.1 amd64 (x64) only.\n"
+      printf "PortsBuild has been tested to work with FreeBSD versions 11/12/13+ amd64 (x64) only.\n"
       printf "You can press CTRL+C within 5 seconds to quit the PortsBuild script now,\n"
       printf "or proceed at your own risk.\n"
       sleep 5
@@ -80,8 +65,6 @@ if [ "${OS}" = "FreeBSD" ]; then
   fi
 else
   printf "PortsBuild is for FreeBSD systems only.\n"
-  printf "Please use CustomBuild for your Linux needs.\n"
-  printf "Visit: http://forum.directadmin.com/showthread.php?t=44743\n"
   exit 1
 fi
 
@@ -107,7 +90,7 @@ readonly PB_SETUP=/root/portsbuild.txt
 ## PortsBuild Remote File Repository
 readonly PB_GITHUB="https://github.com/portsbuild/portsbuild"
 readonly PB_GITRAW="https://raw.githubusercontent.com/portsbuild/portsbuild/master"
-readonly PB_MIRROR="http://s3.amazonaws.com/portsbuild/files"
+readonly PB_MIRROR="https://s3.amazonaws.com/portsbuild/files"
 
 ################################################################################
 ### File: constants.conf
@@ -124,8 +107,8 @@ readonly WEBAPPS_USER='webapps'
 readonly WEBAPPS_GROUP='webapps'
 readonly EXIM_USER='mail'         ## mailnull
 readonly EXIM_GROUP='mail'        ## mail
-# readonly DA_SRV_USER=diradmin
-# readonly DA_SRV_GROUP=diradmin
+readonly DA_SRV_USER='diradmin'
+readonly DA_SRV_GROUP='diradmin'
 
 ## System Binary/Application paths and variables
 # readonly BIN=/bin
@@ -167,7 +150,8 @@ readonly TAR=/usr/bin/tar
 ## Runtime Discovery
 readonly CPU_CORES="$("${SYSCTL}" -n hw.ncpu)"
 readonly SERVER_DOMAIN=$(echo "${OS_HOST}" | cut -d. -f2,3,4,5,6)
-readonly NEWSYSLOG_FILE=/usr/local/etc/newsyslog.conf.d/directadmin.conf
+readonly NEWSYSLOG_PATH=/usr/local/etc/newsyslog.conf.d
+readonly NEWSYSLOG_FILE="${NEWSYSLOG_PATH}/directadmin.conf"
 readonly SSHD_CONFIG=/etc/ssh/sshd_config
 
 ## DirectAdmin Paths & Files
@@ -275,8 +259,10 @@ readonly PMA_PATH="${WWW_DIR}/phpMyAdmin"
 readonly PMA_CONFIG="${PMA_PATH}/config.inc.php"
 
 ## MySQL/MariaDB
-# readonly MYSQL_RELEASE_SET="5.5 5.6 5.7"
-# readonly MARIADB_RELEASE_SET="5.5 10.0 10.1"
+# readonly MYSQL_RELEASE_SET="5.6 5.7 8.0"
+# readonly MARIADB_RELEASE_SET="10.3 10.4 10.5 10.6"
+
+## 2022-12-12: recent ersions of MariaDB don't like 'my.cnf' here
 readonly MYSQL_CNF=/usr/local/etc/my.cnf
 readonly MYSQL=/usr/local/bin/mysql
 readonly MYSQLADMIN=/usr/local/bin/mysqladmin
@@ -315,21 +301,24 @@ readonly PUREFTPD_UPLOADSCAN_BIN=/usr/local/bin/pureftpd_uploadscan.sh
 
 DA_ADMIN_EMAIL="${DA_ADMIN_USER}@${SERVER_DOMAIN}"
 
-## todo: retrieve commit hash via dig
+## todo: 2022-12-10: retrieve commit hash via dig
+# COMMIT=$(dnstxt "freebsd-version.directadmin.com" | sed 's|.*commit=\([0-9a-f]*\).*|\1|')
+# FILE="directadmin_${COMMIT}_freebsd_amd64.tar.gz"
+# FILE="directadmin_${COMMIT}_linux_amd64.tar.gz"
+# wget "https://download.directadmin.com/${FILE}"
 case "${OS_MAJ}" in
   # 9|10) DA_SERVICES_PKG="services_freebsd91_64.tar.gz" ;;
-  # 11) DA_SERVICES_PKG="services_freebsd110_64.tar.gz" ;;
-  12) ;;
+  11) DA_SERVICES_PKG="services_freebsd110_64.tar.gz" ;;
+  12) DA_SERVICES_PKG="services_freebsd120_64.tar.gz" ;;
   13) ;;
   14) ;;
 esac
 
 ## Environmental variables
-
 : "${MIN_PASS_LENGTH:=12}"          ## Min Random Password Length
 : "${MAX_PASS_LENGTH:=16}"          ## Max Random Password Length
 : "${NEWSYSLOG_DAYS:=10}"           ## Number of days to keep logs before rotating
-: "${DA_LAN:=0}"                    ## DA LAN Mode
+: "${DA_LAN:=0}"                    ## DA LAN Mode (2022-12-12: no longer needed?)
 : "${DA_INSECURE:=0}"               ## DA Insecure Mode
 : "${LAN_IP=""}"                    ## Server's LAN IP
 
@@ -342,15 +331,15 @@ esac
 : "${MYSQL_HOST:=localhost}"          ## SQL default hostname
 : "${DEFAULT_MY_CNF:="my-huge.cnf"}"  ## Default my.cnf file to use
 
-## 2022-12-12: environmental variables
-#DA_CHANNEL # Download channel: alpha, beta, current, stable
-#DA_COMMIT # Exact DA build to install, will use latest from update channel if empty
-#DA_OS_SLUG # Build targeting specific platform: linux_amd64, debian10_amd64, rhel8_amd64, ...
-#DA_EMAIL # Default email address
-#DA_HOSTNAME # Hostname to use for installation
-#DA_ETH_DEV # Network device
-#DA_NS1 # pre-defined ns1
-#DA_NS2 #  pre-defined ns2
+## 2022-12-12: to review:
+#: "${DA_CHANNEL:=}" # Download channel: alpha, beta, current, stable
+#: "${DA_COMMIT:=}" # Exact DA build to install, will use latest from update channel if empty
+#: "${DA_OS_SLUG:=}" # Build targeting specific platform: linux_amd64, debian10_amd64, rhel8_amd64, ...
+#: "${DA_EMAIL:=}" # Default email address
+#: "${DA_HOSTNAME:=}" # Hostname to use for installation
+#: "${DA_ETH_DEV:=}" # Network device
+#: "${DA_NS1:=}" # pre-defined ns1
+#: "${DA_NS2:=}" #  pre-defined ns2
 
 ## Custom SSL Certificates
 CUSTOM_SSL_KEY='/usr/local/etc/ssl/server.key'
@@ -425,7 +414,7 @@ readonly PORTS_BASE=/usr/ports
 ## Ports: Dependencies
 readonly PORT_PORTMASTER='ports-mgmt/portmaster'
 readonly PORT_SYNTH='ports-mgmt/synth'
-readonly PORT_PERL='lang/perl5.32'
+readonly PORT_PERL='lang/perl5.34'
 readonly PORT_AUTOCONF='devel/autoconf'
 readonly PORT_AUTOMAKE='devel/automake'
 readonly PORT_BISON='devel/bison'
@@ -446,10 +435,11 @@ readonly PORT_FLEX='textproc/flex'
 readonly PORT_GD='graphics/gd'
 readonly PORT_SASL2='security/cyrus-sasl2'
 readonly PORT_MAILX='mail/mailx'
-readonly PORT_BIND='dns/bind99'
+readonly PORT_BIND='dns/bind918'
 readonly PORT_GCC6='lang/gcc6-aux'
 readonly PORT_NCURSES='devel/ncurses'
 
+## Compats
 readonly PORT_COMPATS="misc/compat4x misc/compat5x misc/compat6x misc/compat7x misc/compat8x"
 readonly PORT_DEPS="${PORT_GMAKE} ${PORT_PERL} ${PORT_WGET} ${PORT_BISON} \
 ${PORT_FLEX} ${PORT_GD} ${PORT_SASL2} ${PORT_CMAKE} ${PORT_PYTHON} \
@@ -461,7 +451,7 @@ readonly PORT_DEPS_120="${PORT_DEPS_110} misc/compat11x"
 readonly PORT_DEPS_130="${PORT_DEPS_120} misc/compat12x"
 readonly PORT_DEPS_140="${PORT_DEPS_130} misc/compat13x"
 
-readonly LINUX_COMPAT_C7='emulators/linux_base-c7'
+readonly PORT_LINUX_BASE_C7='emulators/linux_base-c7'
 
 ## Ports: Web Servers
 readonly PORT_APACHE24='www/apache24'
@@ -490,6 +480,7 @@ readonly PORT_ROUNDCUBE='mail/roundcube'
 readonly PORT_LIBSPF2='mail/libspf2'
 readonly PORT_LIBDKIM='mail/libdkim'
 readonly PORT_MAILMAN='mail/mailman'
+readonly PORT_RSPAMD='mail/rspamd'
 
 ## Ports: FTPd
 readonly PORT_PUREFTPD='ftp/pure-ftpd'
@@ -508,11 +499,9 @@ readonly PORT_MARIADB105_CLIENT='databases/mariadb105-client'
 readonly PORT_MARIADB106_CLIENT='databases/mariadb106-client'
 
 ### MySQL
-readonly PORT_MYSQL55='databases/mysql55-server'
 readonly PORT_MYSQL56='databases/mysql56-server'
 readonly PORT_MYSQL57='databases/mysql57-server'
 readonly PORT_MYSQL80='databases/mysql80-server'
-readonly PORT_MYSQL55_CLIENT='databases/mysql55-client'
 readonly PORT_MYSQL56_CLIENT='databases/mysql56-client'
 readonly PORT_MYSQL57_CLIENT='databases/mysql57-client'
 readonly PORT_MYSQL80_CLIENT='databases/mysql80-client'
@@ -547,8 +536,9 @@ NGINX_MAKE_UNSET=""
 
 ## Prefixes for multi-PHP installations:
 # readonly PHP74_PREFIX='/usr/local/php74'
-# readonly PHP80_PREFIX='/usr/local/php74'
-# readonly PHP82_PREFIX='/usr/local/php74'
+# readonly PHP80_PREFIX='/usr/local/php80'
+# readonly PHP81_PREFIX='/usr/local/php81'
+# readonly PHP82_PREFIX='/usr/local/php82'
 
 DEFAULT_PHP_MAKE_SET=""
 DEFAULT_PHP_MAKE_UNSET=""
@@ -563,22 +553,31 @@ PHP74_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
 PHP74_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
 PHP74_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
 
+## todo: 2022-12-12: verify options:
 PHP80_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
 PHP80_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
 PHP80_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
 PHP80_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
+
+PHP81_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
+PHP81_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
+PHP81_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
+PHP81_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
 
 PHP82_MAKE_SET="${DEFAULT_PHP_MAKE_SET}"
 PHP82_MAKE_UNSET="${DEFAULT_PHP_MAKE_UNSET}"
 PHP82_EXT_MAKE_SET="${DEFAULT_PHP_EXT_MAKE_SET}"
 PHP82_EXT_MAKE_UNSET="${DEFAULT_PHP_EXT_MAKE_UNSET}"
 
-PHP56_MOD_MAKE_SET="" # MAILHEAD
-PHP56_MOD_MAKE_UNSET=""
-PHP70_MOD_MAKE_SET=""
-PHP70_MOD_MAKE_UNSET=""
-PHP71_MOD_MAKE_SET=""
-PHP71_MOD_MAKE_UNSET=""
+## todo: 2022-12-12: verify options:
+PHP74_MOD_MAKE_SET=""
+PHP74_MOD_MAKE_UNSET=""
+PHP80_MOD_MAKE_SET=""
+PHP80_MOD_MAKE_UNSET=""
+PHP81_MOD_MAKE_SET=""
+PHP81_MOD_MAKE_UNSET=""
+PHP82_MOD_MAKE_SET=""
+PHP82_MOD_MAKE_UNSET=""
 
 ROUNDCUBE_MAKE_SET="" # SSL
 ROUNDCUBE_MAKE_UNSET=""
@@ -595,6 +594,10 @@ SPAMASSASSIN_MAKE_UNSET=""
 SPAMASSASSIN_UTILITIES_MAKE_SET="SACOMPILE"
 SPAMASSASSIN_UTILITIES_MAKE_UNSET=""
 
+## todo: 2022-12-12: verify options:
+RSPAMD_MAKE_SET=""
+RSPAMD_MAKE_UNSET=""
+
 DOVECOT2_MAKE_SET="" #
 DOVECOT2_MAKE_UNSET=""
 
@@ -610,19 +613,20 @@ PROFTPD_MAKE_UNSET=""
 PUREFTPD_MAKE_SET="UPLOADSCRIPT LARGEFILE" # PERUSERLIMITS THROTTLING
 PUREFTPD_MAKE_UNSET=""
 
-# MARIADB55_MAKE_SET=""
-# MARIADB55_MAKE_UNSET=""
-# MARIADB100_MAKE_SET=""
-# MARIADB100_MAKE_UNSET=""
-# MARIADB101_MAKE_SET="TOKUDB"
-# MARIADB101_MAKE_UNSET=""
-# MYSQL55_MAKE_SET=""
-# MYSQL55_MAKE_UNSET=""
+# MARIADB103_MAKE_SET=""
+# MARIADB103_MAKE_UNSET=""
+# MARIADB104_MAKE_SET=""
+# MARIADB104_MAKE_UNSET=""
+# MARIADB105_MAKE_SET=""
+# MARIADB105_MAKE_UNSET=""
+# MARIADB106_MAKE_SET=""
+# MARIADB106_MAKE_UNSET=""
 # MYSQL56_MAKE_SET=""
 # MYSQL56_MAKE_UNSET=""
 # MYSQL57_MAKE_SET=""
 # MYSQL57_MAKE_UNSET=""
-
+# MYSQL80_MAKE_SET=""
+# MYSQL80_MAKE_UNSET=""
 
 ################################################################################
 ### Custom Configurations
@@ -1012,19 +1016,16 @@ apxs_disable() { ${APXS} -e -A -n "$1" "$2"; }
 
 make_install_clean() {
 
-  # local CATEGORY=$1
-  # local PORT=$2
-
   ## Origin: category/portname
   local CHOSEN_PORT="$1"
+  # local OPTIONS_SET=$2
+  # local OPTIONS_UNSET=$3
 
-  # if [ options_set blank] && [ options_unset blank ]; then
-  # # install via pkg
-  # pkg install -y ${CHOSEN_PORT}
+  # if [ -z ${OPTIONS_SET} ] && [ -z ${OPTIONS_SET} ]; then
+  #   pkg install -y ${CHOSEN_PORT}
   # elif
-  # # install via ports:
+  # # Install via ports:
 
-  ## /usr/bin/make
   ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${CHOSEN_PORT}" rmconfig
   ${MAKE} -DNO_DIALOG -C "${PORTS_BASE}/${CHOSEN_PORT}" \
   OPTIONS_SET="${_MAKE_SET}" \
@@ -1068,6 +1069,7 @@ getTimezone() {
       | ${PERL} -p0 -e 's#/usr/share/zoneinfo/##')"
   fi
 
+  ## todo: 2022-12-12: set to UTC:
   DATETIMEZONE=${DATETIMEZONE:="America/Toronto"}
 
   printf "%s\n" "${DATETIMEZONE}"
@@ -1216,11 +1218,12 @@ global_setup() {
     ports_update
 
     ## todo: 2022-12-12: for running the Linux binary
-    # pkgi "${LINUX_COMPAT_C7}"
+    # pkgi "${PORT_LINUX_BASE_C7}"
 
     ## Install Dependencies
     printf "Installing initial required dependencies and compatibility libraries (misc/compats)\n"
     case "${OS_MAJ}" in
+      11) pkgi "${PORT_DEPS_100}" ;;
       12) pkgi "${PORT_DEPS_110}" ;;
       13) pkgi "${PORT_DEPS_120}" ;;
       14) pkgi "${PORT_DEPS_130}" ;;
@@ -2097,13 +2100,22 @@ basic_system_security() {
   printf "Setting security.bsd.see_other_gids to 0\n"
   ${SYSRC} -f /etc/sysctl.conf security.bsd.see_other_gids=0
 
-# setVal enforce_difficult_passwords 1 ${DA_CONF_TEMPLATE}
-# setVal enforce_difficult_passwords 1 ${DA_CONF}
+  printf "Setting security.bsd.unprivileged_read_msgbuf to 0\n"
+  ${SYSRC} -f /etc/sysctl.conf security.bsd.unprivileged_read_msgbuf=0
 
-  printf "\n *** Heads up! *** \n"
-  printf "Please note that 'AllowUsers root' was added to %s as a precautionary step (in case you get locked out).\n" "${SSHD_CONFIG}"
-  printf "This means the root user can remotely login to this machine via SSH.\n"
-  printf "You may want to modify this value/file later on when setting up this machine for production use.\n\n"
+  printf "Setting security.bsd.unprivileged_proc_debug to 0\n"
+  ${SYSRC} -f /etc/sysctl.conf security.bsd.unprivileged_proc_debug=0
+
+  printf "Setting kern.randompid to 1\n"
+  ${SYSRC} -f /etc/sysctl.conf kern.randompid=1
+
+  # setVal enforce_difficult_passwords 1 ${DA_CONF_TEMPLATE}
+  # setVal enforce_difficult_passwords 1 ${DA_CONF}
+
+  #  printf "\n *** Heads up! *** \n"
+  #  printf "Please note that 'AllowUsers root' was added to %s as a precautionary step (in case you get locked out).\n" "${SSHD_CONFIG}"
+  #  printf "This means the root user can remotely login to this machine via SSH.\n"
+  #  printf "You may want to modify this value/file later on when setting up this machine for production use.\n\n"
 
   return
 }
@@ -2173,8 +2185,8 @@ deny_cron() {
 
 newsyslog_setup() {
 
-  if [ ! -d /usr/local/etc/newsyslog.conf.d ]; then
-    ${MKDIR} -p /usr/local/etc/newsyslog.conf.d
+  if [ ! -d "${NEWSYSLOG_PATH}" ]; then
+    ${MKDIR} -p "${NEWSYSLOG_PATH}"
   fi
 
   if [ ! -e "${NEWSYSLOG_FILE}" ]; then
@@ -2280,7 +2292,7 @@ freebsd_set_newsyslog() {
   local NSL_ACCOUNT="$2"
 
   if [ ! -e "${NEWSYSLOG_FILE}" ]; then
-    ${MKDIR} -p /usr/local/etc/newsyslog.conf.d/
+    ${MKDIR} -p "${NEWSYSLOG_PATH}"
     ${TOUCH} "${NEWSYSLOG_FILE}"
   fi
 
@@ -8408,7 +8420,7 @@ check_options_file() {
       printf "*** Notice: PortsBuild's options.conf file is missing. Downloading a fresh copy now.\n"
       getFile options.conf "${PB_CONF}"
     fi
-      
+
     if [ ! -f "${PB_CONF}" ]; then
       printf "*** Error: options.conf is still missing. Can't continue.\n"
       exit 1
